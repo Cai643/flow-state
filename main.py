@@ -16,7 +16,7 @@ except ImportError:
 from ui.component.float_ball import TaijiBall
 from ui.interaction_logic.pop_up import CardPopup, ImageOverlay
 import ui.component.focus_card as cardgen
-from ui.component.reminder import ReminderOverlay
+from ui.interaction_logic.reminder_logic import EntertainmentReminder
 
 # 导入 AI 模块
 from ai.tool.tool import InputMonitor, ScreenAnalyzer
@@ -111,18 +111,10 @@ def main():
     # 创建弹窗
     popup = CardPopup(card_path, ball_size=BALL_SIZE)
 
-    # 创建提醒遮罩
-    reminder = ReminderOverlay()
+    reminder_logic = EntertainmentReminder()
 
-    # 启动监控线程
     monitor_thread = MonitorThread()
-    
-    def on_status_update(result):
-        # 检查是否满足提醒条件：娱乐状态持续20秒
-        if result['status'] == 'entertainment' and result.get('duration', 0) > 20:
-            reminder.show_message("检测到您长时间处于娱乐状态，请注意休息！")
-            
-    monitor_thread.status_updated.connect(on_status_update)
+    monitor_thread.status_updated.connect(reminder_logic.on_status_update)
     monitor_thread.start()
     
     # 退出时停止线程
