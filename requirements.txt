@@ -1,6 +1,11 @@
 PySide6
 opencv-python
-numpy
+numpy>=2.3
 Pillow
 pynput
 matplotlib
+flask==3.0.0
+flask-cors==4.0.0
+pyjwt==2.8.0
+numpy>=2.3
+requests>=2.31

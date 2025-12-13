@@ -2,28 +2,93 @@ import time
 import threading
 import sys
 import os
+from typing import Callable, Dict, Optional, Tuple
 
-# 将项目根目录添加到 pythonpath 以便导入兄弟模块
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+print("[INIT] Starting imports...", file=sys.stderr)
+sys.stderr.flush()
 
-import cv2
-import numpy as np
-from PIL import ImageGrab
-# 注意：使用 pynput 需要确保环境已安装该库 (pip install pynput)
-from pynput import keyboard, mouse
+# Optional: cv2 (known to hang on some Windows 3.14 builds)
+CV2_AVAILABLE = False
+try:
+    import cv2  # type: ignore
+    print("[INIT] cv2 imported", file=sys.stderr)
+    sys.stderr.flush()
+    CV2_AVAILABLE = True
+except Exception as e:
+    print(f"[INIT] cv2 not available (expected on Windows 3.14): {e}", file=sys.stderr)
+    sys.stderr.flush()
+    cv2 = None
+
+try:
+    import numpy as np  # type: ignore
+    print("[INIT] numpy imported", file=sys.stderr)
+    sys.stderr.flush()
+except Exception as e:
+    print(f"[INIT] numpy import failed: {e}", file=sys.stderr)
+    sys.stderr.flush()
+    np = None
+
+try:
+    from PIL import ImageGrab  # type: ignore
+    print("[INIT] PIL imported", file=sys.stderr)
+    sys.stderr.flush()
+except Exception as e:
+    print(f"[INIT] PIL import failed: {e}", file=sys.stderr)
+    sys.stderr.flush()
+    ImageGrab = None
+
+# Try pynput with timeout
+PYNPUT_AVAILABLE = False
+try:
+    from pynput import keyboard, mouse  # type: ignore
+    print("[INIT] pynput imported", file=sys.stderr)
+    sys.stderr.flush()
+    PYNPUT_AVAILABLE = True
+except Exception as e:
+    print(f"[INIT] pynput not available: {e}, using mock", file=sys.stderr)
+    sys.stderr.flush()
+    PYNPUT_AVAILABLE = False
+    # Mock classes
+    class keyboard:
+        class Listener:
+            def __init__(self, on_press=None):
+                self.on_press = on_press
+            def start(self):
+                print("[keyboard.Listener] (mocked, no-op)", file=sys.stderr)
+            def stop(self):
+                pass
+    class mouse:
+        class Listener:
+            def __init__(self, on_move=None, on_click=None):
+                self.on_move = on_move
+                self.on_click = on_click
+            def start(self):
+                print("[mouse.Listener] (mocked, no-op)", file=sys.stderr)
+            def stop(self):
+                pass
 
 # 导入 API 模块
+print("[INIT] Importing API module...", file=sys.stderr)
 try:
     from ai.model import API
+    print("[INIT] API imported successfully", file=sys.stderr)
 except ImportError:
     # 尝试相对导入（如果在 IDE 中直接运行 tool.py）
     try:
         import sys
         sys.path.append('..')
         from model import API
+        print("[INIT] API imported (relative) successfully", file=sys.stderr)
     except Exception as e:
-        print(f"Warning: Could not import API module: {e}")
+        print(f"[INIT] Warning: Could not import API module: {e}", file=sys.stderr)
         API = None
+
+print("[INIT] All imports completed", file=sys.stderr)
+
+def _get_analysis_safe(payload: dict) -> dict:
+    if API and hasattr(API, 'get_analysis'):
+        return API.get_analysis(payload)
+    return {'status': 'unknown', 'duration': 0, 'message': 'API.get_analysis not available'}
 
 class InputMonitor:
     """
@@ -101,12 +166,16 @@ class InputMonitor:
             return
             
         self.running = True
-        self.keyboard_listener = keyboard.Listener(on_press=self.on_press)
-        self.mouse_listener = mouse.Listener(on_move=self.on_move, on_click=self.on_click)
-        
-        self.keyboard_listener.start()
-        self.mouse_listener.start()
-        print("[InputMonitor] 输入监控已启动...")
+        try:
+            self.keyboard_listener = keyboard.Listener(on_press=self.on_press)
+            self.mouse_listener = mouse.Listener(on_move=self.on_move, on_click=self.on_click)
+            
+            self.keyboard_listener.start()
+            self.mouse_listener.start()
+            print("[InputMonitor] 输入监控已启动...")
+        except Exception as e:
+            print(f"[InputMonitor] Warning: 启动失败: {e}")
+            self.running = False
 
     def stop(self):
         """停止监听器"""
@@ -152,9 +221,10 @@ class ScreenAnalyzer:
     def capture_screen(self):
         """
         捕获当前屏幕画面
-        :return: OpenCV 格式的图像帧 (BGR)
+        :return: OpenCV 格式的图像帧 (BGR) 或 None
         """
-        # 使用 PIL ImageGrab 获取全屏截图
+        if not CV2_AVAILABLE or not ImageGrab:
+            return None
         try:
             screen = ImageGrab.grab()
             # 将 PIL 图像转换为 numpy 数组
@@ -163,7 +233,7 @@ class ScreenAnalyzer:
             frame = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
             return frame
         except Exception as e:
-            print(f"Screen capture failed: {e}")
+            print(f"[ScreenAnalyzer] Screen capture failed: {e}", file=sys.stderr)
             return None
 
     def analyze_frame(self, frame):
@@ -174,33 +244,42 @@ class ScreenAnalyzer:
         1. 计算平均亮度。
         2. 使用 Canny 算法检测边缘，评估画面复杂度。
         
-        :param frame: OpenCV 图像帧
+        :param frame: OpenCV 图像帧 或 None
         :return: 包含分析结果的字典
         """
-        if frame is None:
+        if frame is None or not CV2_AVAILABLE:
+            return {
+                "resolution": (0, 0),
+                "average_brightness": 128,
+                "edge_density": 0.01,
+                "is_complex_scene": False
+            }
+
+        try:
+            # 1. 转换为灰度图，减少计算量
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+            # 2. 边缘检测 (Canny)，阈值可根据实际场景微调
+            # 较低的阈值会捕获更多细节，较高的阈值只捕获强边缘
+            edges = cv2.Canny(gray, 100, 200)
+
+            # 3. 简单的亮度分析 (0-255)
+            avg_brightness = np.mean(gray)
+            
+            # 4. 画面变化率/复杂度分析（边缘像素占比）
+            edge_density = np.count_nonzero(edges) / edges.size
+            
+            analysis_result = {
+                "resolution": frame.shape[:2],
+                "average_brightness": avg_brightness,
+                "edge_density": edge_density,
+                "is_complex_scene": edge_density > 0.05 # 简单判定：边缘多则场景复杂
+            }
+            
+            return analysis_result
+        except Exception as e:
+            print(f"[ScreenAnalyzer] Frame analysis failed: {e}", file=sys.stderr)
             return None
-
-        # 1. 转换为灰度图，减少计算量
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-        # 2. 边缘检测 (Canny)，阈值可根据实际场景微调
-        # 较低的阈值会捕获更多细节，较高的阈值只捕获强边缘
-        edges = cv2.Canny(gray, 100, 200)
-
-        # 3. 简单的亮度分析 (0-255)
-        avg_brightness = np.mean(gray)
-        
-        # 4. 画面变化率/复杂度分析（边缘像素占比）
-        edge_density = np.count_nonzero(edges) / edges.size
-        
-        analysis_result = {
-            "resolution": frame.shape[:2],
-            "average_brightness": avg_brightness,
-            "edge_density": edge_density,
-            "is_complex_scene": edge_density > 0.05 # 简单判定：边缘多则场景复杂
-        }
-        
-        return analysis_result
 
     def detect_content_type(self, current_frame, prev_frame):
         """
@@ -211,126 +290,161 @@ class ScreenAnalyzer:
         :param prev_frame: 上一帧
         :return: 判定结果字符串, 变化率数值
         """
-        if current_frame is None or prev_frame is None:
+        if current_frame is None or prev_frame is None or not CV2_AVAILABLE:
             return "未知", 0.0
 
-        # 1. 转灰度，降低计算量
-        curr_gray = cv2.cvtColor(current_frame, cv2.COLOR_BGR2GRAY)
-        prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
+        try:
+            # 1. 转灰度，降低计算量
+            curr_gray = cv2.cvtColor(current_frame, cv2.COLOR_BGR2GRAY)
+            prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
 
-        # 2. 计算两帧差异 (绝对差值)
-        # 视频/游戏：差异像素多，差异值大
-        # 文档/代码：差异像素极少（仅光标移动）
-        diff = cv2.absdiff(curr_gray, prev_gray)
+            # 2. 计算两帧差异 (绝对差值)
+            # 视频/游戏：差异像素多，差异值大
+            # 文档/代码：差异像素极少（仅光标移动）
+            diff = cv2.absdiff(curr_gray, prev_gray)
 
-        # 3. 二值化差异图，过滤微小噪声（阈值30）
-        _, thresh = cv2.threshold(diff, 30, 255, cv2.THRESH_BINARY)
+            # 3. 二值化差异图，过滤微小噪声（阈值30）
+            _, thresh = cv2.threshold(diff, 30, 255, cv2.THRESH_BINARY)
 
-        # 4. 计算非零像素比例 (变化区域占比)
-        # countNonZero 返回白色像素数量
-        total_pixels = curr_gray.size
-        changed_pixels = cv2.countNonZero(thresh)
-        change_ratio = changed_pixels / total_pixels
+            # 4. 计算非零像素比例 (变化区域占比)
+            # countNonZero 返回白色像素数量
+            total_pixels = curr_gray.size
+            changed_pixels = cv2.countNonZero(thresh)
+            change_ratio = changed_pixels / total_pixels
 
-        # 5. 判定阈值 (根据经验设定)
-        # 变化率 > 5% 通常意味着正在播放视频或玩游戏
-        # 变化率 < 1% 通常意味着正在阅读或打字
-        if change_ratio > 0.05:
-            return "高动态(娱乐/视频)", change_ratio
-        elif change_ratio > 0.01:
-            return "中动态(浏览/操作)", change_ratio
-        else:
-            return "静止(阅读/思考)", change_ratio
+            # 5. 判定阈值 (根据经验设定)
+            # 变化率 > 5% 通常意味着正在播放视频或玩游戏
+            # 变化率 < 1% 通常意味着正在阅读或打字
+            if change_ratio > 0.05:
+                return "高动态(娱乐/视频)", change_ratio
+            elif change_ratio > 0.01:
+                return "中动态(浏览/操作)", change_ratio
+            else:
+                return "静止(阅读/思考)", change_ratio
+        except Exception as e:
+            print(f"[ScreenAnalyzer] Content detection failed: {e}", file=sys.stderr)
+            return "未知", 0.0
 
-    def show_preview(self, frame, edges=None):
-        """
-        (调试用) 显示当前捕获的画面和边缘检测结果
-        按 'q' 键退出预览窗口
-        """
-        if frame is not None:
-            # 缩小尺寸以便查看
-            scale = 0.5
-            h, w = frame.shape[:2]
-            small_frame = cv2.resize(frame, (int(w*scale), int(h*scale)))
-            cv2.imshow('Screen Monitor Preview', small_frame)
-            
-            if edges is not None:
-                small_edges = cv2.resize(edges, (int(w*scale), int(h*scale)))
-                cv2.imshow('Edge Detection', small_edges)
-                
-            return cv2.waitKey(1) & 0xFF == ord('q')
-        return False
+
+# ========== 便于外部调用的封装函数 ==========
+
+def gather_sample(
+    monitor: InputMonitor,
+    analyzer: ScreenAnalyzer,
+    prev_frame,
+) -> Tuple[Dict, object]:
+    """采集一次输入与屏幕分析数据，返回 (payload, current_frame).
+
+    payload 结构示例:
+    {
+        "key_presses": int,
+        "mouse_clicks": int,
+        "mouse_distance_pixels": int,
+        "screen_change_rate": float,
+        "content_type": str,
+        "is_complex_scene": bool,
+        "recent_activity": list[str],
+        "average_brightness": float | None,
+        "edge_density": float | None,
+    }
+    """
+    frame = analyzer.capture_screen()
+    analysis_stats = analyzer.analyze_frame(frame)
+    content_type, change_val = analyzer.detect_content_type(frame, prev_frame)
+    input_stats = monitor.get_and_reset_stats()
+
+    payload = {
+        "key_presses": input_stats.get("key_presses", 0),
+        "mouse_clicks": input_stats.get("mouse_clicks", 0),
+        "mouse_distance_pixels": input_stats.get("mouse_distance_pixels", 0),
+        "screen_change_rate": change_val,
+        "content_type": content_type,
+        "is_complex_scene": bool(analysis_stats.get("is_complex_scene", False)) if analysis_stats else False,
+        "recent_activity": input_stats.get("recent_activity", []),
+        "average_brightness": analysis_stats.get("average_brightness") if analysis_stats else None,
+        "edge_density": analysis_stats.get("edge_density") if analysis_stats else None,
+    }
+
+    return payload, frame
+
+
+def stream_monitoring(
+    interval: float,
+    on_sample: Callable[[Dict], None],
+    stop_event: Optional[threading.Event] = None,
+):
+    """持续采样输入与屏幕数据，并将 payload 交给回调 on_sample。
+
+    - interval: 采样间隔秒数
+    - on_sample(payload): 回调处理采样结果（可将数据递交到其他模块/服务）
+    - stop_event: 外部传入的 threading.Event，用于优雅停止
+    """
+    monitor = InputMonitor()
+    analyzer = ScreenAnalyzer()
+    monitor.start()
+    prev_frame = None
+
+    try:
+        while True:
+            if stop_event and stop_event.is_set():
+                break
+            payload, prev_frame = gather_sample(monitor, analyzer, prev_frame)
+            on_sample(payload)
+            time.sleep(interval)
+    finally:
+        monitor.stop()
+        if stop_event:
+            stop_event.set()
+
+
+def start_monitoring_thread(
+    interval: float,
+    on_sample: Callable[[Dict], None],
+) -> threading.Event:
+    """启动一个后台线程执行 stream_monitoring，返回可用于停止的事件。"""
+    stop_event = threading.Event()
+    t = threading.Thread(
+        target=stream_monitoring,
+        args=(interval, on_sample, stop_event),
+        daemon=True,
+    )
+    t.start()
+    return stop_event
+
+
+def example_on_sample_with_api(payload: Dict):
+    """示例回调：调用 API.get_analysis 并打印结果。"""
+    try:
+        result = _get_analysis_safe({
+            'key_presses': payload.get('key_presses', 0),
+            'mouse_clicks': payload.get('mouse_clicks', 0),
+            'screen_change_rate': payload.get('screen_change_rate', 0.0),
+            'is_complex_scene': payload.get('is_complex_scene', False),
+        })
+        print(f"[analysis] status={result['status']} duration={result['duration']}s msg={result['message']}")
+    except Exception as e:
+        print(f"analysis error: {e}")
 
 
 if __name__ == "__main__":
-    # --- 模块功能测试代码 ---
-    print("=== 初始化监控工具 ===")
-    
-    # 1. 启动输入监控
-    monitor = InputMonitor()
-    monitor.start()
-    
-    # 2. 初始化屏幕分析
-    analyzer = ScreenAnalyzer()
-    
+    # 简化测试：直接测试采样和 API 调用，不依赖线程
+    print("[*] 初始化工具...")
     try:
-        print("正在运行监控测试 (按 Ctrl+C 停止)...")
-        start_time = time.time()
-        
-        # 模拟运行循环
-        last_frame = None # 存储上一帧用于对比
-        while True:
-            # 获取屏幕帧
-            frame = analyzer.capture_screen()
-            
-            # 分析屏幕内容
-            analysis_stats = analyzer.analyze_frame(frame)
-            
-            # [新增] 动态内容检测
-            content_type, change_val = analyzer.detect_content_type(frame, last_frame)
-            last_frame = frame # 更新上一帧
-
-            # 获取并重置输入统计（每秒一次）
-            input_stats = monitor.get_and_reset_stats()
-            
-            # --- [核心修改] 调用 API 进行分析 ---
-            if API:
-                # 构造 API 需要的数据格式
-                monitor_data = {
-                    'key_presses': input_stats['key_presses'],
-                    'mouse_clicks': input_stats['mouse_clicks'],
-                    'screen_change_rate': change_val,
-                    'is_complex_scene': analysis_stats.get('is_complex_scene', False) if analysis_stats else False
-                }
-                
-                # 获取分析结果
-                result = API.get_analysis(monitor_data)
-                
-                # 打印 AI 分析结果
-                print(f"\n[AI 分析] 状态: {result['status'].upper()} | 建议: {result['message']}")
-            else:
-                print("\n[AI 分析] API 模块未加载，无法分析")
-
-            # 打印实时摘要
-            print("--- 实时数据 ---")
-            print(f"当前活动判定: [{content_type}] (画面变化率: {change_val*100:.2f}%)")
-            print(f"键盘敲击: {input_stats['key_presses']} 次/周期")
-            print(f"鼠标点击: {input_stats['mouse_clicks']} 次/周期")
-            print(f"鼠标移动: {input_stats['mouse_distance_pixels']} 像素/周期")
-            if analysis_stats:
-                print(f"屏幕亮度: {analysis_stats['average_brightness']:.2f}")
-                print(f"场景复杂度: {'高' if analysis_stats['is_complex_scene'] else '低'} ({analysis_stats['edge_density']:.4f})")
-            
-            # 预览最近输入（演示内容捕获）
-            if input_stats['recent_activity']:
-                print(f"最近动作: {input_stats['recent_activity']}")
-                
-            time.sleep(2) # 每2秒输出一次
-            
-    except KeyboardInterrupt:
-        print("\n测试被用户中断。")
-    finally:
-        # 清理资源
+        monitor = InputMonitor()
+        analyzer = ScreenAnalyzer()
+        print("[*] 工具初始化完成。")
+        print("[*] 启动输入监听...")
+        monitor.start()
+        print("[*] 输入监听启动完成。")
+        print("[*] 采样一次...")
+        payload, frame = gather_sample(monitor, analyzer, None)
+        print(f"[*] 采样成功: {payload}")
+        result = _get_analysis_safe(payload)
+        print(f"[*] 分析结果: {result}")
         monitor.stop()
-        cv2.destroyAllWindows()
-        print("=== 监控工具已退出 ===")
+    except KeyboardInterrupt:
+        print("\n[*] 被用户中断。")
+    except Exception as e:
+        print(f"[!] 错误: {e}")
+        import traceback
+        traceback.print_exc()

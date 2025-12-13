@@ -1,7 +1,7 @@
 try:
-    from PySide6 import QtCore
+    from PySide6 import QtCore  # type: ignore
 except ImportError:
-    from PyQt5 import QtCore
+    from PyQt5 import QtCore  # type: ignore
 
 from ui.component.reminder import ReminderOverlay
 
@@ -16,5 +16,5 @@ class EntertainmentReminder(QtCore.QObject):
         status = result.get("status")
         duration = result.get("duration", 0)
         if status == "entertainment" and duration > self.threshold_duration:
-            self.overlay.show_message("检测到您长时间处于娱乐状态，请注意休息！")
+            self.overlay.show_message("检测到您长时间处于娱乐状态，请在休息娱乐足够后，尽快回到学习！")
 

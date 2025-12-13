@@ -1,7 +1,7 @@
 try:
-    from PySide6 import QtCore, QtGui, QtWidgets
+    from PySide6 import QtCore, QtGui, QtWidgets  # type: ignore
 except ImportError:
-    from PyQt5 import QtCore, QtGui, QtWidgets
+    from PyQt5 import QtCore, QtGui, QtWidgets  # type: ignore
 
 class ReminderOverlay(QtWidgets.QWidget):
     def __init__(self, parent=None):
