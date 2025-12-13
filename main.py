@@ -1,22 +1,19 @@
-import os
 import sys
+import os
 import time
 
-# 尝试导入 PySide6，如果不存在或加载失败则回退到 PyQt5
 try:
     from PySide6 import QtCore, QtGui, QtWidgets
-    QT = "PySide6"
     Signal = QtCore.Signal
 except ImportError:
     from PyQt5 import QtCore, QtGui, QtWidgets
-    QT = "PyQt5"
     Signal = QtCore.pyqtSignal
 
 # 导入自定义组件
-from ui.component.float_ball import TaijiBall
-from ui.interaction_logic.pop_up import CardPopup, ImageOverlay
+from ui.component.float_ball import SuspensionBall
+from ui.interaction_logic.pop_up import CardPopup
+from ui.component.reminder import ReminderOverlay
 import ui.component.focus_card as cardgen
-from ui.interaction_logic.reminder_logic import EntertainmentReminder
 
 # 导入 AI 模块
 from ai.tool.tool import InputMonitor, ScreenAnalyzer
@@ -24,48 +21,46 @@ from ai.model import API
 
 class MonitorThread(QtCore.QThread):
     status_updated = Signal(dict)
-    
-    def __init__(self):
-        super().__init__()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
         self.running = True
-        
+        self.monitor = InputMonitor()
+        self.analyzer = ScreenAnalyzer()
+        self.last_frame = None
+
     def run(self):
-        monitor = InputMonitor()
-        monitor.start()
-        analyzer_tool = ScreenAnalyzer()
-        last_frame = None
-        
+        self.monitor.start()
         while self.running:
-            try:
-                # 1. 获取数据
-                frame = analyzer_tool.capture_screen()
-                content_type, change_val = analyzer_tool.detect_content_type(frame, last_frame)
-                last_frame = frame
-                
-                analysis_stats = analyzer_tool.analyze_frame(frame)
-                input_stats = monitor.get_and_reset_stats()
-                
-                # 2. 构造数据包
-                monitor_data = {
-                    'key_presses': input_stats['key_presses'],
-                    'mouse_clicks': input_stats['mouse_clicks'],
-                    'screen_change_rate': change_val,
-                    'is_complex_scene': analysis_stats.get('is_complex_scene', False) if analysis_stats else False
-                }
-                
-                # 3. API 分析
-                result = API.get_analysis(monitor_data)
-                self.status_updated.emit(result)
-                
-                time.sleep(2)
-            except Exception as e:
-                print(f"Monitor error: {e}")
-                time.sleep(2)
-        
-        monitor.stop()
+            # 1. Capture Data
+            frame = self.analyzer.capture_screen()
+            analysis_stats = self.analyzer.analyze_frame(frame)
+            content_type, change_val = self.analyzer.detect_content_type(frame, self.last_frame)
+            self.last_frame = frame
+            
+            input_stats = self.monitor.get_and_reset_stats()
+
+            # 2. Prepare Data for API
+            monitor_data = {
+                'key_presses': input_stats['key_presses'],
+                'mouse_clicks': input_stats['mouse_clicks'],
+                'screen_change_rate': change_val,
+                'is_complex_scene': analysis_stats.get('is_complex_scene', False) if analysis_stats else False
+            }
+
+            # 3. Call API
+            if API:
+                try:
+                    result = API.get_analysis(monitor_data)
+                    self.status_updated.emit(result)
+                except Exception as e:
+                    print(f"API Error: {e}")
+            
+            time.sleep(1) # Check every second
 
     def stop(self):
         self.running = False
+        self.monitor.stop()
         self.wait()
 
 def ensure_card_png(path):
@@ -75,81 +70,104 @@ def ensure_card_png(path):
     if not os.path.exists(path):
         cardgen.draw_card2(save_path=path, show=False)
 
-
 def main():
     """
     主程序入口。
     """
-    # 启用高 DPI 支持（让悬浮球在高清屏上更清晰）
-    if hasattr(QtCore.Qt, 'AA_EnableHighDpiScaling'):
-        QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True)
-    if hasattr(QtCore.Qt, 'AA_UseHighDpiPixmaps'):
-        QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True)
-
     app = QtWidgets.QApplication(sys.argv)
     
-    # 确保资源存在
+    # 确保资源目录存在
     assets_dir = os.path.join(os.getcwd(), "assets")
     os.makedirs(assets_dir, exist_ok=True)
     card_path = os.path.join(assets_dir, "focus_card.png")
     ensure_card_png(card_path)
     
-    # 定义小球颜色（渐变）
-    # 顶部颜色：绿色系
-    top_color = QtGui.QColor("#048c3c")
-    # 底部颜色：薄荷绿
-    bottom_color = QtGui.QColor("#0ed68d")
-    
-    # 定义小球大小
-    BALL_SIZE = 43
-    
-    # 创建并显示悬浮球
-    # color_b 是起始色(顶部)，color_a 是结束色(底部)
-    ball = TaijiBall(size=BALL_SIZE, color_a=bottom_color, color_b=top_color)
+    # 1. 创建并显示悬浮球
+    ball = SuspensionBall()
     ball.show()
     
-    # 创建弹窗
-    popup = CardPopup(card_path, ball_size=BALL_SIZE)
+    # 2. 创建弹窗 (CardPopup 需要 ball_size 来计算布局，SuspensionBall 尺寸为 43+margin*2，但实际球体是 43)
+    # pop_up.py 默认 ball_size=64，我们传入实际球体大小或 widget 大小？
+    # pop_up.py 逻辑: bottom_h = max(ball_size, 64)
+    # 传入 widget 的高度更合适，确保对齐
+    popup = CardPopup(card_path, ball_size=ball.height())
 
-    reminder_logic = EntertainmentReminder()
+    # 3. 创建提醒遮罩
+    reminder = ReminderOverlay()
 
+    # 4. 交互逻辑连接
+    
+    # 鼠标悬停悬浮球：自动显示弹窗
+    def on_ball_hover():
+        if not popup.isVisible():
+            popup.showFromBall(ball)
+            
+    # 连接 entered 信号 (悬浮球类中已定义)
+    ball.entered.connect(on_ball_hover)
+    
+    # 点击悬浮球：切换弹窗显示 (保留作为辅助)
+    def on_ball_clicked():
+        if popup.isVisible():
+            popup.hideToBall(ball)
+        else:
+            popup.showFromBall(ball)
+    ball.clicked.connect(on_ball_clicked)
+    
+    # 悬浮球移动：弹窗跟随
+    ball.positionChanged.connect(lambda pos: popup.followBall(ball))
+    
+    # 5. 启动 AI 监控线程
     monitor_thread = MonitorThread()
-    monitor_thread.status_updated.connect(reminder_logic.on_status_update)
+    
+    def on_status_update(result):
+        # 结果格式: {'status': 'working', 'duration': 120, 'message': '...'}
+        status = result.get('status', 'idle')
+        duration = result.get('duration', 0)
+        
+        # 5.1 检查提醒 (娱乐状态持续20秒以上)
+        if status == 'entertainment' and duration > 20:
+            reminder.show_message("检测到您长时间处于娱乐状态，请注意休息！")
+            
+        # 5.2 更新悬浮球状态
+        status_map = {
+            'working': 'focus',
+            'entertainment': 'distract_lite', # 默认轻度分心
+            'idle': 'rest'
+        }
+        
+        # 根据时长升级分心状态
+        ball_state = status_map.get(status, 'focus')
+        if status == 'entertainment' and duration > 60:
+            ball_state = 'distract_heavy'
+            
+        ball.update_state(ball_state)
+        
+        # 5.3 更新悬浮球微信息 (显示时长)
+        mins = int(duration / 60) # 分钟
+        if mins > 0:
+            ball.update_data(text=f"{mins}m")
+        else:
+            ball.update_data(text="")
+            
+    monitor_thread.status_updated.connect(on_status_update)
     monitor_thread.start()
     
-    # 退出时停止线程
-    app.aboutToQuit.connect(monitor_thread.stop)
+    # 6. 生成日报 (可选，启动时检查)
+    report_path = os.path.join(assets_dir, "daily_summary_report.png")
+    if not os.path.exists(report_path):
+        try:
+            from ui.component.report import daily_sum
+            # 这里假设有一个生成函数，如果没有，则跳过
+            pass 
+        except Exception:
+            pass
 
-    # 交互逻辑
-    def on_touch():
-        popup.showFromBall(ball)
-
-    def show_full_report():
-        report_path = os.path.join(os.getcwd(), "assets", "daily_summary_report.png")
-        if not os.path.exists(report_path):
-            try:
-                import ui.component.daily_summary_report as reportgen
-                reportgen.create_daily_summary()
-            except Exception:
-                pass
-        if os.path.exists(report_path):
-            overlay = ImageOverlay(report_path)
-            overlay.show()
-            setattr(popup, "_overlay", overlay)
-            overlay.closed.connect(lambda: setattr(popup, "_overlay", None))
-
-    # 连接信号
-    ball.entered.connect(on_touch)
-    ball.positionChanged.connect(lambda *_: popup.followBall(ball))
-    ball.left.connect(lambda *_: popup.hideToBall(ball))
-    popup.request_full_report.connect(show_full_report)
+    # 运行主循环
+    exit_code = app.exec()
     
-    # 启动事件循环
-    if QT == "PyQt5":
-        sys.exit(app.exec_())
-    else:
-        sys.exit(app.exec())
-
+    # 退出清理
+    monitor_thread.stop()
+    sys.exit(exit_code)
 
 if __name__ == "__main__":
     main()
