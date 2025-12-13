@@ -13,8 +13,9 @@ except ImportError:
     Signal = QtCore.pyqtSignal
 
 # 导入自定义组件
-from ui.component.float_ball import SuspensionBall
+from ui.component.float_ball import TaijiBall
 from ui.interaction_logic.pop_up import CardPopup, ImageOverlay
+import ui.component.focus_card as cardgen
 from ui.component.reminder import ReminderOverlay
 
 # 导入 AI 模块
@@ -67,6 +68,14 @@ class MonitorThread(QtCore.QThread):
         self.running = False
         self.wait()
 
+def ensure_card_png(path):
+    """
+    确保 focus_card.png 存在，如果不存在则生成。
+    """
+    if not os.path.exists(path):
+        cardgen.draw_card2(save_path=path, show=False)
+
+
 def main():
     """
     主程序入口。
@@ -79,17 +88,28 @@ def main():
 
     app = QtWidgets.QApplication(sys.argv)
     
-    # 确保资源目录存在（日报等图片输出会使用）
+    # 确保资源存在
     assets_dir = os.path.join(os.getcwd(), "assets")
     os.makedirs(assets_dir, exist_ok=True)
+    card_path = os.path.join(assets_dir, "focus_card.png")
+    ensure_card_png(card_path)
+    
+    # 定义小球颜色（渐变）
+    # 顶部颜色：绿色系
+    top_color = QtGui.QColor("#048c3c")
+    # 底部颜色：薄荷绿
+    bottom_color = QtGui.QColor("#0ed68d")
+    
+    # 定义小球大小
+    BALL_SIZE = 43
     
     # 创建并显示悬浮球
-    ball = SuspensionBall()
+    # color_b 是起始色(顶部)，color_a 是结束色(底部)
+    ball = TaijiBall(size=BALL_SIZE, color_a=bottom_color, color_b=top_color)
     ball.show()
     
-    # 创建弹窗：内置实时专注卡片
-    # 悬浮球组件尺寸为 59x59 (43 + 8*2)
-    popup = CardPopup(ball_size=59)
+    # 创建弹窗
+    popup = CardPopup(card_path, ball_size=BALL_SIZE)
 
     # 创建提醒遮罩
     reminder = ReminderOverlay()
@@ -98,33 +118,11 @@ def main():
     monitor_thread = MonitorThread()
     
     def on_status_update(result):
-        # 1. 检查提醒
+        # 检查是否满足提醒条件：娱乐状态持续20秒
         if result['status'] == 'entertainment' and result.get('duration', 0) > 20:
             reminder.show_message("检测到您长时间处于娱乐状态，请注意休息！")
             
-        # 2. 更新悬浮球状态
-        status_map = {
-            'working': 'focus',
-            'entertainment': 'distract_lite', # 默认轻度分心
-            'idle': 'rest'
-        }
-        
-        # 根据时长升级分心状态
-        ball_state = status_map.get(result['status'], 'focus')
-        if result['status'] == 'entertainment' and result.get('duration', 0) > 60:
-            ball_state = 'distract_heavy'
-            
-        ball.update_state(ball_state)
-        
-        # 3. 更新悬浮球微信息 (显示时长)
-        duration = int(result.get('duration', 0) / 60) # 分钟
-        if duration > 0:
-            ball.update_data(text=f"{duration}m")
-        else:
-            ball.update_data(text="")
-            
     monitor_thread.status_updated.connect(on_status_update)
-    monitor_thread.status_updated.connect(popup.update_focus_status)
     monitor_thread.start()
     
     # 退出时停止线程
@@ -138,7 +136,7 @@ def main():
         report_path = os.path.join(os.getcwd(), "assets", "daily_summary_report.png")
         if not os.path.exists(report_path):
             try:
-                import assets.daily_summary_report as reportgen
+                import ui.component.daily_summary_report as reportgen
                 reportgen.create_daily_summary()
             except Exception:
                 pass
