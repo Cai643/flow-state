@@ -4,21 +4,28 @@
 提供高精度的动画效果，包括按钮动画、元素入场退场、数值滚动等。
 """
 
-from PySide6 import QtCore, QtGui, QtWidgets
+try:
+    from PySide6 import QtCore, QtGui, QtWidgets
+    Signal = QtCore.Signal
+    Property = QtCore.Property
+except ImportError:
+    from PyQt5 import QtCore, QtGui, QtWidgets
+    Signal = QtCore.pyqtSignal
+    Property = QtCore.pyqtProperty
 from enum import Enum
 from typing import Optional, Callable
 
 
 # 简化的AnimatedValue类（避免导入问题）
 class AnimatedValue(QtCore.QObject):
-    valueChanged = QtCore.Signal(float)
+    valueChanged = Signal(float)
 
     def __init__(self, start_val=0.0):
         super().__init__()
         self._value = start_val
         self._anim = QtCore.QPropertyAnimation(self, b"value")
 
-    @QtCore.Property(float)
+    @Property(float)
     def value(self):
         return self._value
 

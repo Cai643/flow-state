@@ -6,7 +6,12 @@
 
 import math
 import random
-from PySide6 import QtCore, QtGui, QtWidgets
+try:
+    from PySide6 import QtCore, QtGui, QtWidgets
+    Signal = QtCore.Signal
+except ImportError:
+    from PyQt5 import QtCore, QtGui, QtWidgets
+    Signal = QtCore.pyqtSignal
 from typing import List, Tuple
 from dataclasses import dataclass
 
@@ -32,8 +37,8 @@ class StartupParticleSystem(QtWidgets.QWidget):
     """启动粒子效果系统"""
 
     # 信号
-    effectStarted = QtCore.Signal()
-    effectCompleted = QtCore.Signal()
+    effectStarted = Signal()
+    effectCompleted = Signal()
 
     # 粒子配置
     PARTICLE_COUNT = 50

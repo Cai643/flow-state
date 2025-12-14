@@ -4,7 +4,12 @@
 负责管理应用程序的暗色系主题，包括颜色调色板、字体管理和样式表生成。
 """
 
-from PySide6 import QtCore, QtGui, QtWidgets
+try:
+    from PySide6 import QtCore, QtGui, QtWidgets
+    Signal = QtCore.Signal
+except ImportError:
+    from PyQt5 import QtCore, QtGui, QtWidgets
+    Signal = QtCore.pyqtSignal
 from typing import Dict, Optional
 import colorsys
 
@@ -13,7 +18,7 @@ class DarkThemeManager(QtCore.QObject):
     """暗色主题管理器"""
 
     # 信号
-    themeChanged = QtCore.Signal()
+    themeChanged = Signal()
 
     # 完整的暗色系颜色调色板
     COLORS = {
@@ -31,16 +36,16 @@ class DarkThemeManager(QtCore.QObject):
         'text_disabled': '#666666',           # 禁用文字颜色 - 深灰色
 
         # 强调色系
-        'accent_green': '#00FF88',            # 主强调绿色 - 荧光绿
-        'accent_green_dark': '#00CC66',       # 深绿色
-        'accent_green_light': '#33FFAA',      # 浅绿色
-        'accent_blue': '#4ECDC4',             # 辅助蓝色
-        'accent_yellow': '#FFD700',           # 警告黄色
-        'accent_red': '#FF6B6B',              # 错误红色
+        'accent_green': '#a8d8ea',            # 主强调色 - 莫兰迪蓝
+        'accent_green_dark': '#8ec5db',       # 深莫兰迪蓝
+        'accent_green_light': '#bfe6f2',      # 浅莫兰迪蓝
+        'accent_blue': '#a8d8ea',             # 辅助色 - 莫兰迪蓝
+        'accent_yellow': '#FFD700',           # 警告黄色 (保持不变)
+        'accent_red': '#FF6B6B',              # 错误红色 (保持不变)
 
         # 边框和分隔线
         'border_color': '#4a4a4a',            # 默认边框颜色
-        'border_focus': '#00FF88',            # 焦点边框颜色
+        'border_focus': '#a8d8ea',            # 焦点边框颜色
         'border_error': '#FF6B6B',            # 错误边框颜色
         'separator_color': '#333333',         # 分隔线颜色
 
@@ -50,10 +55,10 @@ class DarkThemeManager(QtCore.QObject):
         'glass_color': 'rgba(58, 58, 58, 0.8)',  # 毛玻璃颜色
 
         # 状态色系
-        'success_color': '#00FF88',           # 成功状态色
+        'success_color': '#a8d8ea',           # 成功状态色 - 莫兰迪蓝
         'warning_color': '#FFD700',           # 警告状态色
         'error_color': '#FF6B6B',             # 错误状态色
-        'info_color': '#4ECDC4',              # 信息状态色
+        'info_color': '#a8d8ea',              # 信息状态色 - 莫兰迪蓝
     }
 
     # 字体配置

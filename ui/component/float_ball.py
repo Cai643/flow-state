@@ -67,6 +67,33 @@ class SuspensionBall(QtWidgets.QWidget):
         # 初始状态
         self.update_state('focus')
 
+        # 使用定时器延迟初始化位置，以应对高DPI缩放或窗口初始化未完成的问题
+        QtCore.QTimer.singleShot(100, self._init_position)
+
+    def _init_position(self):
+        """初始化位置到屏幕右下角"""
+        screen = QtGui.QGuiApplication.primaryScreen()
+        if screen:
+            # 使用 geometry() 而不是 availableGeometry() 来获取包括任务栏在内的完整屏幕尺寸
+            # 然后手动计算避开任务栏的大致位置，或者直接贴边
+            # 这里我们尝试更激进的计算方式
+            screen_geo = screen.availableGeometry()
+            
+            # 获取实际的 DPI 缩放因子
+            # ratio = screen.devicePixelRatio() 
+            # 注意：move() 使用的是逻辑坐标，理论上不需要手动乘除 ratio，
+            # 但如果 Application 没有开启 AA_EnableHighDpiScaling，可能会有问题。
+            # 这里先假设坐标系是正确的逻辑坐标。
+            
+            # 距离右边 50px
+            x = screen_geo.right() - self.width() - 50
+            
+            # 距离底部 100px (加大一点以防被任务栏遮挡)
+            y = screen_geo.bottom() - self.height() - 100
+            
+            self.move(int(x), int(y))
+            print(f"FloatBall init pos: {x}, {y}, Screen: {screen_geo}") # 调试信息
+
     def _setup_ui(self):
         # 微文字标签 (默认隐藏，悬停显示)
         self.micro_label = QtWidgets.QLabel(self)

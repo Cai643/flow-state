@@ -66,9 +66,30 @@ class MonitorThread(QtCore.QThread):
 def ensure_card_png(path):
     """
     确保 focus_card.png 存在，如果不存在则生成。
+    注意：由于旧的生成代码已被移除，这里不再生成静态图片。
+    如果需要显示卡片，应该直接使用 FocusStatusCard 组件。
+    为了兼容性，我们可以创建一个空白或默认的图片，或者修改调用逻辑。
     """
     if not os.path.exists(path):
-        cardgen.draw_card2(save_path=path, show=False)
+        # 创建一个简单的空白/占位图片，防止报错
+        img = QtGui.QImage(300, 400, QtGui.QImage.Format_ARGB32)
+        img.fill(QtCore.Qt.transparent)
+        painter = QtGui.QPainter(img)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        
+        # 绘制简单的圆角矩形背景
+        painter.setBrush(QtGui.QColor(40, 40, 40, 200))
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.drawRoundedRect(0, 0, 300, 400, 20, 20)
+        
+        # 绘制文字
+        painter.setPen(QtGui.QColor(255, 255, 255))
+        font = QtGui.QFont("Microsoft YaHei", 12)
+        painter.setFont(font)
+        painter.drawText(img.rect(), QtCore.Qt.AlignCenter, "Focus Card")
+        
+        painter.end()
+        img.save(path)
 
 def main():
     """
@@ -163,6 +184,8 @@ def main():
             pass
 
     # 运行主循环
+    # 设置 quitOnLastWindowClosed 为 False，确保日报关闭时主程序（悬浮球）不退出
+    app.setQuitOnLastWindowClosed(False)
     exit_code = app.exec()
     
     # 退出清理

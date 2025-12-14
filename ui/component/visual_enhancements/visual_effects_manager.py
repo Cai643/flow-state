@@ -4,7 +4,10 @@
 提供现代化的视觉效果，包括阴影、渐变、发光等装饰效果。
 """
 
-from PySide6 import QtCore, QtGui, QtWidgets
+try:
+    from PySide6 import QtCore, QtGui, QtWidgets
+except ImportError:
+    from PyQt5 import QtCore, QtGui, QtWidgets
 from typing import List, Optional, Tuple
 
 

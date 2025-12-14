@@ -4,7 +4,12 @@
 提供精美的建议弹窗，包含任务建议、环境建议、行为建议等不同类型的内容。
 """
 
-from PySide6 import QtCore, QtGui, QtWidgets
+try:
+    from PySide6 import QtCore, QtGui, QtWidgets
+    Signal = QtCore.Signal
+except ImportError:
+    from PyQt5 import QtCore, QtGui, QtWidgets
+    Signal = QtCore.pyqtSignal
 from typing import Dict, List
 from .dark_theme_manager import DarkThemeManager
 from .precision_animation_engine import PrecisionAnimationEngine
@@ -17,8 +22,8 @@ class SuggestionDialog(QtWidgets.QDialog):
     """精美的建议弹窗 - 增强错误处理和调试功能"""
 
     # 信号
-    creationFailed = QtCore.Signal(str)  # 创建失败原因
-    displayFailed = QtCore.Signal(str)   # 显示失败原因
+    creationFailed = Signal(str)  # 创建失败原因
+    displayFailed = Signal(str)   # 显示失败原因
 
     # 建议内容数据 - 增强版本，包含丰富的视觉效果配置
     SUGGESTIONS = {
@@ -27,8 +32,8 @@ class SuggestionDialog(QtWidgets.QDialog):
             "icon": "🎯",
             "title": "高效时段优化建议",
             "visual_config": {
-                "theme_color": "#00FF88",
-                "background_gradient": ("#1a1a1a", "#2d4a2d"),
+                "theme_color": "#a8d8ea",
+                "background_gradient": ("#1a1a1a", "#2a3a40"),
                 "icon_animation": "pulse",
                 "entrance_effect": "elastic"
             },
@@ -63,8 +68,8 @@ class SuggestionDialog(QtWidgets.QDialog):
             "icon": "🌿",
             "title": "专注环境优化方案",
             "visual_config": {
-                "theme_color": "#4ECDC4",
-                "background_gradient": ("#1a1a1a", "#2d3a3a"),
+                "theme_color": "#a8d8ea",
+                "background_gradient": ("#1a1a1a", "#2a3a40"),
                 "icon_animation": "glow",
                 "entrance_effect": "slide_up"
             },
@@ -99,8 +104,8 @@ class SuggestionDialog(QtWidgets.QDialog):
             "icon": "🚀",
             "title": "持续成长行动计划",
             "visual_config": {
-                "theme_color": "#45B7D1",
-                "background_gradient": ("#1a1a1a", "#2d2d3a"),
+                "theme_color": "#a8d8ea",
+                "background_gradient": ("#1a1a1a", "#2a3a40"),
                 "icon_animation": "bounce",
                 "entrance_effect": "scale_fade"
             },
@@ -790,7 +795,8 @@ class SuggestionDialog(QtWidgets.QDialog):
         self.remove_background_blur_effect()
 
         # 关闭弹窗
-        self.close()
+        # 使用 accept() 而不是 close()，因为这是 Dialog
+        self.accept()
 
     def create_footer(self, layout):
         """创建底部按钮区域"""
@@ -962,6 +968,11 @@ class SuggestionDialog(QtWidgets.QDialog):
 
     def close_with_animation(self):
         """带动画效果关闭弹窗"""
+        # 防止重复调用
+        if getattr(self, '_is_closing', False):
+            return
+        self._is_closing = True
+
         # 创建缩小动画
         self.close_scale_animation = QtCore.QPropertyAnimation(self, b"size")
         self.close_scale_animation.setDuration(250)
@@ -985,6 +996,9 @@ class SuggestionDialog(QtWidgets.QDialog):
         # 启动动画
         self.close_scale_animation.start()
         self.close_opacity_animation.start()
+        
+        # 安全网：确保必定关闭
+        QtCore.QTimer.singleShot(300, self.cleanup_and_close)
 
     def apply_suggestions(self):
         """应用建议"""
@@ -1004,7 +1018,7 @@ class SuggestionDialog(QtWidgets.QDialog):
             QMessageBox {{
                 background-color: {self.theme_manager.COLORS['background_card']};
                 color: {self.theme_manager.COLORS['text_primary']};
-                border: 2px solid {self.visual_config.get('theme_color', '#00FF88')};
+                border: 2px solid {self.visual_config.get('theme_color', '#a8d8ea')};
                 border-radius: 12px;
                 font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
             }}
@@ -1014,7 +1028,7 @@ class SuggestionDialog(QtWidgets.QDialog):
                 font-size: 13px;
             }}
             QMessageBox QPushButton {{
-                background-color: {self.visual_config.get('theme_color', '#00FF88')};
+                background-color: {self.visual_config.get('theme_color', '#a8d8ea')};
                 color: {self.theme_manager.COLORS['background_primary']};
                 border: none;
                 border-radius: 8px;
@@ -1023,7 +1037,7 @@ class SuggestionDialog(QtWidgets.QDialog):
                 font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
             }}
             QMessageBox QPushButton:hover {{
-                background-color: {self.visual_config.get('theme_color', '#00FF88')}EE;
+                background-color: {self.visual_config.get('theme_color', '#a8d8ea')}EE;
             }}
         """)
 
@@ -1048,7 +1062,7 @@ class SuggestionDialog(QtWidgets.QDialog):
             QMessageBox {{
                 background-color: {self.theme_manager.COLORS['background_card']};
                 color: {self.theme_manager.COLORS['text_primary']};
-                border: 2px solid {self.visual_config.get('theme_color', '#00FF88')};
+                border: 2px solid {self.visual_config.get('theme_color', '#a8d8ea')};
                 border-radius: 12px;
                 font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
             }}
@@ -1058,7 +1072,7 @@ class SuggestionDialog(QtWidgets.QDialog):
                 font-size: 13px;
             }}
             QMessageBox QPushButton {{
-                background-color: {self.visual_config.get('theme_color', '#00FF88')};
+                background-color: {self.visual_config.get('theme_color', '#a8d8ea')};
                 color: {self.theme_manager.COLORS['background_primary']};
                 border: none;
                 border-radius: 8px;
@@ -1067,7 +1081,7 @@ class SuggestionDialog(QtWidgets.QDialog):
                 font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
             }}
             QMessageBox QPushButton:hover {{
-                background-color: {self.visual_config.get('theme_color', '#00FF88')}EE;
+                background-color: {self.visual_config.get('theme_color', '#a8d8ea')}EE;
             }}
         """)
 
@@ -1118,6 +1132,9 @@ class SuggestionDialog(QtWidgets.QDialog):
             if not hasattr(self, 'dialog_particle_system'):
                 self.dialog_particle_system = StartupParticleSystem(self)
                 self.dialog_particle_system.resize(self.size())
+                
+                # 再次确保鼠标穿透
+                self.dialog_particle_system.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents)
 
                 # 设置粒子系统在弹窗顶层
                 self.dialog_particle_system.raise_()
