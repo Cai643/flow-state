@@ -183,7 +183,7 @@ class TimelineNode(QtWidgets.QWidget):
 
         # 主题颜色
         line_color = MorandiTheme.COLOR_BORDER
-        accent_color = MorandiTheme.COLOR_TEXT_TITLE # 金色
+        accent_color = MorandiTheme.COLOR_CHART_BAR # 亮黄色
         text_primary = MorandiTheme.COLOR_TEXT_NORMAL
         text_secondary = MorandiTheme.COLOR_TEXT_SUBTITLE
         text_disabled = MorandiTheme.COLOR_TEXT_LOCKED
@@ -225,12 +225,15 @@ class TimelineNode(QtWidgets.QWidget):
         # 标题 (50h / 100h)
         if self.status != 'locked':
             p.setPen(accent_color)
+            font = QtGui.QFont("Segoe UI", 14, QtGui.QFont.Bold)
+            p.setFont(font)
+            MorandiTheme.draw_text_at_point_with_shadow(
+                p, text_x, cy + 8, self.hours, accent_color)
         else:
             p.setPen(text_disabled)
-
-        font = QtGui.QFont("Segoe UI", 14, QtGui.QFont.Bold)
-        p.setFont(font)
-        p.drawText(text_x, cy + 8, self.hours)
+            font = QtGui.QFont("Segoe UI", 14, QtGui.QFont.Bold)
+            p.setFont(font)
+            p.drawText(text_x, cy + 8, self.hours)
 
         # 日期
         p.setPen(text_primary)
@@ -238,17 +241,19 @@ class TimelineNode(QtWidgets.QWidget):
         p.setFont(font)
         fm = QtGui.QFontMetrics(font)
         date_w = fm.horizontalAdvance(self.date)
-        p.drawText(self.width() - date_w - 15, cy + 8, self.date)
+        MorandiTheme.draw_text_at_point_with_shadow(
+            p, self.width() - date_w - 15, cy + 8, self.date, text_primary)
 
         # 描述
         p.setPen(text_secondary)
         font = QtGui.QFont("Segoe UI", 11)
         p.setFont(font)
-        p.drawText(text_x, cy + 28, self.title)
+        MorandiTheme.draw_text_at_point_with_shadow(
+            p, text_x, cy + 28, self.title, text_secondary)
 
         # 悬停高亮
         if self.hover_progress.value > 0.01:
-            bg_color = QtGui.QColor(168, 216, 234, 25) # 10%
+            bg_color = MorandiTheme.color(MorandiTheme.HEX_BLUE_LIGHT, 25) # 10%
             p.setPen(QtCore.Qt.NoPen)
             p.setBrush(bg_color)
             p.drawRoundedRect(5, 5, self.width() - 10, 70, 8, 8)
@@ -321,8 +326,8 @@ class GrowthChart(QtWidgets.QWidget):
         self.particle_system.hide()
 
         self.weeks = ['W1', 'W2', 'W3', 'W4']
-        self.weekly_add = [20, 30, 25, 25]
-        self.cumulative = [20, 50, 75, 100]
+        self.weekly_add = [20, 30, 25, 250]
+        self.cumulative = [20, 50, 75, 150]
 
         QtCore.QTimer.singleShot(1500, self.start_anim)
 
@@ -341,11 +346,14 @@ class GrowthChart(QtWidgets.QWidget):
     def draw_chart(self, progress):
         self.figure.clear()
 
-        # 莫兰迪配色
-        color_gold = '#ffd700'
-        color_blue = '#a8d8ea'
-        color_text = '#a8d8ea' # 90%
-        color_grid = 'rgba(168, 216, 234, 0.1)'
+        # 莫兰迪配色 (统一主题)
+        def to_mpl(qcolor):
+            return (qcolor.redF(), qcolor.greenF(), qcolor.blueF(), qcolor.alphaF())
+
+        color_gold = to_mpl(MorandiTheme.COLOR_CHART_BAR)
+        color_blue = to_mpl(MorandiTheme.COLOR_BORDER)
+        color_text = to_mpl(MorandiTheme.COLOR_TEXT_NORMAL)
+        color_grid = to_mpl(MorandiTheme.COLOR_GRID)
 
         # 双Y轴
         ax1 = self.figure.add_subplot(111)
@@ -369,10 +377,11 @@ class GrowthChart(QtWidgets.QWidget):
 
         x = np.arange(len(self.weeks))
 
-        # 1. 柱状图 (每周新增) - 金色 50%
+        # 1. 柱状图 (每周新增) - 使用主题色
         bar_heights = [h * progress for h in self.weekly_add]
+        # 移除固定 alpha=0.5，改用颜色自身的 alpha (由主题控制)
         bars = ax2.bar(x, bar_heights, color=color_gold,
-                       alpha=0.5, width=0.5, label='每周新增',
+                       width=0.5, label='每周新增',
                        edgecolor=color_blue, linewidth=1)
 
         ax2.set_ylim(0, 40)
@@ -441,11 +450,11 @@ class CheckBoxItem(QtWidgets.QWidget):
                 background-color: transparent;
             }}
             QCheckBox::indicator:checked {{ 
-                background-color: #ffd700; 
-                border-color: #ffd700;
+                background-color: {MorandiTheme.COLOR_CHART_BAR.name()}; 
+                border-color: {MorandiTheme.COLOR_CHART_BAR.name()};
             }}
             QCheckBox::indicator:hover {{
-                border-color: #ffd700;
+                border-color: {MorandiTheme.COLOR_CHART_BAR.name()};
             }}
         """)
 
@@ -514,7 +523,7 @@ class NextMonthPlan(QtWidgets.QWidget):
                 color: transparent;
             }}
             QProgressBar::chunk {{
-                background-color: rgba(255, 215, 0, 153);
+                background-color: rgba(255, 215, 0, 250);
                 border-radius: 5px;
             }}
         """)

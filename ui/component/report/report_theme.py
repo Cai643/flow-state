@@ -23,8 +23,23 @@ class ReportTheme:
     _C_CYAN               = "#4ECDC4"
     _C_BLUE               = "#45B7D1"
     _C_YELLOW             = "#F9CA24"
+    _C_BRIGHT_YELLOW      = "#FFEA00"  # 亮黄色 (用于时间轴高亮)
     _C_WHITE              = "#FFFFFF"
     _C_BLACK              = "#000000"
+
+    # --- 2. 背景系统 (Background System) ---
+    # [全局背景] (用于: 窗口最底层的背景)
+    _CFG_BG_GLOBAL_COLOR = _C_MORANDI_BLUE_DARK 
+    _CFG_BG_GLOBAL_ALPHA = 153       # 透明度 0-255 (约60% 不透明)
+
+    # [背景板] (用于: 卡片, 列表项, 浮层, 按钮背景)
+    _CFG_BG_PANEL_COLOR = _C_MORANDI_BLUE_LIGHT
+    _CFG_BG_PANEL_ALPHA = 153        # 透明度 0-255 (约60% 不透明)
+
+    # --- 3. 图表系统 (Chart System) ---
+    # [柱状图] (用于: 数据条, 进度条)
+    _CFG_CHART_COLOR = _C_BRIGHT_YELLOW # 使用亮黄色
+    _CFG_CHART_ALPHA = 255           # 透明度 0-255 (约90% 不透明)
 
     # --- Semantic Colors (QColor with Alpha) ---
 
@@ -121,7 +136,7 @@ class ReportTheme:
 
     @property
     def COLOR_CHART_BAR(self):
-        return self.color(self._C_GOLD, 153)    # 60%
+        return self.color(self._CFG_CHART_COLOR, self._CFG_CHART_ALPHA)
 
     @property
     def COLOR_CHART_BORDER(self):
@@ -175,6 +190,37 @@ class ReportTheme:
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
+
+    @staticmethod
+    def draw_text_with_shadow(painter, rect, flags, text, color, shadow_color=None, offset=(1, 1)):
+        """Helper to draw text with shadow."""
+        if shadow_color is None:
+            # Default shadow: black with 50% opacity (128)
+            shadow_color = QtGui.QColor(0, 0, 0, 128)
+        
+        # Draw Shadow
+        painter.setPen(shadow_color)
+        shadow_rect = QtCore.QRectF(rect)
+        shadow_rect.translate(offset[0], offset[1])
+        painter.drawText(shadow_rect, flags, text)
+        
+        # Draw Text
+        painter.setPen(color)
+        painter.drawText(rect, flags, text)
+        
+    @staticmethod
+    def draw_text_at_point_with_shadow(painter, x, y, text, color, shadow_color=None, offset=(1, 1)):
+        """Helper to draw text at specific point with shadow."""
+        if shadow_color is None:
+            shadow_color = QtGui.QColor(0, 0, 0, 128)
+            
+        # Draw Shadow
+        painter.setPen(shadow_color)
+        painter.drawText(int(x + offset[0]), int(y + offset[1]), text)
+        
+        # Draw Text
+        painter.setPen(color)
+        painter.drawText(int(x), int(y), text)
 
 # Global instance for easy import
 theme = ReportTheme.get_instance()

@@ -1388,7 +1388,8 @@ class TimelineView(QtWidgets.QWidget):
 
             # 绘制时间文字
             text_rect = painter.fontMetrics().boundingRect(time_str)
-            painter.drawText(int(x - text_rect.width()/2), y + 15, time_str)
+            MorandiTheme.draw_text_at_point_with_shadow(
+                painter, x - text_rect.width()/2, y + 15, time_str, QtGui.QColor(168, 216, 234, 179))
 
         painter.restore()
 
@@ -1457,24 +1458,24 @@ class TimelineView(QtWidgets.QWidget):
             icon_font = QtGui.QFont("Segoe UI Emoji", 20)
             painter.setFont(icon_font)
             icon_rect = painter.fontMetrics().boundingRect(stat["icon"])
-            painter.drawText(int(x - icon_rect.width()/2),
-                             y + 35, stat["icon"])
+            MorandiTheme.draw_text_at_point_with_shadow(
+                painter, x - icon_rect.width()/2, y + 35, stat["icon"], QtGui.QColor("#a8d8ea"))
 
             # 数值
             painter.setPen(QtGui.QColor("#ffd700")) # 数值金色
             value_font = QtGui.QFont("Segoe UI", 18, QtGui.QFont.Bold)
             painter.setFont(value_font)
             value_rect = painter.fontMetrics().boundingRect(stat["value"])
-            painter.drawText(int(x - value_rect.width()/2),
-                             y + 65, stat["value"])
+            MorandiTheme.draw_text_at_point_with_shadow(
+                painter, x - value_rect.width()/2, y + 65, stat["value"], QtGui.QColor("#ffd700"))
 
             # 标签
             painter.setPen(QtGui.QColor("#a8d8ea")) # 标题蓝色
             label_font = QtGui.QFont("Segoe UI", 11)
             painter.setFont(label_font)
             label_rect = painter.fontMetrics().boundingRect(stat["label"])
-            painter.drawText(int(x - label_rect.width()/2),
-                             y + 85, stat["label"])
+            MorandiTheme.draw_text_at_point_with_shadow(
+                painter, x - label_rect.width()/2, y + 85, stat["label"], QtGui.QColor("#a8d8ea"))
 
         painter.restore()
 
@@ -1536,27 +1537,25 @@ class TimelineView(QtWidgets.QWidget):
         # 莫兰迪调整：使用 MorandiTheme 颜色
         # 根据活动类型调整渐变
         if entry.activity_type == "work":
-            # 金色 #ffd700 50%透明
-            c1 = QtGui.QColor("#ffd700")
-            c1.setAlpha(128) # 50%
-            c2 = QtGui.QColor("#e6c200")
-            c2.setAlpha(128) # 50%
+            # 亮黄色 (100%不透明)
+            c1 = MorandiTheme.COLOR_CHART_BAR
+            c2 = MorandiTheme.COLOR_CHART_BAR
             gradient.setColorAt(0, c1)
             gradient.setColorAt(1, c2)
             
             # 蓝色边框 #a8d8ea
             border_color = QtGui.QColor("#a8d8ea")
         elif entry.activity_type == "rest":
-            # 莫兰迪蓝 40%
-            c1 = QtGui.QColor(168, 216, 234, 100)
-            c2 = QtGui.QColor(126, 179, 232, 100)
+            # 莫兰迪蓝 100%不透明
+            c1 = QtGui.QColor(168, 216, 234, 255)
+            c2 = QtGui.QColor(126, 179, 232, 255)
             gradient.setColorAt(0, c1)
             gradient.setColorAt(1, c2)
             border_color = MorandiTheme.COLOR_BORDER
         else:  # break
-            # 莫兰迪蓝 60%
-            c1 = QtGui.QColor(168, 216, 234, 150)
-            c2 = QtGui.QColor(126, 179, 232, 150)
+            # 莫兰迪蓝 100%不透明
+            c1 = QtGui.QColor(168, 216, 234, 255)
+            c2 = QtGui.QColor(126, 179, 232, 255)
             gradient.setColorAt(0, c1)
             gradient.setColorAt(1, c2)
             border_color = MorandiTheme.COLOR_BORDER
@@ -1586,7 +1585,8 @@ class TimelineView(QtWidgets.QWidget):
             painter.setPen(QtGui.QColor(255, 255, 255))
             icon_font = QtGui.QFont("Segoe UI Emoji", 16)
             painter.setFont(icon_font)
-            painter.drawText(int(icon_x), int(icon_y), icon)
+            MorandiTheme.draw_text_at_point_with_shadow(
+                painter, icon_x, icon_y, icon, QtGui.QColor(255, 255, 255))
 
         # 绘制时间标签和描述（动画完成70%后显示）- 修复重叠问题
         if animation_progress > 0.7:
@@ -1604,7 +1604,8 @@ class TimelineView(QtWidgets.QWidget):
             # 时间文字 - 根据索引调整位置
             painter.setPen(QtGui.QColor("#a8d8ea")) # 标题蓝色
             time_y = timeline_y - 50 - vertical_offset
-            painter.drawText(int(x_start), time_y, time_text)
+            MorandiTheme.draw_text_at_point_with_shadow(
+                painter, x_start, time_y, time_text, QtGui.QColor("#a8d8ea"))
 
             # 描述文字 - 智能换行和位置调整
             desc_font = QtGui.QFont("Segoe UI", 10)
@@ -1623,7 +1624,8 @@ class TimelineView(QtWidgets.QWidget):
                 desc_text += "..."
 
             desc_y = timeline_y + 35 + vertical_offset
-            painter.drawText(int(x_start), desc_y, desc_text)
+            MorandiTheme.draw_text_at_point_with_shadow(
+                painter, x_start, desc_y, desc_text, QtGui.QColor("#ffd700"))
 
         # 绘制持续时长指示器 - 调整位置避免重叠
         if animation_progress > 0.8:
@@ -1639,8 +1641,12 @@ class TimelineView(QtWidgets.QWidget):
             duration_x = x_start + (x_end - x_start) * animation_progress / 2
             duration_rect = painter.fontMetrics().boundingRect(duration_text)
             duration_y = timeline_y + 5  # 显示在时间段条内部
-            painter.drawText(
-                int(duration_x - duration_rect.width()/2), duration_y, duration_text)
+            
+            # 使用更深的阴影以确保在亮色背景上可见
+            shadow_color = QtGui.QColor(0, 0, 0, 160)
+            MorandiTheme.draw_text_at_point_with_shadow(
+                painter, duration_x - duration_rect.width()/2, duration_y, duration_text, 
+                MorandiTheme.COLOR_TEXT_SUBTITLE, shadow_color)
 
         painter.restore()
 
