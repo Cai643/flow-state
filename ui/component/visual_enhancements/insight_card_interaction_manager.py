@@ -4,7 +4,12 @@
 专门处理洞察卡片的点击事件和建议弹窗触发，提供详细的错误处理和调试功能。
 """
 
-from PySide6 import QtCore, QtGui, QtWidgets
+try:
+    from PySide6 import QtCore, QtGui, QtWidgets
+    Signal = QtCore.Signal
+except ImportError:
+    from PyQt5 import QtCore, QtGui, QtWidgets
+    Signal = QtCore.pyqtSignal
 from typing import Dict, Optional
 import traceback
 import logging
@@ -26,9 +31,9 @@ class InsightCardInteractionManager(QtCore.QObject):
     }
 
     # 信号
-    cardClicked = QtCore.Signal(str)  # 卡片标题
-    dialogRequested = QtCore.Signal(str)  # 建议类型
-    interactionError = QtCore.Signal(str, str)  # 错误类型, 错误消息
+    cardClicked = Signal(str)  # 卡片标题
+    dialogRequested = Signal(str)  # 建议类型
+    interactionError = Signal(str, str)  # 错误类型, 错误消息
 
     def __init__(self, parent=None):
         super().__init__(parent)

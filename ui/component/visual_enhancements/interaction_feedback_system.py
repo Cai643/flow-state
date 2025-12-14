@@ -4,7 +4,10 @@
 为用户交互提供即时的视觉反馈，包括悬停、点击、状态反馈等。
 """
 
-from PySide6 import QtCore, QtGui, QtWidgets
+try:
+    from PySide6 import QtCore, QtGui, QtWidgets
+except ImportError:
+    from PyQt5 import QtCore, QtGui, QtWidgets
 from typing import Optional, Callable
 from .precision_animation_engine import PrecisionAnimationEngine
 from .visual_effects_manager import VisualEffectsManager
