@@ -6,8 +6,10 @@
 
 try:
     from PySide6 import QtCore, QtGui, QtWidgets
+    Property = QtCore.Property
 except ImportError:
     from PyQt5 import QtCore, QtGui, QtWidgets
+    Property = QtCore.pyqtProperty
 from typing import List, Optional, Tuple
 
 
@@ -240,7 +242,7 @@ class VisualEffectsManager(QtCore.QObject):
                 self.animation.finished.connect(self.deleteLater)
                 self.animation.start()
 
-            @QtCore.Property(int)
+            @Property(int)
             def radius(self):
                 return self._radius
 
