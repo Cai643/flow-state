@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -40,13 +41,13 @@
                 opacity: 0;
                 transform: translateY(-30px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
             }
         }
 
-        /* 标题区域 */
         .header {
             display: flex;
             gap: 20px;
@@ -76,7 +77,6 @@
             font-weight: 500;
         }
 
-        /* 提示区域 */
         .tip {
             background-color: #fff9e6;
             border-left: 4px solid #f39c12;
@@ -88,7 +88,6 @@
             margin-bottom: 24px;
         }
 
-        /* 建议列表 */
         .suggestions-label {
             font-size: 14px;
             font-weight: bold;
@@ -158,7 +157,6 @@
             margin-left: 10px;
         }
 
-        /* 按钮区域 */
         .buttons {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
@@ -184,22 +182,12 @@
             background-color: #7f8c8d;
         }
 
-        .btn-continue:active {
-            background-color: #6c7a7b;
-            transform: scale(0.98);
-        }
-
         .btn-snooze-30 {
             background-color: #f39c12;
         }
 
         .btn-snooze-30:hover {
             background-color: #e67e22;
-        }
-
-        .btn-snooze-30:active {
-            background-color: #d35400;
-            transform: scale(0.98);
         }
 
         .btn-snooze-60 {
@@ -210,61 +198,6 @@
             background-color: #c0392b;
         }
 
-        .btn-snooze-60:active {
-            background-color: #a93226;
-            transform: scale(0.98);
-        }
-
-        /* 响应式 */
-        @media (max-width: 600px) {
-            .dialog {
-                padding: 30px 20px;
-            }
-
-            .header {
-                flex-direction: column;
-                gap: 15px;
-            }
-
-            .buttons {
-                grid-template-columns: 1fr;
-            }
-
-            .suggestion-content {
-                flex-direction: column;
-            }
-
-            .suggestion-duration {
-                margin-left: 0;
-                margin-top: 4px;
-            }
-
-            button {
-                padding: 12px 15px;
-                font-size: 12px;
-            }
-        }
-
-        /* 滚动条美化 */
-        .suggestions::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        .suggestions::-webkit-scrollbar-track {
-            background: #ecf0f1;
-            border-radius: 4px;
-        }
-
-        .suggestions::-webkit-scrollbar-thumb {
-            background: #95a5a6;
-            border-radius: 4px;
-        }
-
-        .suggestions::-webkit-scrollbar-thumb:hover {
-            background: #7f8c8d;
-        }
-
-        /* 信息提示 */
         .info-box {
             background-color: #e8f4f8;
             border: 1px solid #3498db;
@@ -274,6 +207,7 @@
             font-size: 12px;
             color: #2c3e50;
             line-height: 1.6;
+            display: none;
         }
 
         .info-box strong {
@@ -281,10 +215,10 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="dialog">
-            <!-- 标题区域 -->
             <div class="header">
                 <div class="icon">⏰</div>
                 <div class="title-content">
@@ -293,15 +227,12 @@
                 </div>
             </div>
 
-            <!-- 提示区域 -->
             <div class="tip">
                 连续工作过久会导致疲劳、注意力下降，甚至影响身体健康。建议你立即休息一会儿，恢复精力会让你更高效！
             </div>
 
-            <!-- 建议列表 -->
             <div class="suggestions-label">💡 推荐的休息方式：</div>
             <div class="suggestions">
-                <!-- 散步 -->
                 <div class="suggestion-card" onclick="selectSuggestion('散步')">
                     <div class="suggestion-icon">🚶</div>
                     <div class="suggestion-content">
@@ -313,7 +244,6 @@
                     </div>
                 </div>
 
-                <!-- 小睡 -->
                 <div class="suggestion-card" onclick="selectSuggestion('小睡')">
                     <div class="suggestion-icon">😴</div>
                     <div class="suggestion-content">
@@ -325,7 +255,6 @@
                     </div>
                 </div>
 
-                <!-- 伸展运动 -->
                 <div class="suggestion-card" onclick="selectSuggestion('伸展运动')">
                     <div class="suggestion-icon">🧘</div>
                     <div class="suggestion-content">
@@ -337,7 +266,6 @@
                     </div>
                 </div>
 
-                <!-- 眼部放松 -->
                 <div class="suggestion-card" onclick="selectSuggestion('眼部放松')">
                     <div class="suggestion-icon">👀</div>
                     <div class="suggestion-content">
@@ -349,7 +277,6 @@
                     </div>
                 </div>
 
-                <!-- 营养补充 -->
                 <div class="suggestion-card" onclick="selectSuggestion('营养补充')">
                     <div class="suggestion-icon">🥤</div>
                     <div class="suggestion-content">
@@ -361,7 +288,6 @@
                     </div>
                 </div>
 
-                <!-- 冥想静坐 -->
                 <div class="suggestion-card" onclick="selectSuggestion('冥想静坐')">
                     <div class="suggestion-icon">🧖</div>
                     <div class="suggestion-content">
@@ -374,15 +300,13 @@
                 </div>
             </div>
 
-            <!-- 按钮区域 -->
             <div class="buttons">
                 <button class="btn-continue" onclick="handleContinue()">继续工作</button>
                 <button class="btn-snooze-30" onclick="handleSnooze(30)">30分钟后提醒</button>
                 <button class="btn-snooze-60" onclick="handleSnooze(60)">1小时后提醒</button>
             </div>
 
-            <!-- 信息提示 -->
-            <div class="info-box" id="infoBox" style="display: none;">
+            <div class="info-box" id="infoBox">
                 <strong id="infoText"></strong>
             </div>
         </div>
@@ -390,14 +314,17 @@
 
     <script>
         function selectSuggestion(title) {
+            console.log('SELECT_SUGGESTION:' + title);
             showInfo(`你选择了：${title}。希望这次休息能让你恢复精力！`);
         }
 
         function handleContinue() {
+            console.log('CONTINUE_WORK');
             showInfo('好的，继续工作。记住定期活动一下身体！');
         }
 
         function handleSnooze(minutes) {
+            console.log('SNOOZE:' + minutes);
             showInfo(`已设置${minutes}分钟后提醒。继续加油！`);
         }
 
@@ -406,12 +333,12 @@
             const infoText = document.getElementById('infoText');
             infoText.textContent = message;
             infoBox.style.display = 'block';
-            
-            // 3秒后隐藏
+
             setTimeout(() => {
                 infoBox.style.display = 'none';
             }, 3000);
         }
     </script>
 </body>
+
 </html>

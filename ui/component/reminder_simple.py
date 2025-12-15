@@ -78,12 +78,12 @@ class ReminderOverlay(QtWidgets.QDialog):
         center_y = geometry.top() + (geometry.height() - window_height) // 2
         self.setGeometry(center_x, center_y, window_width, window_height)
         
-        # 主容器 - 柔和的渐变背景
+        # 主容器 - 淡蓝色渐变背景，高透明度
         self.container = QtWidgets.QWidget(self)
         self.container.setStyleSheet("""
             QWidget {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #f8f9ff, stop:1 #f0f4ff);
+                    stop:0 rgba(200, 230, 255, 200), stop:1 rgba(150, 200, 255, 200));
                 border: none;
                 border-radius: 16px;
             }

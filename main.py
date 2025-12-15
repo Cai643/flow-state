@@ -12,7 +12,9 @@ except ImportError:
 # 导入自定义组件
 from ui.component.float_ball import SuspensionBall
 from ui.interaction_logic.pop_up import CardPopup
-from ui.component.reminder import ReminderOverlay
+from ui.component.reminder_simple import ReminderOverlay
+from ui.component.reminder_simple import ReminderOverlay as SimpleReminderOverlay
+from ui.component.fatigue_rest_reminder import FatigueRestReminder
 import ui.component.focus_card as cardgen
 
 # 导入 AI 模块
@@ -115,6 +117,14 @@ def main():
 
     # 3. 创建提醒遮罩
     reminder = ReminderOverlay()
+    simple_reminder = SimpleReminderOverlay()
+    
+    # 创建疲劳休息提醒
+    fatigue_reminder = FatigueRestReminder()
+    
+    # 追踪娱乐状态的开始时间
+    entertainment_start_time = None
+    entertainment_reminder_shown = False
 
     # 4. 交互逻辑连接
     
@@ -142,12 +152,61 @@ def main():
     
     def on_status_update(result):
         # 结果格式: {'status': 'working', 'duration': 120, 'message': '...'}
+        nonlocal entertainment_start_time, entertainment_reminder_shown
+        
         status = result.get('status', 'idle')
         duration = result.get('duration', 0)
         
+        # ========== 疲劳休息提醒逻辑 ==========
+        # 初始化：程序启动时设置开始时间
+        if not hasattr(on_status_update, 'app_start_time'):
+            on_status_update.app_start_time = time.time()
+        
+        # 程序运行 15 秒后弹出疲劳提醒（仅显示一次）
+        if not hasattr(on_status_update, 'fatigue_reminder_shown'):
+            on_status_update.fatigue_reminder_shown = False
+        
+        if not on_status_update.fatigue_reminder_shown:
+            elapsed_time = time.time() - on_status_update.app_start_time
+            if elapsed_time >= 15:  # 15 秒后
+                on_status_update.fatigue_reminder_shown = True
+                print("[MAIN] 程序运行 15 秒，弹出疲劳休息提醒")
+                fatigue_reminder.show_reminder(duration=int(elapsed_time))
+        
+        # ========== 娱乐时间过长提醒逻辑 ==========
+        # 检测娱乐状态的开始和结束
+        if status in ["entertainment", "reading"]:
+            # 进入娱乐状态
+            if entertainment_start_time is None:
+                entertainment_start_time = time.time()
+                entertainment_reminder_shown = False
+                print("[MAIN] 检测到娱乐状态开始")
+            
+            # 娱乐状态持续 15 秒后弹出提醒
+            entertainment_duration = time.time() - entertainment_start_time
+            if not entertainment_reminder_shown and entertainment_duration >= 15:
+                entertainment_reminder_shown = True
+                print("[MAIN] 娱乐状态持续 15 秒，弹出娱乐时间过长提醒")
+                
+                # 创建娱乐提醒数据
+                test_data = {
+                    'message': '检测到您正在看视频',
+                    'duration': int(entertainment_duration),
+                    'severity': 'medium',
+                    'encouragement': '时间飞快～该休息一下了！'
+                }
+                simple_reminder.show_reminder(test_data)
+        else:
+            # 离开娱乐状态，重置
+            if entertainment_start_time is not None:
+                print("[MAIN] 离开娱乐状态")
+                entertainment_start_time = None
+                entertainment_reminder_shown = False
+        
+        # ========== 原有逻辑 ==========
         # 5.1 检查提醒 (娱乐状态持续20秒以上)
         if status == 'entertainment' and duration > 20:
-            reminder.show_message("检测到您长时间处于娱乐状态，请注意休息！")
+            pass  # 原逻辑可在这里保留
             
         # 5.2 更新悬浮球状态
         status_map = {

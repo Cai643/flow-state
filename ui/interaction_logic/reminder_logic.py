@@ -140,20 +140,20 @@ class EntertainmentReminder(QtCore.QObject):
             self._reminded_at_50min = False
             self.reminder_count = 0
         
-        # 检查三个提醒时间点：22分钟、35分钟、50分钟
+        # 检查三个提醒时间点：10秒、20秒、30秒
         if status in ["entertainment", "reading"] and not self.reminder_disabled:
             current_time = time.time()
             if current_time >= self.snooze_until_time:
-                # 22分钟提醒
-                if 22 * 60 <= duration < 35 * 60 and not self._reminded_at_22min:
+                # 10秒提醒
+                if 10 <= duration < 20 and not self._reminded_at_22min:
                     self._reminded_at_22min = True
                     self._handle_entertainment_warning(status, duration, 'low')
-                # 35分钟提醒
-                elif 35 * 60 <= duration < 50 * 60 and not self._reminded_at_35min:
+                # 20秒提醒
+                elif 20 <= duration < 30 and not self._reminded_at_35min:
                     self._reminded_at_35min = True
                     self._handle_entertainment_warning(status, duration, 'medium')
-                # 50分钟提醒
-                elif duration >= 50 * 60 and not self._reminded_at_50min:
+                # 30秒提醒
+                elif duration >= 30 and not self._reminded_at_50min:
                     self._reminded_at_50min = True
                     self._handle_entertainment_warning(status, duration, 'high')
     
