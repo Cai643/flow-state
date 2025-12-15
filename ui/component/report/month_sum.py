@@ -478,8 +478,8 @@ class GrowthChart(QtWidgets.QWidget):
 
         ax2.spines['top'].set_visible(False)
         ax2.spines['left'].set_visible(False)
-        ax2.spines['right'].set_color(color_text)
-        ax2.tick_params(axis='y', colors=color_gold, labelsize=10)
+        ax2.spines['right'].set_visible(False)  # 隐藏右侧轴线
+        ax2.set_yticks([])  # 隐藏右侧刻度和标签
 
         x = np.arange(len(self.weeks))
 
@@ -489,6 +489,15 @@ class GrowthChart(QtWidgets.QWidget):
         bars = ax2.bar(x, bar_heights, color=color_gold,
                        width=0.5, label='每周新增',
                        edgecolor=color_blue, linewidth=1)
+        
+        # 在柱状图上方添加数值标签
+        for rect, h_val in zip(bars, bar_heights):
+            height = rect.get_height()
+            if height > 1:  # 只有高度大于1才显示
+                ax2.text(rect.get_x() + rect.get_width()/2., height + 0.5,
+                         f'{int(h_val)}h',
+                         ha='center', va='bottom', 
+                         color=color_gold, fontsize=10, fontweight='bold')
 
         ax2.set_ylim(0, 40)
 
@@ -522,7 +531,7 @@ class GrowthChart(QtWidgets.QWidget):
                     ax1.annotate(f'{int(self.cumulative[i])}h',
                                  (xi, yi), textcoords="offset points",
                                  xytext=(0, 10), ha='center',
-                                 color=color_text, fontsize=9, fontweight='bold')
+                                 color=color_gold, fontsize=9, fontweight='bold')
 
         ax1.set_ylim(0, 150)
         ax1.set_xticks(x)
