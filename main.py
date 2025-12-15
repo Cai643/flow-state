@@ -12,6 +12,7 @@ from ui.interaction_logic.pop_up import CardPopup
 from ui.component.reminder_simple import ReminderOverlay
 from ui.component.reminder_simple import ReminderOverlay as SimpleReminderOverlay
 import ui.component.focus_card as cardgen
+from ui.interaction_logic.reminder_logic import EntertainmentReminder
 
 # 导入 AI 模块
 from ai.tool.tool import InputMonitor, ScreenAnalyzer, get_active_window_title
@@ -176,6 +177,15 @@ def main():
         fatigueer = None
         html_reminder_window = None
     
+    # 初始化娱乐提醒逻辑模块
+    entertainment_logic = None
+    try:
+        if simple_reminder:
+            entertainment_logic = EntertainmentReminder(overlay=simple_reminder)
+            print("[MAIN] EntertainmentReminder 初始化完成")
+    except Exception as e:
+        print(f"[MAIN] ERROR 初始化 EntertainmentReminder 失败: {e}")
+
     # 追踪娱乐状态的开始时间
     entertainment_start_time = None
     entertainment_reminder_shown = False
@@ -232,34 +242,12 @@ def main():
             # ========== 疲劳休息提醒逻辑 ==========
             # (已移除旧的错误实现，改用 main 函数中的 QTimer)
             
-            # ========== 娱乐时间过长提醒逻辑 ==========
-            if status in ["entertainment", "reading"]:
-                if entertainment_start_time is None:
-                    entertainment_start_time = time.time()
-                    entertainment_reminder_shown = False
-                    print("[MAIN] 检测到娱乐状态开始")
-                
-                entertainment_duration = time.time() - entertainment_start_time
-                if not entertainment_reminder_shown and entertainment_duration >= 15:
-                    entertainment_reminder_shown = True
-                    print("[MAIN] 娱乐状态持续 15 秒，弹出娱乐时间过长提醒")
-                    
-                    test_data = {
-                        'message': '检测到您正在看视频',
-                        'duration': int(entertainment_duration),
-                        'severity': 'medium',
-                        'encouragement': '时间飞快～该休息一下了！'
-                    }
-                    if simple_reminder:
-                        try:
-                            simple_reminder.show_reminder(test_data)
-                        except Exception as e:
-                            print(f"[on_status_update] Error showing simple reminder: {e}")
-            else:
-                if entertainment_start_time is not None:
-                    print("[MAIN] 离开娱乐状态")
-                    entertainment_start_time = None
-                    entertainment_reminder_shown = False
+            # ========== 娱乐时间过长提醒逻辑 (使用 EntertainmentReminder) ==========
+            if entertainment_logic:
+                try:
+                    entertainment_logic.on_status_update(result)
+                except Exception as e:
+                    print(f"[on_status_update] Error in entertainment_logic: {e}")
             
             # ========== 更新悬浮球状态 ==========
             status_map = {
@@ -307,12 +295,21 @@ def main():
 
     # 30秒后显示疲劳提醒 (Added per user request)
     def show_fatigue_reminder_test():
-        print("[MAIN] 30秒已到，显示疲劳提醒测试")
+        print("[MAIN] 30秒已到，显示疲劳提醒测试 (FatigueReminderWindow)")
         # 随机选择严重程度
         import random
         severity = random.choice(['low', 'medium', 'high'])
         durations = {'low': 30, 'medium': 120, 'high': 240}
-        
+
+        # 优先使用新版 Qt 提醒窗口
+        if fatigue_window:
+            try:
+                fatigue_window.show_reminder(duration=durations[severity])
+                return
+            except Exception as e:
+                print(f"[MAIN] ERROR 显示 FatigueReminderWindow 失败，回退到 Dialog: {e}")
+
+        # 回退到旧的 Dialog 方案
         dialog = FatigueReminderDialog(severity=severity, duration=durations[severity])
         dialog.exec()
 
