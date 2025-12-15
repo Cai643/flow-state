@@ -101,7 +101,7 @@ class InsightCard(QtWidgets.QWidget):
 
     def __init__(self, title, subtitle, desc, detail_hint="→ 点击查看详细建议"):
         super().__init__()
-        self.setFixedSize(200, 140)
+        self.setFixedSize(200, 100) # 减小高度，去掉多余空间
         self.setCursor(QtCore.Qt.PointingHandCursor)
 
         # 初始化视觉增强组件
@@ -168,14 +168,22 @@ class InsightCard(QtWidgets.QWidget):
             p.translate(-cx, -cy)
 
         # 动态布局调整
+        # 悬停时展开高度以显示描述和详情提示
+        if progress > 0.05:
+            # 动态调整高度: 基础高度 + 额外高度 * 进度
+            current_height = 100 + 60 * progress
+            self.setFixedHeight(int(current_height))
+        else:
+            self.setFixedHeight(100)
+            
         offset_y = -5 * progress  # 悬停上浮 5px
 
         # 背景区域
         rect = QtCore.QRectF(
             5, 5 + offset_y, self.width()-10, self.height()-10)
 
-        # 莫兰迪背景 (透明度很低，依靠主窗口背景，这里加一点点叠加)
-        bg_color = QtGui.QColor(168, 216, 234, 15) # 极淡的背景
+        # 莫兰迪背景 (透明度8%-15%)
+        bg_color = QtGui.QColor(168, 216, 234, 30) # ~12%
         p.setBrush(bg_color)
 
         # 边框 (悬停时金色发光)
@@ -193,51 +201,47 @@ class InsightCard(QtWidgets.QWidget):
             p.setBrush(bg_color) # 恢复背景
             
         else:
-            border_color = MorandiTheme.COLOR_BORDER
+            # 边框透明度 30%
+            border_color = QtGui.QColor(168, 216, 234, 76)
             p.setPen(QtGui.QPen(border_color, 1))
 
         p.drawRoundedRect(rect, 12, 12)
 
         # 文字绘制
-        # 标题 - 莫兰迪蓝 90%
-        p.setPen(MorandiTheme.COLOR_TEXT_TITLE)
+        # 标题 - 莫兰迪蓝 100%
+        p.setPen(QtGui.QColor(168, 216, 234, 255))
         font = QtGui.QFont("Noto Sans SC", 11, QtGui.QFont.Bold)
         p.setFont(font)
         p.drawText(rect.adjusted(15, 15, -15, 0),
                    QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop, self.title)
 
         # 星星图标 (如果在标题旁) - 这里直接绘制在标题右侧
-        if "✨" not in self.title: # 简单判断，如果需要额外绘制
-            # 这里假设标题文本不包含星星，手动绘制一个金色星星
-            # 但用户说 "保持原✨位置(标题旁)"，InsightCard里原代码没画星星
-            # 我们假设它包含在 title 字符串里，或者我们可以画一个
+        if "✨" not in self.title: 
             pass
 
         # 副标题 (数据值) - 金色 100% + 发光
         font_sub = QtGui.QFont("Noto Sans SC", 12)
         p.setFont(font_sub)
-        p.setPen(MorandiTheme.COLOR_TEXT_VALUE)
+        p.setPen(QtGui.QColor("#ffd700"))
         
         # 绘制文字阴影 (模拟发光)
         p.save()
         p.translate(0, 0)
-        shadow_color = QtGui.QColor(255, 215, 0, 76) # 0.3 alpha
-        # 简单模拟glow: 多次绘制微小偏移? 还是直接用Pen color?
-        # Qt text shadow is hard without GraphicsEffect. 
-        # We can just draw semi-transparent text underneath?
-        # Or just trust the color.
         p.restore()
         
         p.drawText(rect.adjusted(15, 40, -15, 0),
                    QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop, self.subtitle)
 
-        # 描述文字 - 莫兰迪蓝 80%
-        font_desc = QtGui.QFont("Noto Sans SC", 11)
-        p.setFont(font_desc)
-        p.setPen(MorandiTheme.COLOR_TEXT_DESC)
-        rect_desc = rect.adjusted(15, 65, -15, -30)
-        p.drawText(rect_desc, QtCore.Qt.AlignLeft |
-                   QtCore.Qt.TextWordWrap, self.desc)
+        # 描述文字 - 莫兰迪蓝 80% (仅在悬停时显示)
+        if progress > 0.05:
+            font_desc = QtGui.QFont("Noto Sans SC", 11)
+            p.setFont(font_desc)
+            p.setPen(QtGui.QColor(168, 216, 234, 204))
+            p.setOpacity(progress)
+            rect_desc = rect.adjusted(15, 65, -15, -30)
+            p.drawText(rect_desc, QtCore.Qt.AlignLeft |
+                       QtCore.Qt.TextWordWrap, self.desc)
+            p.setOpacity(1.0)
 
         # 底部提示 - 悬停时显示金色
         if progress > 0.05:
@@ -280,202 +284,314 @@ class InsightCard(QtWidgets.QWidget):
         finally:
             self._processing_click = False
 
-# --- 中栏：对比图 ---
+# --- 左栏：核心洞察 (WeeklySummaryView) ---
+
+class SummaryCard(QtWidgets.QWidget):
+    def __init__(self, data):
+        super().__init__()
+        self.setCursor(QtCore.Qt.PointingHandCursor)
+        
+        # 动画相关
+        self.hover_progress = AnimatedValue(0.0)
+        self.hover_progress.valueChanged.connect(self.update)
+        
+        self.data = data
+        self.setFixedHeight(110) # 固定高度
+        
+        # 字体预设
+        self.font_icon = QtGui.QFont("Segoe UI Emoji", 18)
+        self.font_title = QtGui.QFont("Noto Sans SC", 10, QtGui.QFont.Bold)
+        self.font_value = QtGui.QFont("Noto Sans SC", 16, QtGui.QFont.Bold)
+        self.font_sub = QtGui.QFont("Noto Sans SC", 9)
+        self.font_desc = QtGui.QFont("Noto Sans SC", 9)
+
+    def paintEvent(self, event):
+        p = QtGui.QPainter(self)
+        p.setRenderHint(QtGui.QPainter.Antialiasing)
+        
+        rect = self.rect()
+        progress = self.hover_progress.value
+        
+        # 1. 背景
+        # 基础背景: 莫兰迪蓝 10%
+        bg_color = QtGui.QColor(168, 216, 234, 25)
+        # 悬停时加深
+        if progress > 0:
+            bg_color = QtGui.QColor(168, 216, 234, 25 + int(20 * progress))
+            
+        p.setBrush(bg_color)
+        
+        # 边框
+        border_color = QtGui.QColor(self.data['color'])
+        border_color.setAlphaF(0.3 + 0.4 * progress) # 30% -> 70%
+        p.setPen(QtGui.QPen(border_color, 1 + progress))
+        
+        p.drawRoundedRect(rect.adjusted(2, 2, -2, -2), 12, 12)
+        
+        # 2. 内容绘制
+        # 图标
+        p.setFont(self.font_icon)
+        p.setPen(QtCore.Qt.NoPen) # Emoji通常不需要Pen颜色，或者跟随系统
+        # 注意：Qt绘制Emoji可能需要特定字体支持，这里假设Segoe UI Emoji可用
+        p.setPen(QtGui.QColor(0,0,0, 220)) 
+        p.drawText(QtCore.QRect(15, 15, 40, 40), QtCore.Qt.AlignCenter, self.data['icon'])
+        
+        # 标题
+        p.setFont(self.font_title)
+        p.setPen(QtGui.QColor(168, 216, 234, 255))
+        p.drawText(QtCore.QRect(60, 15, 200, 20), QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter, self.data['title'])
+        
+        # 数值
+        p.setFont(self.font_value)
+        p.setPen(QtGui.QColor(self.data['color']))
+        p.drawText(QtCore.QRect(60, 38, 200, 30), QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter, self.data['value'])
+        
+        # 副标题 (显示在数值右侧或下方，这里放右侧)
+        # p.setFont(self.font_sub)
+        # p.setPen(QtGui.QColor(168, 216, 234, 200))
+        # text_width = QtGui.QFontMetrics(self.font_value).horizontalAdvance(self.data['value'])
+        # p.drawText(QtCore.QRect(60 + text_width + 10, 42, 150, 20), 
+        #            QtCore.Qt.AlignLeft | QtCore.Qt.AlignBottom, self.data['subtitle'])
+        
+        # 描述 (底部)
+        p.setFont(self.font_desc)
+        p.setPen(QtGui.QColor(168, 216, 234, 180))
+        p.drawText(QtCore.QRect(15, 75, self.width()-30, 30), 
+                   QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter | QtCore.Qt.TextWordWrap, 
+                   self.data['description'])
+
+    def enterEvent(self, event):
+        self.hover_progress.animate_to(1.0, 200)
+
+    def leaveEvent(self, event):
+        self.hover_progress.animate_to(0.0, 200)
 
 
-class BarItem:
-    def __init__(self, label, value, delay, is_current=False):
-        self.label = label
-        self.target_value = value
-        self.current_height = AnimatedValue(0.0)
-        self.delay = delay
-        self.is_current = is_current
-
-
-class ComparisonChart(QtWidgets.QWidget):
+class WeeklySummaryView(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
         self.setMinimumSize(380, 400)
+        
+        # 数据生成 (模拟 generate_weekly_summary_v1)
+        self.summary_data = {
+             "title": "本周核心洞察",
+             "cards": [
+                 {
+                     "icon": "🎯",
+                     "title": "专注得分",
+                     "value": "82分",
+                     "subtitle": "连续5天达标",
+                     "description": "你的专注力超越了78%的用户，保持这个节奏！",
+                     "color": "#4CAF50" # 绿色
+                 },
+                 {
+                     "icon": "⚡",
+                     "title": "效率峰值",
+                     "value": "09:00-11:00",
+                     "subtitle": "平均专注6.0小时",
+                     "description": "这个时段你的代码产出量是平时的2.3倍",
+                     "color": "#FF9800" # 橙色
+                 },
+                 {
+                     "icon": "🛡️",
+                     "title": "自控力挑战",
+                     "value": "15:00-17:00",
+                     "subtitle": "分心次数增加2次",
+                     "description": "AI帮你截停了3次无效浏览，夺回45分钟",
+                     "color": "#2196F3" # 蓝色
+                 }
+             ]
+         }
 
-        # 初始化视觉增强组件
-        self.animation_engine = PrecisionAnimationEngine(self)
+        # 布局
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(20, 40, 20, 20)
+        layout.setSpacing(15)
+        
+        # 标题
+        title_label = QtWidgets.QLabel(self.summary_data["title"])
+        title_label.setStyleSheet("""
+            color: #ffd700;
+            font-family: 'Noto Sans SC';
+            font-size: 18px;
+            font-weight: bold;
+            background: transparent;
+        """)
+        title_label.setAlignment(QtCore.Qt.AlignCenter)
+        layout.addWidget(title_label)
+        
+        layout.addSpacing(10)
+        
+        # 卡片列表
+        for card_data in self.summary_data["cards"]:
+            card = SummaryCard(card_data)
+            layout.addWidget(card)
+            
+        layout.addStretch()
 
-        self.bars = [
-            BarItem("三周前", 4.5, 800),
-            BarItem("两周前", 3.8, 600),
-            BarItem("上周", 4.1, 400),
-            BarItem("本周", 5.2, 200, is_current=True)
+    def paintEvent(self, event):
+        # 绘制简单的背景或边框辅助查看区域 (可选)
+        pass
+
+# --- 左栏：成就墙 (改为 WeeklyTrendChart) ---
+
+class WeeklyTrendChart(QtWidgets.QWidget):
+    clicked = Signal()
+
+    def __init__(self):
+        super().__init__()
+        self.setFixedWidth(280)
+        self.setMinimumHeight(300)
+        self.setCursor(QtCore.Qt.PointingHandCursor)
+
+        # 动画变量
+        self.anim_progress = AnimatedValue(0.0)
+        self.anim_progress.valueChanged.connect(self.update)
+        # 启动入场动画
+        self.anim_progress.animate_to(1.0, 1000, 200, QtCore.QEasingCurve.OutQuart)
+        
+        # 悬停点索引
+        self.hovered_index = -1
+
+        # 数据: (周几, 日期, 时长, 评级, 图标类型)
+        self.data = [
+            ("周一", "12/8", 4.2, "专注", "sun"),
+            ("周二", "12/9", 6.1, "巅峰", "sun"),
+            ("周三", "12/10", 5.8, "优秀", "sun"),
+            ("周四", "12/11", 2.5, "放松", "cloud"),
+            ("周五", "12/12", 5.2, "良好", "sun"),
+            ("周六", "12/13", 3.0, "休息", "star"),
+            ("周日", "12/14", 4.5, "恢复", "moon"),
         ]
+        
+        self.max_hours = 8.0 # Y轴最大值
 
-        self.max_val = 6.0
+    def mouseMoveEvent(self, event):
+        # 简单的悬停检测
+        pos = event.pos()
+        w = self.width()
+        spacing = w / len(self.data)
+        margin_left = spacing / 2
+        
+        index = int((pos.x()) / spacing)
+        if 0 <= index < len(self.data):
+            self.hovered_index = index
+            self.update()
+        else:
+            self.hovered_index = -1
+        super().mouseMoveEvent(event)
 
-        # 启动动画
-        for bar in self.bars:
-            bar.current_height.valueChanged.connect(self.update)
-            # 0 -> target_value
-            bar.current_height.animate_to(
-                bar.target_value, 800, bar.delay, QtCore.QEasingCurve.OutBack)
+    def leaveEvent(self, event):
+        self.hovered_index = -1
+        self.update()
+        super().leaveEvent(event)
+
+    def mousePressEvent(self, event):
+        self.clicked.emit()
+        super().mousePressEvent(event)
 
     def paintEvent(self, event):
         p = QtGui.QPainter(self)
         p.setRenderHint(QtGui.QPainter.Antialiasing)
-
+        
         w = self.width()
         h = self.height()
-        padding_left = 60
-        padding_bottom = 40
-        padding_top = 60
-        graph_w = w - padding_left - 20
-        graph_h = h - padding_bottom - padding_top
-
-        # 1. 绘制坐标轴和网格线
-        p.setPen(MorandiTheme.COLOR_BORDER)
-        font = QtGui.QFont("Noto Sans SC", 9)
-        p.setFont(font)
-
-        grid_count = 4
-        for i in range(grid_count + 1):
-            val = self.max_val * i / grid_count
-            y = padding_top + graph_h - (val / self.max_val * graph_h)
-
-            # 网格线 - 极淡蓝
-            if i > 0:
-                p.setPen(QtGui.QPen(MorandiTheme.COLOR_GRID, 1, QtCore.Qt.DashLine))
-                p.drawLine(int(padding_left), int(y), int(w - 20), int(y))
-
-            # Y轴刻度 - 莫兰迪蓝 70%
-            p.setPen(MorandiTheme.COLOR_TEXT_DATE)
-            p.drawText(QtCore.QRect(0, int(y - 10), padding_left - 10, 20),
-                       QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter, f"{val:.1f}h")
-
-        # 2. 绘制柱子
-        bar_width = graph_w / len(self.bars) * 0.6
-        spacing = graph_w / len(self.bars)
-
-        for i, bar in enumerate(self.bars):
-            cx = padding_left + spacing * i + spacing / 2
-            val = bar.current_height.value
-            bar_h = (val / self.max_val) * graph_h
-
-            # 柱子矩形 (底部对齐)
-            rect = QtCore.QRectF(
-                cx - bar_width/2, padding_top + graph_h - bar_h, bar_width, bar_h)
-
-            if bar_h > 0:
-                # 填充: 金色 60%
-                p.setBrush(MorandiTheme.COLOR_CHART_BAR)
-                # 边框: 莫兰迪蓝 40%
-                p.setPen(QtGui.QPen(MorandiTheme.COLOR_CHART_BORDER, 1))
-                p.drawRoundedRect(rect, 4, 4)
-
-            # X轴标签 - 莫兰迪蓝 70%
-            p.setPen(MorandiTheme.COLOR_TEXT_DATE)
-            p.drawText(QtCore.QRectF(cx - spacing/2, h - padding_bottom + 5, spacing, 30),
-                       QtCore.Qt.AlignCenter, bar.label)
-
-            # 数值标签 (金色)
-            if val > bar.target_value * 0.95:
-                p.setPen(MorandiTheme.COLOR_TEXT_VALUE)
-                font_val = QtGui.QFont("Noto Sans SC", 10, QtGui.QFont.Bold)
-                p.setFont(font_val)
-                p.drawText(QtCore.QRectF(cx - spacing/2, rect.top() - 25, spacing, 20),
-                           QtCore.Qt.AlignCenter, f"{bar.target_value}h")
-                p.setFont(font) # 还原
-
-                # 皇冠图标 (本周) - 金色
-                if bar.is_current:
-                    p.setPen(QtGui.QColor("#ffd700"))
-                    font_icon = QtGui.QFont("Segoe UI Emoji", 12)
-                    p.setFont(font_icon)
-                    p.drawText(QtCore.QRectF(cx - spacing/2, rect.top() - 45, spacing, 20),
-                               QtCore.Qt.AlignCenter, "👑")
-                    p.setFont(font)
-
-# --- 左栏：成就墙 ---
-
-
-class DayIcon(QtWidgets.QWidget):
-    def __init__(self, day_name, date_str, hours, level, icon_type):
-        super().__init__()
-        self.setFixedSize(70, 100)
-        self.setCursor(QtCore.Qt.PointingHandCursor)
-        self.day_name = day_name
-        self.date_str = date_str
-        self.hours = hours
-        self.level = level
-        self.icon_type = icon_type  # 'sun', 'star', 'cloud', 'moon'
-
-        # 初始化视觉增强组件
-        # self.feedback_system = InteractionFeedbackSystem(self) # 移除可能有问题的反馈系统
-
-        self.hover_progress = AnimatedValue(0.0)
-        self.hover_progress.valueChanged.connect(self.update)
-
-        # 设置交互反馈 - 改为仅使用内部动画
-        # self.feedback_system.setup_hover_feedback(self, scale_factor=1.08)
-        # self.feedback_system.setup_click_feedback(self, with_particles=True)
-
-    def paintEvent(self, event):
-        p = QtGui.QPainter(self)
-        p.setRenderHint(QtGui.QPainter.Antialiasing)
-
-        prog = self.hover_progress.value
         
-        # 应用缩放 (中心缩放)
-        if prog > 0:
-            scale = 1.0 + 0.08 * prog # 放大 8%
-            cx, cy = self.width() / 2, self.height() / 2
-            p.translate(cx, cy)
-            p.scale(scale, scale)
-            p.translate(-cx, -cy)
-
-        # 1. 绘制背景光晕 (Hover) - 莫兰迪蓝光晕
-        if prog > 0.01:
-            center = QtCore.QPointF(self.width()/2, 40)
-            radius = 35 + 5 * prog
+        # 绘图区域参数
+        padding_top = 60
+        padding_bottom = 40
+        graph_h = h - padding_top - padding_bottom
+        
+        spacing = w / len(self.data)
+        
+        # 1. 绘制折线
+        points = []
+        progress = self.anim_progress.value
+        
+        # 颜色定义
+        color_main = QtGui.QColor("#a8d8ea") # 莫兰迪蓝
+        color_gold = QtGui.QColor("#ffd700") # 金色
+        
+        for i, item in enumerate(self.data):
+            hours = item[2]
+            cx = spacing * i + spacing / 2
             
-            # 使用 QLinearGradient 替代 QRadialGradient
-            # 某些环境（如远程桌面或虚拟机）对 QRadialGradient 的支持可能不完善，导致 Painter 状态错误
-            # 这里改用简单的实心填充+透明度，或者用图片，或者用 QLinearGradient 模拟
-            # 为安全起见，我们暂时简化为一个半透明圆
+            # 计算Y坐标 (0在下方)
+            # 加上动画效果: 高度从0长到目标值
+            target_y_ratio = hours / self.max_hours
+            current_y_ratio = target_y_ratio * progress
             
-            glow_color = QtGui.QColor(168, 216, 234, 76) # 30% alpha
-            glow_color.setAlphaF(0.3 * prog)
+            cy = h - padding_bottom - (current_y_ratio * graph_h)
+            points.append(QtCore.QPointF(cx, cy))
             
-            p.setBrush(glow_color)
+        if len(points) > 1:
+            # 绘制连线 - 金色
+            p.setPen(QtGui.QPen(color_gold, 2))
+            path = QtGui.QPainterPath()
+            path.moveTo(points[0])
+            for pt in points[1:]:
+                path.lineTo(pt)
+            p.drawPath(path)
+            
+            # 绘制下方填充 (渐变)
+            fill_path = QtGui.QPainterPath(path)
+            fill_path.lineTo(points[-1].x(), h - padding_bottom)
+            fill_path.lineTo(points[0].x(), h - padding_bottom)
+            fill_path.closeSubpath()
+            
+            grad = QtGui.QLinearGradient(0, padding_top, 0, h - padding_bottom)
+            c_start = QtGui.QColor(color_gold)
+            c_start.setAlpha(40) # 15%左右
+            c_end = QtGui.QColor(color_gold)
+            c_end.setAlpha(0)
+            grad.setColorAt(0, c_start)
+            grad.setColorAt(1, c_end)
+            p.setBrush(grad)
             p.setPen(QtCore.Qt.NoPen)
-            p.drawEllipse(center, radius, radius)
+            p.drawPath(fill_path)
 
-        # 2. 绘制图标
-        icon_size = 40 + 4 * prog  # 放大
-        icon_rect = QtCore.QRectF(
-            (self.width()-icon_size)/2, 40 - icon_size/2, icon_size, icon_size)
-
-        self.draw_icon_shape(p, icon_rect, self.icon_type)
-
-        # 3. 文字信息
-        # 周几 - 莫兰迪蓝 90%
-        p.setPen(MorandiTheme.COLOR_TEXT_TITLE)
-        font = QtGui.QFont("Noto Sans SC", 9)
-        p.setFont(font)
-
-        p.drawText(QtCore.QRect(0, 0, self.width(), 20),
-                   QtCore.Qt.AlignCenter, self.day_name)
-
-        # 日期 - 莫兰迪蓝 70%
-        p.setPen(MorandiTheme.COLOR_TEXT_DATE)
-        font.setPixelSize(8)
-        p.setFont(font)
-        p.drawText(QtCore.QRect(0, 65, self.width(), 15),
-                   QtCore.Qt.AlignCenter, self.date_str)
-
-        # 时长 - 金色
-        p.setPen(MorandiTheme.COLOR_TEXT_VALUE)
-        font.setPixelSize(9)
-        font.setBold(True)
-        p.setFont(font)
-        p.drawText(QtCore.QRect(0, 80, self.width(), 15),
-                   QtCore.Qt.AlignCenter, f"{self.hours}h")
+        # 2. 绘制每个点的内容 (图标, 文字)
+        for i, (day, date_str, hours, lvl, icon_type) in enumerate(self.data):
+            pt = points[i]
+            cx, cy = pt.x(), pt.y()
+            
+            is_hovered = (i == self.hovered_index)
+            
+            # 绘制点 - 金色实心
+            p.setBrush(color_gold)
+            p.setPen(QtCore.Qt.NoPen)
+            dot_size = 6 if not is_hovered else 9
+            p.drawEllipse(QtCore.QPointF(cx, cy), dot_size/2, dot_size/2)
+            
+            # 绘制上方图标
+            # 稍微上移一点
+            icon_y = cy - 25
+            icon_size = 24 if not is_hovered else 30
+            icon_rect = QtCore.QRectF(cx - icon_size/2, icon_y - icon_size/2, icon_size, icon_size)
+            
+            self.draw_icon_shape(p, icon_rect, icon_type)
+            
+            # 绘制上方时长文字
+            p.setPen(color_gold)
+            font_val = QtGui.QFont("Noto Sans SC", 9, QtGui.QFont.Bold)
+            p.setFont(font_val)
+            p.drawText(QtCore.QRectF(cx - 30, icon_rect.top() - 20, 60, 20), 
+                       QtCore.Qt.AlignCenter, f"{hours}h")
+            
+            # 绘制下方日期文字
+            # 周几
+            p.setPen(QtGui.QColor(168, 216, 234, 255)) # 100% 莫兰迪蓝
+            font_day = QtGui.QFont("Noto Sans SC", 9)
+            p.setFont(font_day)
+            p.drawText(QtCore.QRectF(cx - 30, h - padding_bottom + 5, 60, 20),
+                       QtCore.Qt.AlignCenter, day)
+            
+            # 日期
+            p.setPen(QtGui.QColor(168, 216, 234, 204)) # 80%
+            font_date = QtGui.QFont("Noto Sans SC", 8)
+            p.setFont(font_date)
+            p.drawText(QtCore.QRectF(cx - 30, h - padding_bottom + 22, 60, 15),
+                       QtCore.Qt.AlignCenter, date_str)
 
     def draw_icon_shape(self, p, rect, type):
         # 统一使用金色主题
@@ -484,16 +600,16 @@ class DayIcon(QtWidgets.QWidget):
         if type == 'sun':
             p.setBrush(gold)
             p.setPen(QtCore.Qt.NoPen)
-            p.drawEllipse(rect.adjusted(4, 4, -4, -4))
+            p.drawEllipse(rect.adjusted(2, 2, -2, -2))
             # 光芒
             cx, cy = rect.center().x(), rect.center().y()
-            r = rect.width()/2
+            r = rect.width()/2 - 1
             for i in range(8):
                 angle = i * 45
                 rad = math.radians(angle)
-                ox = cx + math.cos(rad) * (r + 2)
-                oy = cy + math.sin(rad) * (r + 2)
-                p.setPen(QtGui.QPen(gold, 2))
+                ox = cx + math.cos(rad) * (r + 1.5)
+                oy = cy + math.sin(rad) * (r + 1.5)
+                p.setPen(QtGui.QPen(gold, 1.5))
                 p.drawLine(QtCore.QPointF(cx + math.cos(rad)*r, cy + math.sin(rad)*r),
                            QtCore.QPointF(ox, oy))
 
@@ -518,7 +634,7 @@ class DayIcon(QtWidgets.QWidget):
         elif type == 'cloud':
             p.setBrush(QtGui.QColor(168, 216, 234, 180)) # 莫兰迪蓝
             p.setPen(QtCore.Qt.NoPen)
-            p.drawEllipse(rect.adjusted(2, 6, -2, -6))
+            p.drawEllipse(rect.adjusted(1, 3, -1, -3))
 
         elif type == 'moon':
             p.setBrush(gold.lighter(120)) # 浅金
@@ -530,39 +646,6 @@ class DayIcon(QtWidgets.QWidget):
                 rect.width()*0.3, -rect.height()*0.1))
             path = path.subtracted(cut)
             p.drawPath(path)
-
-    def enterEvent(self, event):
-        super().enterEvent(event)
-        self.hover_progress.animate_to(1.0, 300)
-
-    def leaveEvent(self, event):
-        self.hover_progress.animate_to(0.0, 300)
-
-
-class AchievementWall(QtWidgets.QWidget):
-    def __init__(self):
-        super().__init__()
-        self.setFixedWidth(280)
-
-        layout = QtWidgets.QGridLayout(self)
-        layout.setSpacing(5)
-
-        # 数据
-        data = [
-            ("周一", "12/8", 4.2, "专注", "sun"),
-            ("周二", "12/9", 6.1, "巅峰", "sun"),
-            ("周三", "12/10", 5.8, "优秀", "sun"),
-            ("周四", "12/11", 2.5, "放松", "cloud"),
-            ("周五", "12/12", 5.2, "良好", "sun"),
-            ("周六", "12/13", 3.0, "休息", "star"),
-            ("周日", "12/14", 4.5, "恢复", "moon"),
-        ]
-
-        for i, (day, date, h, lvl, icon) in enumerate(data):
-            item = DayIcon(day, date, h, lvl, icon)
-            row = i // 4
-            col = i % 4
-            layout.addWidget(item, row, col)
 
 try:
     from ui.component.visual_enhancements.starry_envelope import ReportEnvelopeContainer
@@ -578,12 +661,16 @@ except ImportError:
 # --- 主仪表盘内容 ---
 
 
-class _WeeklyDashboardContent(QtWidgets.QWidget):
+class WeeklyReportMain(QtWidgets.QWidget):
     clicked = Signal()
 
     def __init__(self):
         super().__init__()
-        self.resize(900, 600)
+        self.resize(1000, 600)
+        
+        # 状态标记：是否已展开左右面板
+        self.is_left_expanded = False
+        self.is_right_expanded = False
         
         # 初始化视觉增强组件
         self.animation_engine = PrecisionAnimationEngine(self)
@@ -600,8 +687,12 @@ class _WeeklyDashboardContent(QtWidgets.QWidget):
         self.main_layout.setContentsMargins(30, 40, 30, 40)
         self.main_layout.setSpacing(20)
 
-        # 左栏
-        self.left_panel = AchievementWall()
+        # 左栏 (原中栏成就墙 ComparisonChart -> WeeklySummaryView)
+        self.left_panel = WeeklySummaryView()
+        # 初始隐藏左栏
+        self.left_panel.setMinimumWidth(0)
+        self.left_panel.setMaximumWidth(0)
+        
         # 移除 GraphicsEffect 以修复 Painter 错误
         # self.left_anim_opacity = QtWidgets.QGraphicsOpacityEffect(self.left_panel)
         # self.left_panel.setGraphicsEffect(self.left_anim_opacity)
@@ -609,45 +700,86 @@ class _WeeklyDashboardContent(QtWidgets.QWidget):
         self.left_panel.setWindowOpacity(0.0) # 尝试使用 windowOpacity 或 stylesheet opacity (但这通常对子控件无效)
         # 这里我们使用自定义属性来控制 paintEvent 中的透明度，或者简单地禁用淡入动画
 
-        # 中栏
-        self.mid_panel = ComparisonChart()
-        # self.mid_anim_opacity = QtWidgets.QGraphicsOpacityEffect(self.mid_panel)
-        # self.mid_panel.setGraphicsEffect(self.mid_anim_opacity)
-        # self.mid_anim_opacity.setOpacity(0)
+        # 中栏 (原左栏本周记录 AchievementWall)
+        # 创建中间容器，用于垂直排列成就墙和下方按钮
+        self.mid_container = QtWidgets.QWidget()
+        self.mid_container.setFixedWidth(280)
+        self.mid_layout = QtWidgets.QVBoxLayout(self.mid_container)
+        # 增加顶部边距，避开标题 (标题高度约90+40=130，这里设置80+40=120，略有重叠或紧凑，视情况调整)
+        # 考虑到标题框的实际位置，下移 100px 比较稳妥
+        # 用户要求再下移一点，改为 140 -> 180 -> 150 (上移以平衡空间)
+        self.mid_layout.setContentsMargins(0, 60, 0, 0)
+        self.mid_layout.setSpacing(15)
+
+        self.mid_panel = WeeklyTrendChart()
+        self.mid_layout.addWidget(self.mid_panel)
+        
+        # 添加两个功能按钮
+        # 按钮样式
+        btn_style = """
+            QPushButton {
+                background-color: rgba(168, 216, 234, 30);
+                border: 1px solid rgba(168, 216, 234, 76);
+                border-radius: 12px;
+                color: #ffd700;
+                font-family: 'Noto Sans SC';
+                font-size: 14px;
+                font-weight: bold;
+                padding: 8px;
+            }
+            QPushButton:hover {
+                background-color: rgba(168, 216, 234, 64);
+                border: 1px solid #ffd700;
+            }
+        """
+        
+        self.btn_summary = QtWidgets.QPushButton("核心洞察")
+        self.btn_summary.setCursor(QtCore.Qt.PointingHandCursor)
+        self.btn_summary.setStyleSheet(btn_style)
+        self.btn_summary.clicked.connect(self.toggle_left_panel)
+        self.mid_layout.addWidget(self.btn_summary)
+
+        self.btn_ai_suggestion = QtWidgets.QPushButton("AI建议")
+        self.btn_ai_suggestion.setCursor(QtCore.Qt.PointingHandCursor)
+        self.btn_ai_suggestion.setStyleSheet(btn_style)
+        self.btn_ai_suggestion.clicked.connect(self.toggle_right_panel)
+        self.mid_layout.addWidget(self.btn_ai_suggestion)
+        
+        self.mid_layout.addStretch()
+
+        # 连接点击信号以触发展开动画 (可选：点击面板本身也展开全部，或取消此行为)
+        # self.mid_panel.clicked.connect(self.expand_panels) # 取消点击面板展开全部的行为，改由按钮控制
 
         # 右栏
         self.right_panel = QtWidgets.QWidget()
-        self.right_panel.setFixedWidth(220)
+        # 初始隐藏右栏
+        self.right_panel.setFixedWidth(0) # 初始宽度0
+        
         r_layout = QtWidgets.QVBoxLayout(self.right_panel)
+        # 增加顶部边距，留出标题空间
+        r_layout.setContentsMargins(0, 40, 0, 0)
+        # 增加栏目间距
+        r_layout.setSpacing(30) # 10 -> 20 -> 30
+
+        # 添加 "AI建议" 标题
+        title_label = QtWidgets.QLabel("AI建议")
+        title_label.setStyleSheet("""
+            color: #ffd700;
+            font-family: 'Noto Sans SC';
+            font-size: 18px;
+            font-weight: bold;
+            background: transparent;
+        """)
+        title_label.setAlignment(QtCore.Qt.AlignCenter)
+        r_layout.addWidget(title_label)
+        
+        r_layout.addSpacing(10)
+        
         r_layout.addWidget(InsightCard(
             "💡 效率高峰期", "上午9-11点", "抓住黄金时段，学霸体质get！"))
         r_layout.addWidget(InsightCard("⚠️ 易分心时段", "下午3点后", "不妨安排轻松任务，灵活调整~"))
         r_layout.addWidget(InsightCard("📈 成长趋势", "本周提升15%", "稳步上升，势头强劲！"))
         r_layout.addStretch()
-        
-        # 添加 "查看时间轴" 按钮 (新增)
-        self.timeline_btn = QtWidgets.QPushButton("查看时间轴")
-        self.timeline_btn.setCursor(QtCore.Qt.PointingHandCursor)
-        self.timeline_btn.setFixedHeight(40)
-        # 按钮样式
-        self.timeline_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: rgba(168, 216, 234, 30);
-                border: 1px solid rgba(168, 216, 234, 76);
-                border-radius: 20px;
-                color: rgba(168, 216, 234, 230);
-                font-family: 'Noto Sans SC';
-                font-size: 14px;
-            }}
-            QPushButton:hover {{
-                background-color: rgba(168, 216, 234, 64);
-                color: #ffd700;
-                border: 1px solid rgba(168, 216, 234, 128);
-            }}
-        """)
-        r_layout.addWidget(self.timeline_btn)
-        # 连接按钮点击信号
-        self.timeline_btn.clicked.connect(self.show_timeline)
 
         # self.right_anim_opacity = QtWidgets.QGraphicsOpacityEffect(self.right_panel)
         # self.right_panel.setGraphicsEffect(self.right_anim_opacity)
@@ -657,18 +789,22 @@ class _WeeklyDashboardContent(QtWidgets.QWidget):
         self.main_layout.addWidget(self.left_panel)
 
         # 分隔线 1 - 莫兰迪蓝
-        line1 = QtWidgets.QFrame()
-        line1.setFrameShape(QtWidgets.QFrame.VLine)
-        line1.setStyleSheet("background-color: rgba(168, 216, 234, 76);")
-        self.main_layout.addWidget(line1)
+        self.line1 = QtWidgets.QFrame()
+        self.line1.setFrameShape(QtWidgets.QFrame.VLine)
+        self.line1.setStyleSheet("background-color: rgba(168, 216, 234, 76);")
+        # 初始隐藏分隔线
+        self.line1.hide()
+        self.main_layout.addWidget(self.line1)
 
-        self.main_layout.addWidget(self.mid_panel)
+        self.main_layout.addWidget(self.mid_container)
 
         # 分隔线 2
-        line2 = QtWidgets.QFrame()
-        line2.setFrameShape(QtWidgets.QFrame.VLine)
-        line2.setStyleSheet("background-color: rgba(168, 216, 234, 76);")
-        self.main_layout.addWidget(line2)
+        self.line2 = QtWidgets.QFrame()
+        self.line2.setFrameShape(QtWidgets.QFrame.VLine)
+        self.line2.setStyleSheet("background-color: rgba(168, 216, 234, 76);")
+        # 初始隐藏分隔线
+        self.line2.hide()
+        self.main_layout.addWidget(self.line2)
 
         self.main_layout.addWidget(self.right_panel)
 
@@ -779,6 +915,182 @@ class _WeeklyDashboardContent(QtWidgets.QWidget):
         p.setPen(inner_pen)
         p.drawRoundedRect(rect.adjusted(4, 4, -4, -4), 10, 10)
 
+        # 绘制顶部中央标题框
+        # 修改定位逻辑：获取 mid_panel 在 WeeklyReportMain 中的绝对位置中心
+        # 这样即使左侧趋势图展开导致布局移动，标题也会跟随移动，保持相对位置不变
+        
+        # 1. 获取 mid_panel 在 mid_container 中的中心点
+        panel_center_in_container = self.mid_panel.geometry().center().x()
+        # 2. 获取 mid_container 在 WeeklyReportMain (self) 中的 x 坐标
+        container_x = self.mid_container.geometry().x()
+        
+        target_center_x = container_x + panel_center_in_container
+        
+        title_rect_w, title_rect_h = 300, 90
+        top_margin = 40  # 与主布局顶部边距一致
+        
+        title_rect = QtCore.QRectF(target_center_x - title_rect_w / 2,
+                                   top_margin,
+                                   title_rect_w, title_rect_h)
+
+        # 标题文字 - 金色
+        p.setPen(QtGui.QColor("#ffd700"))
+        font_title = QtGui.QFont("Noto Sans SC", 24, QtGui.QFont.Bold)
+        p.setFont(font_title)
+        p.drawText(title_rect, QtCore.Qt.AlignCenter, "本周战绩")
+
+        # 装饰线 - 莫兰迪蓝 30%
+        p.setPen(QtGui.QPen(QtGui.QColor(168, 216, 234, 76), 2))
+        p.drawLine(QtCore.QPointF(title_rect.left() + 40, title_rect.bottom() - 20),
+                   QtCore.QPointF(title_rect.right() - 40, title_rect.bottom() - 20))
+
+    def toggle_left_panel(self):
+        """切换左侧面板（核心洞察）"""
+        target_left_width = 380
+        top_window = self.window()
+        
+        if not self.is_left_expanded:
+            # 展开左侧
+            self.is_left_expanded = True
+            self.line1.show()
+            
+            # 1. 窗口扩展
+            if top_window:
+                current_geo = top_window.geometry()
+                # 向左扩展
+                target_geo = QtCore.QRect(
+                    current_geo.x() - target_left_width,
+                    current_geo.y(),
+                    current_geo.width() + target_left_width,
+                    current_geo.height()
+                )
+                self.anim_window_l = QtCore.QPropertyAnimation(top_window, b"geometry")
+                self.anim_window_l.setDuration(600)
+                self.anim_window_l.setStartValue(current_geo)
+                self.anim_window_l.setEndValue(target_geo)
+                self.anim_window_l.setEasingCurve(QtCore.QEasingCurve.OutQuart)
+                self.anim_window_l.start()
+
+            # 2. 左栏动画
+            self.left_panel.setMinimumWidth(0)
+            self.anim_left = QtCore.QPropertyAnimation(self.left_panel, b"maximumWidth")
+            self.anim_left.setDuration(600)
+            self.anim_left.setStartValue(0)
+            self.anim_left.setEndValue(target_left_width)
+            self.anim_left.setEasingCurve(QtCore.QEasingCurve.OutQuart)
+            self.anim_left.finished.connect(lambda: self.left_panel.setMinimumWidth(target_left_width))
+            self.anim_left.start()
+            
+            self.btn_summary.setText("收起洞察")
+            
+        else:
+            # 收起左侧
+            self.is_left_expanded = False
+            # self.line1.hide() # 动画结束后隐藏
+            
+            # 1. 窗口收缩
+            if top_window:
+                current_geo = top_window.geometry()
+                # 向右收缩 (x 增加，width 减小)
+                target_geo = QtCore.QRect(
+                    current_geo.x() + target_left_width,
+                    current_geo.y(),
+                    current_geo.width() - target_left_width,
+                    current_geo.height()
+                )
+                self.anim_window_l = QtCore.QPropertyAnimation(top_window, b"geometry")
+                self.anim_window_l.setDuration(600)
+                self.anim_window_l.setStartValue(current_geo)
+                self.anim_window_l.setEndValue(target_geo)
+                self.anim_window_l.setEasingCurve(QtCore.QEasingCurve.OutQuart)
+                self.anim_window_l.start()
+
+            # 2. 左栏动画
+            self.left_panel.setMinimumWidth(0)
+            self.left_panel.setMaximumWidth(target_left_width)
+            self.anim_left = QtCore.QPropertyAnimation(self.left_panel, b"maximumWidth")
+            self.anim_left.setDuration(600)
+            self.anim_left.setStartValue(target_left_width)
+            self.anim_left.setEndValue(0)
+            self.anim_left.setEasingCurve(QtCore.QEasingCurve.OutQuart)
+            self.anim_left.finished.connect(self.line1.hide)
+            self.anim_left.start()
+            
+            self.btn_summary.setText("核心洞察")
+
+    def toggle_right_panel(self):
+        """切换右侧面板（AI建议）"""
+        target_right_width = 220
+        top_window = self.window()
+        
+        if not self.is_right_expanded:
+            # 展开右侧
+            self.is_right_expanded = True
+            self.line2.show()
+            
+            # 1. 窗口扩展
+            if top_window:
+                current_geo = top_window.geometry()
+                # 向右扩展 (x 不变，width 增加)
+                target_geo = QtCore.QRect(
+                    current_geo.x(),
+                    current_geo.y(),
+                    current_geo.width() + target_right_width,
+                    current_geo.height()
+                )
+                self.anim_window_r = QtCore.QPropertyAnimation(top_window, b"geometry")
+                self.anim_window_r.setDuration(600)
+                self.anim_window_r.setStartValue(current_geo)
+                self.anim_window_r.setEndValue(target_geo)
+                self.anim_window_r.setEasingCurve(QtCore.QEasingCurve.OutQuart)
+                self.anim_window_r.start()
+
+            # 2. 右栏动画
+            self.right_panel.setMinimumWidth(0)
+            self.anim_right = QtCore.QPropertyAnimation(self.right_panel, b"maximumWidth")
+            self.anim_right.setDuration(600)
+            self.anim_right.setStartValue(0)
+            self.anim_right.setEndValue(target_right_width)
+            self.anim_right.setEasingCurve(QtCore.QEasingCurve.OutQuart)
+            self.anim_right.finished.connect(lambda: self.right_panel.setMinimumWidth(target_right_width))
+            self.anim_right.start()
+            
+            self.btn_ai_suggestion.setText("收起建议")
+            
+        else:
+            # 收起右侧
+            self.is_right_expanded = False
+            
+            # 1. 窗口收缩
+            if top_window:
+                current_geo = top_window.geometry()
+                # 向左收缩 (x 不变，width 减小)
+                target_geo = QtCore.QRect(
+                    current_geo.x(),
+                    current_geo.y(),
+                    current_geo.width() - target_right_width,
+                    current_geo.height()
+                )
+                self.anim_window_r = QtCore.QPropertyAnimation(top_window, b"geometry")
+                self.anim_window_r.setDuration(600)
+                self.anim_window_r.setStartValue(current_geo)
+                self.anim_window_r.setEndValue(target_geo)
+                self.anim_window_r.setEasingCurve(QtCore.QEasingCurve.OutQuart)
+                self.anim_window_r.start()
+
+            # 2. 右栏动画
+            self.right_panel.setMinimumWidth(0)
+            self.right_panel.setMaximumWidth(target_right_width)
+            self.anim_right = QtCore.QPropertyAnimation(self.right_panel, b"maximumWidth")
+            self.anim_right.setDuration(600)
+            self.anim_right.setStartValue(target_right_width)
+            self.anim_right.setEndValue(0)
+            self.anim_right.setEasingCurve(QtCore.QEasingCurve.OutQuart)
+            self.anim_right.finished.connect(self.line2.hide)
+            self.anim_right.start()
+            
+            self.btn_ai_suggestion.setText("AI建议")
+
     def start_entrance_animation(self):
         # 暂时禁用淡入动画以修复 Painter 错误
         pass
@@ -824,14 +1136,18 @@ class WeeklyDashboard(ReportEnvelopeContainer):
 
     def __init__(self):
         super().__init__(expanded_height=600)
-        self.resize(900, 280)
+        self.resize(1000, 600)
         self.drag_start_pos = None
 
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.Window | QtCore.Qt.WindowStaysOnTopHint)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
 
-        self.content = _WeeklyDashboardContent()
+        self.content = WeeklyReportMain()
         self.set_content(self.content)
+        
+        # 初始宽度调整为只显示中间面板 (340px = 280 + 30 + 30)
+        # 高度增加以容纳标题、成就墙和按钮 (原280 -> 520 -> 550 -> 600)
+        self.resize(340, 600)
         
         # 居中显示
         screen = QtGui.QGuiApplication.primaryScreen()
@@ -863,6 +1179,10 @@ class WeeklyDashboard(ReportEnvelopeContainer):
             
             # 计算展开后的中心点偏移
             # 我们希望内容看起来是向上生长的，或者整体上移
+            
+            # 此时 content 可能还没有水平展开，宽度较窄
+            # 如果 content 已经展开了，宽度是 1000
+            # 我们取当前宽度即可
             
             target_pos = screen_center - QtCore.QPoint(self.width() // 2, self.height() // 2) - QtCore.QPoint(0, 200)
             
