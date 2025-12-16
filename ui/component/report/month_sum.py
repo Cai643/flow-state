@@ -287,7 +287,7 @@ class TimelineNode(QtWidgets.QWidget):
 
         # 主题颜色
         line_color = MorandiTheme.COLOR_BORDER
-        accent_color = MorandiTheme.COLOR_CHART_BAR  # 亮黄色
+        accent_color = QtGui.QColor("#FFC400")
         text_primary = MorandiTheme.COLOR_TEXT_NORMAL
         text_secondary = MorandiTheme.COLOR_TEXT_SUBTITLE
         text_disabled = MorandiTheme.COLOR_TEXT_LOCKED
@@ -327,17 +327,13 @@ class TimelineNode(QtWidgets.QWidget):
         text_x = 65
 
         # 标题 (50h / 100h)
+        font = QtGui.QFont("Segoe UI", 14, QtGui.QFont.Bold)
+        p.setFont(font)
         if self.status != 'locked':
             p.setPen(accent_color)
-            font = QtGui.QFont("Segoe UI", 14, QtGui.QFont.Bold)
-            p.setFont(font)
-            MorandiTheme.draw_text_at_point_with_shadow(
-                p, text_x, cy + 8, self.hours, accent_color)
         else:
             p.setPen(text_disabled)
-            font = QtGui.QFont("Segoe UI", 14, QtGui.QFont.Bold)
-            p.setFont(font)
-            p.drawText(text_x, cy + 8, self.hours)
+        p.drawText(text_x, cy + 8, self.hours)
 
         # 日期
         p.setPen(text_primary)
@@ -358,7 +354,7 @@ class TimelineNode(QtWidgets.QWidget):
         # 悬停高亮
         if self.hover_progress.value > 0.01:
             bg_color = MorandiTheme.color(
-                MorandiTheme.HEX_BLUE_LIGHT, 25)  # 10%
+                MorandiTheme.COLOR_PRIMARY_LIGHT, 25)  # 10%
             p.setPen(QtCore.Qt.NoPen)
             p.setBrush(bg_color)
             p.drawRoundedRect(5, 5, self.width() - 10, 70, 8, 8)
@@ -616,14 +612,14 @@ class DayCell(QtWidgets.QWidget):
         self.day_label = QtWidgets.QLabel(f"{day}日")
         self.day_label.setAlignment(QtCore.Qt.AlignCenter)
         self.day_label.setFixedHeight(16)  # 固定高度
-        self.day_label.setStyleSheet("""
-            QLabel {
-                color: rgba(168, 216, 234, 204);  /* 莫兰迪蓝 80%透明度 */
+        self.day_label.setStyleSheet(f"""
+            QLabel {{
+                color: {MorandiTheme.COLOR_TEXT_SECONDARY.name()};  /* 莫兰迪蓝 80%透明度 */
                 font-size: 10px;
                 font-weight: bold;
                 font-family: 'Segoe UI', sans-serif;
                 background: transparent;
-            }
+            }}
         """)
         layout.addWidget(self.day_label)
 
@@ -637,25 +633,25 @@ class DayCell(QtWidgets.QWidget):
         self.spin_box.setSuffix("h")
         self.spin_box.setAlignment(QtCore.Qt.AlignCenter)
         self.spin_box.setFixedHeight(26)  # 减小高度
-        self.spin_box.setStyleSheet("""
-            QDoubleSpinBox {
-                color: rgba(255, 215, 0, 255);  /* 金色 100%透明度 */
-                background: rgba(168, 216, 234, 20);  /* 莫兰迪蓝 8%透明度 */
-                border: 1px solid rgba(168, 216, 234, 76);  /* 莫兰迪蓝 30%透明度 */
+        self.spin_box.setStyleSheet(f"""
+            QDoubleSpinBox {{
+                color: {MorandiTheme.COLOR_ACCENT_DARK.name()};  /* 金色 100%透明度 */
+                background: {MorandiTheme.COLOR_PRIMARY_LIGHT.name()};  /* 莫兰迪蓝 8%透明度 (需调整alpha) */
+                border: 1px solid {MorandiTheme.COLOR_BORDER.name()};  /* 莫兰迪蓝 30%透明度 */
                 border-radius: 4px;
                 padding: 3px;
                 font-size: 13px;
                 font-weight: bold;
                 font-family: 'Segoe UI', sans-serif;
-            }
-            QDoubleSpinBox:hover {
-                border-color: rgba(255, 215, 0, 255);  /* 金色边框 */
-                background: rgba(168, 216, 234, 38);  /* 莫兰迪蓝 15%透明度 */
-            }
-            QDoubleSpinBox:focus {
-                border: 2px solid rgba(255, 215, 0, 255);  /* 金色边框 */
-                background: rgba(168, 216, 234, 38);  /* 莫兰迪蓝 15%透明度 */
-            }
+            }}
+            QDoubleSpinBox:hover {{
+                border-color: {MorandiTheme.COLOR_ACCENT_DARK.name()};  /* 金色边框 */
+                background: {MorandiTheme.COLOR_PRIMARY_DARK.name()};  /* 莫兰迪蓝 15%透明度 */
+            }}
+            QDoubleSpinBox:focus {{
+                border: 2px solid {MorandiTheme.COLOR_ACCENT_DARK.name()};  /* 金色边框 */
+                background: {MorandiTheme.COLOR_PRIMARY_DARK.name()};  /* 莫兰迪蓝 15%透明度 */
+            }}
         """)
 
         self.spin_box.valueChanged.connect(self._on_value_changed)
@@ -666,27 +662,27 @@ class DayCell(QtWidgets.QWidget):
         self.task_input.setPlaceholderText("任务...")
         self.task_input.setAlignment(QtCore.Qt.AlignCenter)
         self.task_input.setFixedHeight(24)  # 减小高度
-        self.task_input.setStyleSheet("""
-            QLineEdit {
-                color: rgba(168, 216, 234, 230);  /* 莫兰迪蓝 90%透明度 */
-                background: rgba(168, 216, 234, 15);  /* 莫兰迪蓝 6%透明度 */
-                border: 1px solid rgba(168, 216, 234, 76);  /* 莫兰迪蓝 30%透明度 */
+        self.task_input.setStyleSheet(f"""
+            QLineEdit {{
+                color: {MorandiTheme.COLOR_TEXT_NORMAL.name()};  /* 莫兰迪蓝 90%透明度 */
+                background: {MorandiTheme.COLOR_PRIMARY_LIGHT.name()};  /* 莫兰迪蓝 6%透明度 */
+                border: 1px solid {MorandiTheme.COLOR_BORDER.name()};  /* 莫兰迪蓝 30%透明度 */
                 border-radius: 4px;
                 padding: 3px;
                 font-size: 10px;
                 font-family: 'Segoe UI', sans-serif;
-            }
-            QLineEdit::placeholder {
-                color: rgba(168, 216, 234, 128);  /* 莫兰迪蓝 50%透明度 */
-            }
-            QLineEdit:hover {
-                border-color: rgba(168, 216, 234, 128);  /* 莫兰迪蓝 50%透明度 */
-                background: rgba(168, 216, 234, 25);  /* 莫兰迪蓝 10%透明度 */
-            }
-            QLineEdit:focus {
-                border: 1px solid rgba(255, 215, 0, 200);  /* 金色边框 */
-                background: rgba(168, 216, 234, 30);  /* 莫兰迪蓝 12%透明度 */
-            }
+            }}
+            QLineEdit::placeholder {{
+                color: {MorandiTheme.COLOR_TEXT_SECONDARY.name()};  /* 莫兰迪蓝 50%透明度 */
+            }}
+            QLineEdit:hover {{
+                border-color: {MorandiTheme.COLOR_TEXT_SECONDARY.name()};  /* 莫兰迪蓝 50%透明度 */
+                background: {MorandiTheme.COLOR_PRIMARY_DARK.name()};  /* 莫兰迪蓝 10%透明度 */
+            }}
+            QLineEdit:focus {{
+                border: 1px solid {MorandiTheme.COLOR_ACCENT_DARK.name()};  /* 金色边框 */
+                background: {MorandiTheme.COLOR_PRIMARY_DARK.name()};  /* 莫兰迪蓝 12%透明度 */
+            }}
         """)
         self.task_input.textChanged.connect(self._on_task_changed)
         layout.addWidget(self.task_input)
@@ -736,13 +732,15 @@ class DayCell(QtWidgets.QWidget):
         hover_alpha = 38  # 15%透明度
         alpha = int(base_alpha + (hover_alpha - base_alpha)
                     * self.hover_progress.value)
-        bg_color = QtGui.QColor(168, 216, 234, alpha)
+        bg_color = QtGui.QColor(MorandiTheme.COLOR_BG_PANEL)
+        bg_color.setAlpha(alpha)
         p.setPen(QtCore.Qt.NoPen)
         p.setBrush(bg_color)
         p.drawRoundedRect(rect, 8, 8)
 
         # 边框 - 30%透明度
-        border_color = QtGui.QColor(168, 216, 234, 76)  # 30%透明度
+        border_color = QtGui.QColor(MorandiTheme.COLOR_BORDER)
+        border_color.setAlpha(76)  # 30%透明度
         p.setPen(QtGui.QPen(border_color, 2))
         p.setBrush(QtCore.Qt.NoBrush)
         p.drawRoundedRect(rect.adjusted(1, 1, -1, -1), 8, 8)
@@ -838,15 +836,15 @@ class MonthlyPlanDialog(QtWidgets.QDialog):
         title_label = QtWidgets.QLabel(random.choice(encouragements))
         title_label.setAlignment(QtCore.Qt.AlignCenter)
         title_label.setWordWrap(True)
-        title_label.setStyleSheet("""
-            QLabel {
-                color: rgba(255, 215, 0, 255);  /* 金色 100%透明度 */
+        title_label.setStyleSheet(f"""
+            QLabel {{
+                color: {MorandiTheme.COLOR_ACCENT_DARK.name()};  /* 金色 100%透明度 */
                 font-size: 20px;
                 font-weight: bold;
                 font-family: 'Segoe UI', sans-serif;
                 padding: 10px;
                 background: transparent;
-            }
+            }}
         """)
         main_layout.addWidget(title_label)
 
@@ -860,14 +858,14 @@ class MonthlyPlanDialog(QtWidgets.QDialog):
         for col, weekday in enumerate(weekdays):
             label = QtWidgets.QLabel(weekday)
             label.setAlignment(QtCore.Qt.AlignCenter)
-            label.setStyleSheet("""
-                QLabel {
-                    color: rgba(255, 215, 0, 255);  /* 金色 100%透明度 */
+            label.setStyleSheet(f"""
+                QLabel {{
+                    color: {MorandiTheme.COLOR_ACCENT_DARK.name()};  /* 金色 100%透明度 */
                     font-size: 14px;
                     font-weight: bold;
                     font-family: 'Segoe UI', sans-serif;
                     background: transparent;
-                }
+                }}
             """)
             calendar_layout.addWidget(label, 0, col)
 
@@ -893,17 +891,17 @@ class MonthlyPlanDialog(QtWidgets.QDialog):
         self.total_label = QtWidgets.QLabel(
             f"总计: 0.0h / {self.target_hours}h (0.0%)")
         self.total_label.setAlignment(QtCore.Qt.AlignCenter)
-        self.total_label.setStyleSheet("""
-            QLabel {
-                color: rgba(168, 216, 234, 255);  /* 莫兰迪蓝 100%透明度 */
+        self.total_label.setStyleSheet(f"""
+            QLabel {{
+                color: {MorandiTheme.COLOR_TEXT_TITLE.name()};  /* 莫兰迪蓝 100%透明度 */
                 font-size: 16px;
                 font-weight: bold;
                 font-family: 'Segoe UI', sans-serif;
                 padding: 10px;
-                background: rgba(168, 216, 234, 20);  /* 莫兰迪蓝 8%透明度 */
-                border: 1px solid rgba(168, 216, 234, 76);  /* 莫兰迪蓝 30%透明度 */
+                background: {MorandiTheme.COLOR_PRIMARY_LIGHT.name()};  /* 莫兰迪蓝 8%透明度 (需调整alpha) */
+                border: 1px solid {MorandiTheme.COLOR_BORDER.name()};  /* 莫兰迪蓝 30%透明度 */
                 border-radius: 8px;
-            }
+            }}
         """)
         main_layout.addWidget(self.total_label)
 
@@ -914,24 +912,24 @@ class MonthlyPlanDialog(QtWidgets.QDialog):
         close_btn = QtWidgets.QPushButton("✕ 关闭")
         close_btn.setFixedSize(120, 40)
         close_btn.setCursor(QtCore.Qt.PointingHandCursor)
-        close_btn.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(168, 216, 234, 38);  /* 莫兰迪蓝 15%透明度 */
-                color: rgba(168, 216, 234, 255);  /* 莫兰迪蓝 100%透明度 */
-                border: 1px solid rgba(168, 216, 234, 76);  /* 莫兰迪蓝 30%透明度 */
+        close_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {MorandiTheme.COLOR_PRIMARY_LIGHT.name()};  /* 莫兰迪蓝 15%透明度 */
+                color: {MorandiTheme.COLOR_TEXT_TITLE.name()};  /* 莫兰迪蓝 100%透明度 */
+                border: 1px solid {MorandiTheme.COLOR_BORDER.name()};  /* 莫兰迪蓝 30%透明度 */
                 border-radius: 8px;
                 font-weight: bold;
                 font-size: 14px;
                 font-family: 'Segoe UI', sans-serif;
-            }
-            QPushButton:hover {
-                background-color: rgba(255, 215, 0, 38);  /* 金色 15%透明度 */
-                color: rgba(255, 215, 0, 255);  /* 金色 100%透明度 */
-                border-color: rgba(255, 215, 0, 76);  /* 金色 30%透明度 */
-            }
-            QPushButton:pressed {
-                background-color: rgba(168, 216, 234, 51);  /* 莫兰迪蓝 20%透明度 */
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {MorandiTheme.COLOR_ACCENT_DARK.name()};  /* 金色 15%透明度 */
+                color: {MorandiTheme.COLOR_PRIMARY_DARK.name()};  /* 金色 100%透明度 */
+                border-color: {MorandiTheme.COLOR_ACCENT_DARK.name()};  /* 金色 30%透明度 */
+            }}
+            QPushButton:pressed {{
+                background-color: {MorandiTheme.COLOR_PRIMARY_DARK.name()};  /* 莫兰迪蓝 20%透明度 */
+            }}
         """)
         close_btn.clicked.connect(self.accept)
         button_layout.addWidget(close_btn)
@@ -993,13 +991,9 @@ class MonthlyPlanDialog(QtWidgets.QDialog):
 
         rect = self.rect()
 
-        # 背景渐变 - 使用莫兰迪蓝的渐变 (几乎完全透明)
-        gradient = QtGui.QRadialGradient(
-            rect.center(), max(rect.width(), rect.height()) / 1.2)
-        # 中心：莫兰迪蓝 2%透明度 (几乎完全透明)
-        gradient.setColorAt(0, QtGui.QColor(168, 216, 234, 5))
-        # 边缘：莫兰迪蓝 2%透明度 (几乎完全透明)
-        gradient.setColorAt(1, QtGui.QColor(168, 216, 234, 5))
+        gradient = QtGui.QLinearGradient(rect.topLeft(), rect.bottomRight())
+        gradient.setColorAt(0, QtGui.QColor("#94B267"))
+        gradient.setColorAt(1, QtGui.QColor("#7AA97D"))
 
         p.setBrush(gradient)
         p.setPen(QtCore.Qt.NoPen)
@@ -1007,14 +1001,16 @@ class MonthlyPlanDialog(QtWidgets.QDialog):
 
         # 绘制装饰星星 - 莫兰迪蓝 80%透明度闪烁
         for star in self.stars:
-            star_color = QtGui.QColor(168, 216, 234, star['alpha'])
+            star_color = QtGui.QColor(MorandiTheme.COLOR_ACCENT_DARK)
+            star_color.setAlpha(star['alpha'])
             p.setBrush(star_color)
             p.setPen(QtCore.Qt.NoPen)
             p.drawEllipse(QtCore.QPointF(
                 star['x'], star['y']), star['size'], star['size'])
 
         # 边框 - 莫兰迪蓝 30%透明度
-        border_color = QtGui.QColor(168, 216, 234, 76)
+        border_color = QtGui.QColor(MorandiTheme.COLOR_BORDER)
+        border_color.setAlpha(76)
         p.setPen(QtGui.QPen(border_color, 2))
         p.setBrush(QtCore.Qt.NoBrush)
         p.drawRoundedRect(rect.adjusted(1, 1, -1, -1), 12, 12)
@@ -1064,14 +1060,14 @@ class NextMonthPlan(QtWidgets.QWidget):
 
         progress_bar.setStyleSheet(f"""
             QProgressBar {{
-                background-color: rgba(168, 216, 234, 38);
+                background-color: {MorandiTheme.COLOR_PRIMARY_LIGHT.name()};
                 border: 1px solid {MorandiTheme.COLOR_BORDER.name()};
                 border-radius: 6px;
                 text-align: center;
                 color: transparent;
             }}
             QProgressBar::chunk {{
-                background-color: rgba(255, 215, 0, 250);
+                background-color: {MorandiTheme.COLOR_ACCENT_DARK.name()};
                 border-radius: 5px;
             }}
         """)
@@ -1118,9 +1114,9 @@ class NextMonthPlan(QtWidgets.QWidget):
 
         btn.setStyleSheet(f"""
             QPushButton {{
-                background-color: rgba(168, 216, 234, 30);
+                background-color: {MorandiTheme.COLOR_PRIMARY_LIGHT.name()};
                 color: {MorandiTheme.COLOR_TEXT_NORMAL.name()};
-                border: 1px solid rgba(168, 216, 234, 76);
+                border: 1px solid {MorandiTheme.COLOR_BORDER.name()};
                 border-radius: 10px;
                 padding: 12px;
                 font-weight: bold;
@@ -1128,12 +1124,12 @@ class NextMonthPlan(QtWidgets.QWidget):
                 font-family: 'Segoe UI', sans-serif;
             }}
             QPushButton:hover {{
-                background-color: rgba(168, 216, 234, 64);
-                color: #ffd700;
-                border-color: rgba(168, 216, 234, 128);
+                background-color: {MorandiTheme.COLOR_PRIMARY_DARK.name()};
+                color: {MorandiTheme.COLOR_ACCENT_DARK.name()};
+                border-color: {MorandiTheme.COLOR_ACCENT_DARK.name()};
             }}
             QPushButton:pressed {{
-                background-color: rgba(168, 216, 234, 100);
+                background-color: {MorandiTheme.COLOR_PRIMARY_DARK.name()};
             }}
         """)
 
@@ -1186,9 +1182,9 @@ class ExpandCollapseButton(QtWidgets.QPushButton):
         """应用莫兰迪主题样式"""
         self.setStyleSheet(f"""
             QPushButton {{
-                background-color: rgba(168, 216, 234, 30);
+                background-color: {MorandiTheme.COLOR_PRIMARY_LIGHT.name()};
                 color: {MorandiTheme.COLOR_TEXT_NORMAL.name()};
-                border: 1px solid rgba(168, 216, 234, 76);
+                border: 1px solid {MorandiTheme.COLOR_BORDER.name()};
                 border-radius: 8px;
                 padding: 8px 16px;
                 font-weight: bold;
@@ -1196,12 +1192,12 @@ class ExpandCollapseButton(QtWidgets.QPushButton):
                 font-family: 'Segoe UI', sans-serif;
             }}
             QPushButton:hover {{
-                background-color: rgba(168, 216, 234, 64);
-                color: #ffd700;
-                border-color: rgba(168, 216, 234, 128);
+                background-color: {MorandiTheme.COLOR_PRIMARY_DARK.name()};
+                color: {MorandiTheme.COLOR_ACCENT_DARK.name()};
+                border-color: {MorandiTheme.COLOR_ACCENT_DARK.name()};
             }}
             QPushButton:pressed {{
-                background-color: rgba(168, 216, 234, 100);
+                background-color: {MorandiTheme.COLOR_PRIMARY_DARK.name()};
             }}
         """)
 
@@ -1543,7 +1539,7 @@ class _MilestoneReportContent(QtWidgets.QWidget):
         title_lbl.setAlignment(QtCore.Qt.AlignCenter)
         title_lbl.setStyleSheet(f"""
             QLabel {{
-                color: #ffd700;
+                color: {MorandiTheme.COLOR_ACCENT_DARK.name()};
                 font-size: 32px;
                 font-weight: bold;
                 font-family: 'Segoe UI', sans-serif;
@@ -1604,7 +1600,7 @@ class _MilestoneReportContent(QtWidgets.QWidget):
                 font-weight: bold;
                 font-family: 'Segoe UI', sans-serif;
                 padding: 6px 12px;
-                background: rgba(168, 216, 234, 30);
+                background: {MorandiTheme.COLOR_PRIMARY_LIGHT.name()};
                 border-radius: 8px;
             }}
         """)
@@ -1616,14 +1612,14 @@ class _MilestoneReportContent(QtWidgets.QWidget):
         close_btn.setFixedSize(100, 35)
         close_btn.setStyleSheet(f"""
             QPushButton {{
-                background-color: rgba(168, 216, 234, 180);
+                background-color: rgba(165, 214, 167, 180);
                 color: #1a1a1a;
                 border-radius: 8px;
                 font-weight: bold;
                 font-size: 12px;
             }}
             QPushButton:hover {{
-                background-color: #ffd700;
+                background-color: #F9A825;
                 color: #1a1a1a;
             }}
         """)
@@ -1694,23 +1690,20 @@ class _MilestoneReportContent(QtWidgets.QWidget):
 
         rect = self.rect()
 
-        # 背景：径向渐变
-        gradient = QtGui.QRadialGradient(
-            rect.center(), max(rect.width(), rect.height()) / 1.2)
-        gradient.setColorAt(0, MorandiTheme.COLOR_BG_CENTER)
-        gradient.setColorAt(1, MorandiTheme.COLOR_BG_EDGE)
+        gradient = QtGui.QLinearGradient(rect.topLeft(), rect.bottomRight())
+        gradient.setColorAt(0, QtGui.QColor("#94B267"))
+        gradient.setColorAt(1, QtGui.QColor("#7AA97D"))
 
         p.setBrush(gradient)
         p.setPen(QtCore.Qt.NoPen)
         p.drawRoundedRect(rect, 12, 12)
 
-        # 绘制星星
+        # 绘制背景星星
         for star in self.stars:
-            c = QtGui.QColor("#ffd700")
+            c = QtGui.QColor(MorandiTheme.COLOR_ACCENT_DARK)
             c.setAlpha(int(star['alpha']))
             p.setBrush(c)
-            p.drawEllipse(QtCore.QPointF(
-                star['x'], star['y']), star['size'], star['size'])
+            p.drawEllipse(QtCore.QPointF(star['x'], star['y']), star['size'], star['size'])
 
         # 边框 (30%透明)
         p.setPen(QtGui.QPen(MorandiTheme.COLOR_BORDER, 2))
@@ -1718,7 +1711,8 @@ class _MilestoneReportContent(QtWidgets.QWidget):
         p.drawRoundedRect(rect.adjusted(1, 1, -1, -1), 12, 12)
 
         # 内阴影
-        inner_pen = QtGui.QPen(QtGui.QColor(168, 216, 234, 12), 4)
+        inner_pen = QtGui.QPen(QtGui.QColor(MorandiTheme.COLOR_PRIMARY_LIGHT), 4)
+        inner_pen.color().setAlpha(12)
         p.setPen(inner_pen)
         p.drawRoundedRect(rect.adjusted(4, 4, -4, -4), 10, 10)
 
@@ -1786,6 +1780,7 @@ class MilestoneReport(ReportEnvelopeContainer):
                             QtCore.Qt.Window | QtCore.Qt.WindowStaysOnTopHint)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
 
+        self.toggle_button.set_gradient("#94B267", "#7AA97D")
         self.content = _MilestoneReportContent()
         self.set_content(self.content)
 

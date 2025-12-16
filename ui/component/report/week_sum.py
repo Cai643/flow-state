@@ -183,18 +183,20 @@ class InsightCard(QtWidgets.QWidget):
             5, 5 + offset_y, self.width()-10, self.height()-10)
 
         # 莫兰迪背景 (透明度8%-15%)
-        bg_color = QtGui.QColor(168, 216, 234, 30) # ~12%
+        bg_color = QtGui.QColor(MorandiTheme.COLOR_BG_PANEL)
+        bg_color.setAlpha(30) # ~12%
         p.setBrush(bg_color)
 
-        # 边框 (悬停时金色发光)
+        # 边框 (悬停时发光)
         if progress > 0.1:
-            border_color = QtGui.QColor("#ffd700")
+            border_color = QtGui.QColor("#5D4037")
             border_color.setAlphaF(0.6 * progress)
             p.setPen(QtGui.QPen(border_color, 2 + progress))
             
             # 悬停光晕
             glow_rect = rect.adjusted(-2, -2, 2, 2)
-            glow_color = QtGui.QColor(168, 216, 234, 76)
+            glow_color = QtGui.QColor(MorandiTheme.COLOR_PRIMARY_LIGHT)
+            glow_color.setAlpha(76)
             p.setBrush(glow_color)
             p.setPen(QtCore.Qt.NoPen)
             p.drawRoundedRect(glow_rect, 12, 12)
@@ -202,14 +204,15 @@ class InsightCard(QtWidgets.QWidget):
             
         else:
             # 边框透明度 30%
-            border_color = QtGui.QColor(168, 216, 234, 76)
+            border_color = QtGui.QColor(MorandiTheme.COLOR_BORDER)
+            border_color.setAlpha(76)
             p.setPen(QtGui.QPen(border_color, 1))
 
         p.drawRoundedRect(rect, 12, 12)
 
         # 文字绘制
         # 标题 - 莫兰迪蓝 100%
-        p.setPen(QtGui.QColor(168, 216, 234, 255))
+        p.setPen(QtGui.QColor(MorandiTheme.COLOR_TEXT_TITLE))
         font = QtGui.QFont("Noto Sans SC", 11, QtGui.QFont.Bold)
         p.setFont(font)
         p.drawText(rect.adjusted(15, 15, -15, 0),
@@ -219,10 +222,10 @@ class InsightCard(QtWidgets.QWidget):
         if "✨" not in self.title: 
             pass
 
-        # 副标题 (数据值) - 金色 100% + 发光
+        # 副标题 (数据值) + 发光
         font_sub = QtGui.QFont("Noto Sans SC", 12)
         p.setFont(font_sub)
-        p.setPen(QtGui.QColor("#ffd700"))
+        p.setPen(QtGui.QColor("#5D4037"))
         
         # 绘制文字阴影 (模拟发光)
         p.save()
@@ -236,19 +239,19 @@ class InsightCard(QtWidgets.QWidget):
         if progress > 0.05:
             font_desc = QtGui.QFont("Noto Sans SC", 11)
             p.setFont(font_desc)
-            p.setPen(QtGui.QColor(168, 216, 234, 204))
+            p.setPen(QtGui.QColor(MorandiTheme.COLOR_TEXT_SECONDARY))
             p.setOpacity(progress)
             rect_desc = rect.adjusted(15, 65, -15, -30)
             p.drawText(rect_desc, QtCore.Qt.AlignLeft |
                        QtCore.Qt.TextWordWrap, self.desc)
             p.setOpacity(1.0)
 
-        # 底部提示 - 悬停时显示金色
+        # 底部提示 - 悬停时显示
         if progress > 0.05:
             p.setOpacity(progress)
             font_hint = QtGui.QFont("Noto Sans SC", 10)
             p.setFont(font_hint)
-            p.setPen(QtGui.QColor("#ffd700"))
+            p.setPen(QtGui.QColor("#5D4037"))
             p.drawText(rect.adjusted(15, 0, -15, -10), QtCore.Qt.AlignLeft |
                        QtCore.Qt.AlignBottom, self.detail_hint)
             p.setOpacity(1.0)
@@ -314,15 +317,17 @@ class SummaryCard(QtWidgets.QWidget):
         
         # 1. 背景
         # 基础背景: 莫兰迪蓝 10%
-        bg_color = QtGui.QColor(168, 216, 234, 25)
+        bg_color = QtGui.QColor(MorandiTheme.COLOR_BG_PANEL)
+        bg_color.setAlpha(25)
         # 悬停时加深
         if progress > 0:
-            bg_color = QtGui.QColor(168, 216, 234, 25 + int(20 * progress))
+            bg_color.setAlpha(25 + int(20 * progress))
             
         p.setBrush(bg_color)
         
         # 边框
-        border_color = QtGui.QColor(self.data['color'])
+        # 使用主题颜色映射
+        border_color = QtGui.QColor(self.data.get('color', MorandiTheme.COLOR_BORDER))
         border_color.setAlphaF(0.3 + 0.4 * progress) # 30% -> 70%
         p.setPen(QtGui.QPen(border_color, 1 + progress))
         
@@ -338,24 +343,25 @@ class SummaryCard(QtWidgets.QWidget):
         
         # 标题
         p.setFont(self.font_title)
-        p.setPen(QtGui.QColor(168, 216, 234, 255))
+        p.setPen(QtGui.QColor(MorandiTheme.COLOR_TEXT_TITLE))
         p.drawText(QtCore.QRect(60, 15, 200, 20), QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter, self.data['title'])
         
         # 数值
         p.setFont(self.font_value)
-        p.setPen(QtGui.QColor(self.data['color']))
+        val_color = QtGui.QColor(self.data.get('color', "#5D4037"))
+        p.setPen(val_color)
         p.drawText(QtCore.QRect(60, 38, 200, 30), QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter, self.data['value'])
         
         # 副标题 (显示在数值右侧或下方，这里放右侧)
         # p.setFont(self.font_sub)
-        # p.setPen(QtGui.QColor(168, 216, 234, 200))
+        # p.setPen(QtGui.QColor(165, 214, 167, 200))
         # text_width = QtGui.QFontMetrics(self.font_value).horizontalAdvance(self.data['value'])
         # p.drawText(QtCore.QRect(60 + text_width + 10, 42, 150, 20), 
         #            QtCore.Qt.AlignLeft | QtCore.Qt.AlignBottom, self.data['subtitle'])
         
         # 描述 (底部)
         p.setFont(self.font_desc)
-        p.setPen(QtGui.QColor(168, 216, 234, 180))
+        p.setPen(QtGui.QColor(MorandiTheme.COLOR_TEXT_SECONDARY))
         p.drawText(QtCore.QRect(15, 75, self.width()-30, 30), 
                    QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter | QtCore.Qt.TextWordWrap, 
                    self.data['description'])
@@ -382,7 +388,7 @@ class WeeklySummaryView(QtWidgets.QWidget):
                      "value": "82分",
                      "subtitle": "连续5天达标",
                      "description": "你的专注力超越了78%的用户，保持这个节奏！",
-                     "color": "#4CAF50" # 绿色
+                     "color": MorandiTheme.COLOR_PRIMARY_DARK.name() # 绿色 -> 森林绿
                  },
                  {
                      "icon": "⚡",
@@ -390,7 +396,7 @@ class WeeklySummaryView(QtWidgets.QWidget):
                      "value": "09:00-11:00",
                      "subtitle": "平均专注6.0小时",
                      "description": "这个时段你的代码产出量是平时的2.3倍",
-                     "color": "#FF9800" # 橙色
+                     "color": MorandiTheme.COLOR_WARNING.name() # 橙色 -> 金色/警告色
                  },
                  {
                      "icon": "🛡️",
@@ -398,7 +404,7 @@ class WeeklySummaryView(QtWidgets.QWidget):
                      "value": "15:00-17:00",
                      "subtitle": "分心次数增加2次",
                      "description": "AI帮你截停了3次无效浏览，夺回45分钟",
-                     "color": "#2196F3" # 蓝色
+                     "color": MorandiTheme.HEX_BLUE_LIGHT # 蓝色 -> 莫兰迪蓝
                  }
              ]
          }
@@ -411,7 +417,7 @@ class WeeklySummaryView(QtWidgets.QWidget):
         # 标题
         title_label = QtWidgets.QLabel(self.summary_data["title"])
         title_label.setStyleSheet("""
-            color: #ffd700;
+            color: #5D4037;
             font-family: 'Noto Sans SC';
             font-size: 18px;
             font-weight: bold;
@@ -509,8 +515,8 @@ class WeeklyTrendChart(QtWidgets.QWidget):
         progress = self.anim_progress.value
         
         # 颜色定义
-        color_main = QtGui.QColor("#a8d8ea") # 莫兰迪蓝
-        color_gold = QtGui.QColor("#ffd700") # 金色
+        color_main = QtGui.QColor(MorandiTheme.COLOR_PRIMARY_DARK)
+        color_gold = QtGui.QColor("#FFC400")
         
         for i, item in enumerate(self.data):
             hours = item[2]
@@ -580,22 +586,21 @@ class WeeklyTrendChart(QtWidgets.QWidget):
             
             # 绘制下方日期文字
             # 周几
-            p.setPen(QtGui.QColor(168, 216, 234, 255)) # 100% 莫兰迪蓝
+            p.setPen(QtGui.QColor(MorandiTheme.COLOR_TEXT_TITLE)) # Cream/Beige
             font_day = QtGui.QFont("Noto Sans SC", 9)
             p.setFont(font_day)
             p.drawText(QtCore.QRectF(cx - 30, h - padding_bottom + 5, 60, 20),
                        QtCore.Qt.AlignCenter, day)
             
             # 日期
-            p.setPen(QtGui.QColor(168, 216, 234, 204)) # 80%
+            p.setPen(QtGui.QColor(MorandiTheme.COLOR_TEXT_SECONDARY)) # Secondary
             font_date = QtGui.QFont("Noto Sans SC", 8)
             p.setFont(font_date)
             p.drawText(QtCore.QRectF(cx - 30, h - padding_bottom + 22, 60, 15),
                        QtCore.Qt.AlignCenter, date_str)
 
     def draw_icon_shape(self, p, rect, type):
-        # 统一使用金色主题
-        gold = QtGui.QColor("#ffd700")
+        gold = QtGui.QColor("#FFC400")
         
         if type == 'sun':
             p.setBrush(gold)
@@ -632,7 +637,7 @@ class WeeklyTrendChart(QtWidgets.QWidget):
             p.drawPath(path)
 
         elif type == 'cloud':
-            p.setBrush(QtGui.QColor(168, 216, 234, 180)) # 莫兰迪蓝
+            p.setBrush(QtGui.QColor(MorandiTheme.COLOR_PRIMARY_LIGHT)) # Muted Teal
             p.setPen(QtCore.Qt.NoPen)
             p.drawEllipse(rect.adjusted(1, 3, -1, -3))
 
@@ -716,21 +721,21 @@ class WeeklyReportMain(QtWidgets.QWidget):
         
         # 添加两个功能按钮
         # 按钮样式
-        btn_style = """
-            QPushButton {
-                background-color: rgba(168, 216, 234, 30);
-                border: 1px solid rgba(168, 216, 234, 76);
+        btn_style = f"""
+            QPushButton {{
+                background-color: {MorandiTheme.COLOR_PRIMARY_LIGHT.name()};
+                border: 1px solid {MorandiTheme.COLOR_BORDER.name()};
                 border-radius: 12px;
-                color: #ffd700;
+                color: #FFC400;
                 font-family: 'Noto Sans SC';
                 font-size: 14px;
                 font-weight: bold;
                 padding: 8px;
-            }
-            QPushButton:hover {
-                background-color: rgba(168, 216, 234, 64);
-                border: 1px solid #ffd700;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {MorandiTheme.COLOR_PRIMARY_DARK.name()};
+                border: 1px solid #FFC400;
+            }}
         """
         
         self.btn_summary = QtWidgets.QPushButton("核心洞察")
@@ -764,7 +769,7 @@ class WeeklyReportMain(QtWidgets.QWidget):
         # 添加 "AI建议" 标题
         title_label = QtWidgets.QLabel("AI建议")
         title_label.setStyleSheet("""
-            color: #ffd700;
+            color: #5D4037;
             font-family: 'Noto Sans SC';
             font-size: 18px;
             font-weight: bold;
@@ -791,7 +796,7 @@ class WeeklyReportMain(QtWidgets.QWidget):
         # 分隔线 1 - 莫兰迪蓝
         self.line1 = QtWidgets.QFrame()
         self.line1.setFrameShape(QtWidgets.QFrame.VLine)
-        self.line1.setStyleSheet("background-color: rgba(168, 216, 234, 76);")
+        self.line1.setStyleSheet(f"background-color: {MorandiTheme.COLOR_BORDER.name()};")
         # 初始隐藏分隔线
         self.line1.hide()
         self.main_layout.addWidget(self.line1)
@@ -801,7 +806,7 @@ class WeeklyReportMain(QtWidgets.QWidget):
         # 分隔线 2
         self.line2 = QtWidgets.QFrame()
         self.line2.setFrameShape(QtWidgets.QFrame.VLine)
-        self.line2.setStyleSheet("background-color: rgba(168, 216, 234, 76);")
+        self.line2.setStyleSheet(f"background-color: {MorandiTheme.COLOR_BORDER.name()};")
         # 初始隐藏分隔线
         self.line2.hide()
         self.main_layout.addWidget(self.line2)
@@ -870,28 +875,26 @@ class WeeklyReportMain(QtWidgets.QWidget):
                 from .daily_sum import TimelineView
                 
             self.timeline_window = TimelineView()
-            self.timeline_window.show()
+            self.timeline_window.show_timeline()
         except ImportError:
-            # Fallback for different execution contexts
+            # Fallback for different执行 contexts
             try:
                 from ui.component.report.daily_sum import TimelineView
                 self.timeline_window = TimelineView()
-                self.timeline_window.show()
+                self.timeline_window.show_timeline()
             except Exception as e:
                 print(f"Import Error: {e}")
         except Exception as e:
             print(f"Error showing timeline: {e}")
 
     def paintEvent(self, event):
-        # 绘制莫兰迪主题背景
         p = QtGui.QPainter(self)
         p.setRenderHint(QtGui.QPainter.Antialiasing)
 
-        # 径向渐变背景
         rect = self.rect()
-        gradient = QtGui.QRadialGradient(rect.center(), max(rect.width(), rect.height()) / 1.2)
-        gradient.setColorAt(0, MorandiTheme.COLOR_BG_CENTER)
-        gradient.setColorAt(1, MorandiTheme.COLOR_BG_EDGE)
+        gradient = QtGui.QLinearGradient(rect.topLeft(), rect.bottomRight())
+        gradient.setColorAt(0, QtGui.QColor("#7AA97D"))
+        gradient.setColorAt(1, QtGui.QColor("#C0D6C5"))
         
         p.setBrush(gradient)
         p.setPen(QtCore.Qt.NoPen)
@@ -899,19 +902,19 @@ class WeeklyReportMain(QtWidgets.QWidget):
         
         # 绘制背景星星
         for star in self.stars:
-            c = QtGui.QColor("#ffd700")
+            c = QtGui.QColor("#5D4037")
             c.setAlpha(int(star['alpha']))
             p.setBrush(c)
             p.drawEllipse(QtCore.QPointF(star['x'], star['y']), star['size'], star['size'])
 
-        # 边框 (30%透明)
         p.setPen(QtGui.QPen(MorandiTheme.COLOR_BORDER, 2))
         p.setBrush(QtCore.Qt.NoBrush)
         p.drawRoundedRect(rect.adjusted(1, 1, -1, -1), 12, 12)
         
-        # 内阴影 (模拟: inset 0 0 20px rgba(168, 216, 234, 0.05))
+        # 内阴影 (模拟: inset 0 0 20px rgba(165, 214, 167, 0.05))
         # 简单画一个淡色框
-        inner_pen = QtGui.QPen(QtGui.QColor(168, 216, 234, 12), 4)
+        inner_pen = QtGui.QPen(QtGui.QColor(MorandiTheme.COLOR_PRIMARY_LIGHT), 4)
+        inner_pen.color().setAlpha(12)
         p.setPen(inner_pen)
         p.drawRoundedRect(rect.adjusted(4, 4, -4, -4), 10, 10)
 
@@ -933,14 +936,14 @@ class WeeklyReportMain(QtWidgets.QWidget):
                                    top_margin,
                                    title_rect_w, title_rect_h)
 
-        # 标题文字 - 金色
-        p.setPen(QtGui.QColor("#ffd700"))
+        # 标题文字
+        p.setPen(QtGui.QColor("#8D6E63"))
         font_title = QtGui.QFont("Noto Sans SC", 24, QtGui.QFont.Bold)
         p.setFont(font_title)
         p.drawText(title_rect, QtCore.Qt.AlignCenter, "本周战绩")
 
         # 装饰线 - 莫兰迪蓝 30%
-        p.setPen(QtGui.QPen(QtGui.QColor(168, 216, 234, 76), 2))
+        p.setPen(QtGui.QPen(QtGui.QColor(MorandiTheme.COLOR_BORDER), 2))
         p.drawLine(QtCore.QPointF(title_rect.left() + 40, title_rect.bottom() - 20),
                    QtCore.QPointF(title_rect.right() - 40, title_rect.bottom() - 20))
 
@@ -1142,6 +1145,7 @@ class WeeklyDashboard(ReportEnvelopeContainer):
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.Window | QtCore.Qt.WindowStaysOnTopHint)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
 
+        self.toggle_button.set_gradient("#7AA97D", "#C0D6C5")
         self.content = WeeklyReportMain()
         self.set_content(self.content)
         

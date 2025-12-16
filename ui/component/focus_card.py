@@ -5,6 +5,16 @@ except ImportError:
     from PyQt5 import QtCore, QtGui, QtWidgets
     Signal = QtCore.pyqtSignal
 
+# 导入统一主题
+try:
+    from ui.component.report.report_theme import theme as MorandiTheme
+except ImportError:
+    try:
+        from .report.report_theme import theme as MorandiTheme
+    except ImportError:
+        # Fallback if relative import fails
+        from ui.component.report.report_theme import theme as MorandiTheme
+
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
@@ -112,14 +122,12 @@ class FocusStatusCard(QtWidgets.QWidget):
         layout.setContentsMargins(10, 10, 10, 10)  # 减小边距
         layout.setSpacing(6)  # 减小间距
 
-        # 通用内部条目样式 (简洁无边框)
         self.item_style = """
             QLabel {
-                background-color: rgba(255, 255, 255, 10);
-                border: none;
+                background-color: #FEFAE0;
                 border-radius: 12px;
                 padding: 4px 12px;
-                color: #e0f0f8;
+                color: #5D4037;
             }
         """
 
@@ -139,11 +147,11 @@ class FocusStatusCard(QtWidgets.QWidget):
         self.progress.setStyleSheet("""
             QProgressBar {
                 border: 0px;
-                background-color: rgba(255, 255, 255, 25);
+                background-color: rgba(27, 94, 32, 20);
                 border-radius: 3px;
             }
             QProgressBar::chunk {
-                background-color: #64b5f6; /* 更亮的蓝色 */
+                background-color: #66BB6A; /* 鲜绿色 */
                 border-radius: 3px;
             }
         """)
@@ -164,18 +172,17 @@ class FocusStatusCard(QtWidgets.QWidget):
         layout.addWidget(self.status_label)
         layout.addWidget(self.summary_label)
 
-        # 容器通用样式 (简洁无边框)
-        container_style = """
-            QWidget {
-                background-color: rgba(255, 255, 255, 8);
-                border: none;
+        container_style = f"""
+            QWidget {{
+                background-color: #FEFAE0;
                 border-radius: 12px;
-            }
-            QLabel {
+                border: 1px solid #7FAE0F;
+            }}
+            QLabel {{
                 background-color: transparent;
                 border: none;
-                color: #a8d8ea;
-            }
+                color: #5D4037;
+            }}
         """
 
         # 第2层：高级控制
@@ -193,15 +200,16 @@ class FocusStatusCard(QtWidgets.QWidget):
 
         btn_style = """
             QPushButton {
-                background-color: rgba(255, 255, 255, 20);
+                background-color: #FEFAE0;
                 border-radius: 12px;
-                border: 0px;
-                color: #a8d8ea;
+                border: 1px solid #7FAE0F;
+                color: #5D4037;
                 padding: 0 10px;
                 height: 24px;
             }
             QPushButton:hover {
-                background-color: rgba(255, 255, 255, 40);
+                background-color: #A5CB0B;
+                color: #5D4037;
             }
         """
 
@@ -315,38 +323,38 @@ class FocusStatusCard(QtWidgets.QWidget):
     def _apply_style(self):
         # --- 样式参数调节区 ---
         # 说明：alpha 值范围 0-255，值越大越不透明
-        # 莫兰迪蓝基色: #a8d8ea (RGB: 168, 216, 234)
+        # 清新森林主题基色: #66BB6A (Green)
 
-        # 使用深色半透明背景 (接近黑色/深灰)
-        # 背景色：rgba(40, 45, 50, alpha)
-        # 边框色：rgba(168, 216, 234, border_alpha)
+        # 使用深绿色半透明背景 (接近黑色/深绿)
+        # 背景色：rgba(232, 245, 233, alpha) -> MorandiTheme.COLOR_BG_PANEL (Forest Green)
+        # 边框色：rgba(165, 214, 167, border_alpha) -> MorandiTheme.COLOR_BORDER (Muted Teal)
 
-        if self.hover_level == 1:
-            bg_alpha = 230    # 第1层：紧凑状态
-            border_alpha = 140
-        else:  # self.hover_level == 2
-            bg_alpha = 255    # 第2层：展开状态
-            border_alpha = 220
+        # 背景与边框完全不透明
+        bg_color = QtGui.QColor("#7FA10F")
+        bg_rgba = f"rgba({bg_color.red()}, {bg_color.green()}, {bg_color.blue()}, 255)"
+        border_color = QtGui.QColor("#7FA10F")
+        border_rgba = f"rgba({border_color.red()}, {border_color.green()}, {border_color.blue()}, 255)"
 
-        # 叠加轻微呼吸动画（0.95-1.0）
-        breath_delta = int(3 * self.breath_value)
-        # 这里的bg_alpha控制的是深色底的不透明度
-        current_bg_alpha = max(0, min(255, bg_alpha + breath_delta))
+        text_color = "#5D4037"
 
-        style = f"""
-            QWidget {{
-                background-color: rgba(40, 44, 52, {current_bg_alpha});
+        style = """
+            QWidget {
+                background-color: %s;
                 border-radius: 16px;
-                border: none;
-                color: #e0f0f8;
-            }}
-            /* 进度条样式覆盖 */
-            QProgressBar {{
-                background-color: rgba(255, 255, 255, 20);
-                border: none;
-            }}
+                border: 1px solid %s;
+                color: %s;
+            }
+            QProgressBar {
+                border: 0px;
+                background-color: #FEFAE0;
+                border-radius: 3px;
+            }
+            QProgressBar::chunk {
+                background-color: #7FAE0F;
+                border-radius: 3px;
+            }
         """
-        self.setStyleSheet(style)
+        self.setStyleSheet(style % (bg_rgba, border_rgba, text_color))
 
     def _update_breath(self):
         # 0.95 -> 1.0 的轻微呼吸效果
@@ -543,9 +551,14 @@ class GoalSettingDialog(QtWidgets.QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("设置专注目标")
+        self.setWindowFlags(
+            QtCore.Qt.FramelessWindowHint
+            | QtCore.Qt.Tool
+            | QtCore.Qt.WindowStaysOnTopHint
+        )
         self.setModal(True)
         self.setFixedSize(360, 350)  # 增加宽度和高度以避免文本覆盖
+        self._install_click_outside_filter()
 
         # 呼吸动画
         self.breath_value = 0.0
@@ -580,7 +593,7 @@ class GoalSettingDialog(QtWidgets.QDialog):
                 'life': 1.0,
                 'decay': random.uniform(0.02, 0.05),
                 'size': random.uniform(2, 6),
-                'color': random.choice(['#FFD700', '#FF69B4', '#00CED1', '#FF6347', '#98FB98'])
+                'color': random.choice(['#FFD700', '#A5D6A7', '#66BB6A', '#FFF176', '#FFFFFF'])
             }
             self.particles.append(particle)
 
@@ -652,6 +665,7 @@ class GoalSettingDialog(QtWidgets.QDialog):
 
         goal_label = QtWidgets.QLabel("目标内容:")
         goal_label.setFont(QtGui.QFont("Microsoft YaHei", 9))
+        goal_label.setObjectName("GoalHeadingLabel")
 
         self.goal_input = QtWidgets.QLineEdit()
         self.goal_input.setPlaceholderText("请输入你的专注目标...")
@@ -670,6 +684,7 @@ class GoalSettingDialog(QtWidgets.QDialog):
 
         time_label = QtWidgets.QLabel("专注时长:")
         time_label.setFont(QtGui.QFont("Microsoft YaHei", 9))
+        time_label.setObjectName("TimeHeadingLabel")
         time_layout.addWidget(time_label)
 
         # 预设时间按钮
@@ -698,6 +713,7 @@ class GoalSettingDialog(QtWidgets.QDialog):
 
         custom_label = QtWidgets.QLabel("自定义:")
         custom_label.setFont(QtGui.QFont("Microsoft YaHei", 8))
+        custom_label.setObjectName("CustomHeadingLabel")
 
         self.custom_time_input = QtWidgets.QSpinBox()
         self.custom_time_input.setRange(1, 180)
@@ -739,75 +755,88 @@ class GoalSettingDialog(QtWidgets.QDialog):
         self._select_preset_time(25)
 
     def _apply_style(self):
-        """应用莫兰迪蓝样式"""
-        # 呼吸动画效果
+        """应用新的渐变背景与暖色方框样式"""
         breath_delta = int(3 * self.breath_value)
-        bg_alpha = max(0, min(255, 240 + breath_delta))
+        bg_alpha = max(0, min(255, 245 + breath_delta))
+
+        bg_start = "#2D5256"
+        bg_end = "#C2E3B8"
+        panel_color = "#EBE4C3"
+        text_color = "#7A6855"
+        accent_color = "#FFC400"
 
         dialog_style = f"""
             QDialog {{
-                background-color: rgba(40, 44, 52, {bg_alpha});
-                border-radius: 16px;
+                background-color: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:1,
+                    stop:0 {bg_start},
+                    stop:1 {bg_end}
+                );
+                border-radius: 20px;
                 border: none;
             }}
             QLabel {{
-                color: #e0f0f8;
+                color: {text_color};
                 background-color: transparent;
                 border: none;
             }}
+            QLabel#GoalHeadingLabel,
+            QLabel#TimeHeadingLabel,
+            QLabel#CustomHeadingLabel {{
+                color: {accent_color};
+            }}
             QLineEdit {{
-                background-color: rgba(255, 255, 255, 15);
-                border: none;
-                border-radius: 8px;
+                background-color: {panel_color};
+                border-radius: 12px;
+                border: 1px solid rgba(122, 104, 85, 80);
                 padding: 10px;
-                color: #e0f0f8;
+                color: {text_color};
                 font-size: 9pt;
             }}
             QLineEdit:focus {{
-                background-color: rgba(255, 255, 255, 25);
-                border: none;
+                border: 1px solid {accent_color};
             }}
             QSpinBox {{
-                background-color: rgba(255, 255, 255, 15);
-                border: none;
-                border-radius: 8px;
+                background-color: {panel_color};
+                border-radius: 10px;
+                border: 1px solid rgba(122, 104, 85, 80);
                 padding: 6px 10px;
-                color: #e0f0f8;
+                color: {text_color};
             }}
             QSpinBox:focus {{
-                background-color: rgba(255, 255, 255, 25);
+                border: 1px solid {accent_color};
             }}
             QPushButton {{
-                background-color: rgba(255, 255, 255, 20);
-                border: none;
-                border-radius: 8px;
-                color: #a8d8ea;
+                background-color: {panel_color};
+                border-radius: 12px;
+                border: 1px solid rgba(122, 104, 85, 80);
+                color: {text_color};
                 padding: 6px 16px;
             }}
             QPushButton:hover {{
-                background-color: rgba(255, 255, 255, 35);
+                background-color: rgba(235, 228, 195, 220);
             }}
             QPushButton:pressed {{
-                background-color: rgba(168, 216, 234, 50);
+                background-color: rgba(235, 228, 195, 200);
             }}
             QPushButton:disabled {{
-                background-color: rgba(255, 255, 255, 8);
-                color: rgba(168, 216, 234, 80);
+                background-color: rgba(235, 228, 195, 140);
+                color: rgba(122, 104, 85, 120);
             }}
         """
 
-        # 选中按钮的特殊样式
-        selected_style = """
-            QPushButton {
-                background-color: rgba(168, 216, 234, 60);
-                border: none;
-                color: #ffffff;
-            }
+        selected_style = f"""
+            QPushButton {{
+                background-color: {accent_color};
+                border-radius: 12px;
+                border: 1px solid {accent_color};
+                color: {text_color};
+                font-weight: bold;
+            }}
         """
 
         self.setStyleSheet(dialog_style)
 
-        # 更新选中按钮样式
         for i, btn in enumerate(self.preset_buttons):
             minutes = PRESET_TIMES[i][0]
             if minutes == self.selected_minutes:
@@ -913,6 +942,28 @@ class GoalSettingDialog(QtWidgets.QDialog):
             offset_y = random.randint(-30, 30)
             self._create_particles(center_x + offset_x, center_y + offset_y, 8)
 
+    def _install_click_outside_filter(self):
+        app = QtWidgets.QApplication.instance()
+        if not app:
+            return
+
+        class _OutsideClickFilter(QtCore.QObject):
+            def __init__(self, dialog):
+                super().__init__(dialog)
+                self.dialog = dialog
+
+            def eventFilter(self, obj, event):
+                if event.type() == QtCore.QEvent.MouseButtonPress:
+                    if not self.dialog.isVisible():
+                        return False
+                    global_pos = event.globalPos()
+                    if not self.dialog.geometry().contains(global_pos):
+                        self.dialog.close()
+                return False
+
+        self._outside_filter = _OutsideClickFilter(self)
+        app.installEventFilter(self._outside_filter)
+
 
 class TimerDialog(QtWidgets.QDialog):
     """计时弹窗"""
@@ -959,7 +1010,7 @@ class TimerDialog(QtWidgets.QDialog):
                 'life': 1.0,
                 'decay': random.uniform(0.02, 0.04),
                 'size': random.uniform(2, 5),
-                'color': random.choice(['#FFD700', '#FF69B4', '#00CED1', '#FF6347'])
+                'color': random.choice(['#FFD700', '#A5D6A7', '#66BB6A', '#FFF176'])
             }
             self.particles.append(particle)
 
@@ -1049,29 +1100,29 @@ class TimerDialog(QtWidgets.QDialog):
         layout.addWidget(self.end_button)
 
     def _apply_style(self):
-        """应用莫兰迪蓝样式"""
+        """应用清新森林样式"""
         # 呼吸动画效果
         breath_delta = int(3 * self.breath_value)
         bg_alpha = max(0, min(255, 240 + breath_delta))
 
         dialog_style = f"""
             QDialog {{
-                background-color: rgba(40, 44, 52, {bg_alpha});
+                background-color: rgba(232, 245, 233, {bg_alpha});
                 border-radius: 16px;
                 border: none;
             }}
             QLabel {{
-                color: #e0f0f8;
+                color: #1B5E20;
                 background-color: transparent;
                 border: none;
             }}
             QProgressBar {{
-                background-color: rgba(255, 255, 255, 20);
+                background-color: rgba(27, 94, 32, 20);
                 border: none;
                 border-radius: 4px;
             }}
             QProgressBar::chunk {{
-                background-color: #64b5f6;
+                background-color: #66BB6A;
                 border-radius: 4px;
             }}
             QPushButton {{

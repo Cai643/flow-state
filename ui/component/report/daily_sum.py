@@ -12,7 +12,7 @@ except ImportError:
     Property = QtCore.pyqtProperty
 
 try:
-    from ui.component.visual_enhancements.starry_envelope import StarryEnvelopeWidget
+    from ui.component.visual_enhancements.starry_envelope import StarryEnvelopeWidget, ReportEnvelopeContainer
 except ImportError:
     # 如果失败，可能是直接运行此文件，需要手动添加项目根目录到 path
     import sys
@@ -25,13 +25,13 @@ except ImportError:
         sys.path.insert(0, project_root)
         
     try:
-        from ui.component.visual_enhancements.starry_envelope import StarryEnvelopeWidget
+        from ui.component.visual_enhancements.starry_envelope import StarryEnvelopeWidget, ReportEnvelopeContainer
     except ImportError:
         try:
-            from ..visual_enhancements.starry_envelope import StarryEnvelopeWidget
+            from ..visual_enhancements.starry_envelope import StarryEnvelopeWidget, ReportEnvelopeContainer
         except ImportError:
             # Fallback for direct execution if path setup worked
-            from visual_enhancements.starry_envelope import StarryEnvelopeWidget
+            from visual_enhancements.starry_envelope import StarryEnvelopeWidget, ReportEnvelopeContainer
 
 # --- 统一主题配色 ---
 
@@ -51,22 +51,22 @@ class DesignTokens:
 
     # 颜色调色板 - 从 theme 获取
     COLORS = {
-        'primary': theme.COLOR_TEXT_TITLE,        # 金色 (数值/高光)
-        'primary_light': theme.COLOR_PRIMARY_LIGHT,  # 浅金色
-        'primary_dark': theme.COLOR_PRIMARY_DARK,   # 深金色
-        'secondary': theme.COLOR_TEXT_NORMAL,      # 莫兰迪蓝 (标签/边框)
-        'accent': theme.COLOR_TEXT_NORMAL,         # 莫兰迪蓝点缀
-        'accent_light': theme.COLOR_ACCENT_LIGHT,   # 浅莫兰迪蓝点缀
-        'warning': theme.COLOR_WARNING,        # 橙色
-        'danger': theme.COLOR_DANGER,         # 红色
-        'text_primary': theme.COLOR_TEXT_NORMAL,   # 莫兰迪蓝主文字
-        'text_secondary': theme.COLOR_TEXT_SECONDARY, # 莫兰迪蓝次要文字
-        'text_muted': theme.COLOR_TEXT_MUTED, # 莫兰迪蓝弱化
-        'background': theme.COLOR_BG_CENTER,     # 莫兰迪蓝背景中心
-        'surface': theme.COLOR_SURFACE,        # 莫兰迪蓝背景边缘
-        'border': theme.COLOR_BORDER,          # 莫兰迪蓝边框
-        'shadow': theme.COLOR_SHADOW,      # 阴影
-        'overlay': theme.COLOR_OVERLAY  # 覆盖层
+        'primary': theme.COLOR_TEXT_TITLE,        # Cream/Beige
+        'primary_light': theme.COLOR_PRIMARY_LIGHT,  # Muted Teal
+        'primary_dark': theme.COLOR_PRIMARY_DARK,   # Forest Green
+        'secondary': theme.COLOR_TEXT_SECONDARY,      # Beige 80%
+        'accent': theme.COLOR_ACCENT_DARK,         # Golden Yellow
+        'accent_light': theme.COLOR_ACCENT_LIGHT,   # Pale Green
+        'warning': theme.COLOR_WARNING,        # Orange
+        'danger': theme.COLOR_DANGER,         # Red
+        'text_primary': theme.COLOR_TEXT_TITLE,   # Beige/Cream
+        'text_secondary': theme.COLOR_TEXT_SECONDARY, # Beige 80%
+        'text_muted': theme.COLOR_TEXT_MUTED, # Pale Green 60%
+        'background': theme.COLOR_BG_CENTER,     # Dark Deep Teal
+        'surface': theme.COLOR_SURFACE,        # Forest Green
+        'border': theme.COLOR_BORDER,          # Muted Teal
+        'shadow': theme.COLOR_SHADOW,      # Shadow
+        'overlay': theme.COLOR_OVERLAY  # Overlay
     }
 
     # 渐变色 - 使用 theme 颜色
@@ -208,10 +208,10 @@ class ParticleEffect(QtCore.QObject):
             DesignTokens.COLORS['accent'],
             DesignTokens.COLORS['primary'],
             DesignTokens.COLORS['secondary'],
-            '#ff6b6b',  # 红色
-            '#4ecdc4',  # 青色
-            '#45b7d1',  # 蓝色
-            '#f9ca24',  # 黄色
+            theme.COLOR_DANGER.name(),     # 红色
+            theme.COLOR_PRIMARY_LIGHT.name(), # 青色/浅绿
+            theme.COLOR_BORDER.name(),     # 蓝色/灰蓝
+            theme.COLOR_WARNING.name(),    # 黄色
         ]
         return colors[int(random.random() * len(colors))]
 
@@ -379,7 +379,7 @@ class _StarryEnvelopeWidget_Deprecated(QtWidgets.QWidget):
         
         self.border_alpha = 102 # 40%
         self.border_width = 3.0
-        self.border_color = QtGui.QColor("#a8d8ea")
+        self.border_color = QtGui.QColor(DesignTokens.COLORS['border'])
         self.border_color.setAlpha(self.border_alpha)
         
         # 星星数据
@@ -504,7 +504,7 @@ class _StarryEnvelopeWidget_Deprecated(QtWidgets.QWidget):
             else:
                 alpha = ((1.0 - p) / 0.5) * 204
                 
-            pen = QtGui.QPen(QtGui.QColor("#a8d8ea"), 1)
+            pen = QtGui.QPen(QtGui.QColor(DesignTokens.COLORS['accent_light']), 1)
             painter.setPen(pen)
             
             sx = self.shooting_star['start_x'] + (self.shooting_star['end_x'] - self.shooting_star['start_x']) * p
@@ -514,7 +514,7 @@ class _StarryEnvelopeWidget_Deprecated(QtWidgets.QWidget):
 
         # 4. 文本
         # 主标题 (位置针对新尺寸调整)
-        painter.setPen(QtGui.QColor("#a8d8ea"))
+        painter.setPen(QtGui.QColor(DesignTokens.COLORS['primary']))
         font = QtGui.QFont("Noto Sans SC", 14, QtGui.QFont.Bold)
         font.setPixelSize(18)
         font.setLetterSpacing(QtGui.QFont.AbsoluteSpacing, 0.5)
@@ -530,14 +530,16 @@ class _StarryEnvelopeWidget_Deprecated(QtWidgets.QWidget):
         painter.drawText(rect.adjusted(0, 45, 0, 0), QtCore.Qt.AlignTop | QtCore.Qt.AlignHCenter, "一封来自星星的信")
         
         # 副标题 (位置针对新尺寸调整)
-        painter.setPen(QtGui.QColor(168, 216, 234, 204))
+        c_sub = QtGui.QColor(DesignTokens.COLORS['accent_light'])
+        c_sub.setAlpha(204)
+        painter.setPen(c_sub)
         font_sub = QtGui.QFont("Noto Sans SC")
         font_sub.setPixelSize(12)
         painter.setFont(font_sub)
         painter.drawText(rect.adjusted(0, 75, 0, 0), QtCore.Qt.AlignTop | QtCore.Qt.AlignHCenter, "点开就进入下一个界面")
         
         # 5. Emoji 装饰 (位置针对新尺寸调整)
-        painter.setPen(QtGui.QColor("#a8d8ea"))
+        painter.setPen(QtGui.QColor(DesignTokens.COLORS['primary']))
         font_emoji = QtGui.QFont("Segoe UI Emoji")
         font_emoji.setPixelSize(20)
         painter.setFont(font_emoji)
@@ -578,7 +580,7 @@ class _StarryEnvelopeWidget_Deprecated(QtWidgets.QWidget):
     def mousePressEvent(self, event):
         if not self.disappearing:
             self.scale_factor = 0.98
-            self.border_color = QtGui.QColor("#a8d8ea")
+            self.border_color = QtGui.QColor(DesignTokens.COLORS['border'])
             self.border_width = 4.0
             self.shadow.setBlurRadius(8)
             self.shadow.setOffset(0, 2)
@@ -628,8 +630,8 @@ class CollapsibleContainer(QtWidgets.QWidget):
         self.content_layout.setContentsMargins(0, 0, 0, 0)
         self.content_layout.setSpacing(0)
 
-        # 创建星空信封 (替换原有的按钮)
         self.toggle_button = StarryEnvelopeWidget()
+        self.toggle_button.set_gradient("#D4E0BB", "#E0E1AC")
         self.toggle_button.clicked.connect(self.toggle_state)
         
         # 居中容器
@@ -1228,15 +1230,18 @@ class TimelineView(QtWidgets.QWidget):
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         painter.setRenderHint(QtGui.QPainter.SmoothPixmapTransform)
 
-        # 应用淡入效果
-        painter.setOpacity(self.fade_anim.value)
+        # 应用淡入效果（如果动画未生效则默认不透明，避免内容看不见）
+        fade_opacity = self.fade_anim.value
+        if fade_opacity <= 0:
+            fade_opacity = 1.0
+        painter.setOpacity(fade_opacity)
 
         # 绘制背景粒子
         self._draw_background_particles(painter)
         
         # 绘制星星
         for star in self.stars:
-            c = QtGui.QColor("#ffd700") # 金色星星
+            c = QtGui.QColor("#F9A825") # 金色星星
             c.setAlpha(int(star['alpha']))
             painter.setBrush(c)
             painter.setPen(QtCore.Qt.NoPen)
@@ -1279,10 +1284,10 @@ class TimelineView(QtWidgets.QWidget):
         # bg_gradient.setColorAt(1, MorandiTheme.COLOR_BG_EDGE)
         
         # 自定义深色背景板，增强对比度 (在这里修改背景颜色和透明度)
-        # 中心：深蓝灰色，透明度 230 (约90%)
-        c_center = QtGui.QColor(25, 35, 45, 230)
-        # 边缘：接近黑色，透明度 245 (约96%)
-        c_edge = QtGui.QColor(10, 15, 20, 245)
+        # 中心：主题中心色
+        c_center = DesignTokens.COLORS['background']
+        # 边缘：主题边缘色 (或者 surface)
+        c_edge = DesignTokens.COLORS['surface']
         
         bg_gradient.setColorAt(0, c_center)
         bg_gradient.setColorAt(1, c_edge)
@@ -1341,26 +1346,32 @@ class TimelineView(QtWidgets.QWidget):
         for i, entry in enumerate(self.timeline_entries):
             if i < len(self.segment_animations):
                 animation_progress = self.segment_animations[i].value
-                if animation_progress > 0:
-                    is_hovered = (i == self.hover_segment)
-                    self._draw_timeline_entry(
-                        painter, entry, i, margin, timeline_y, timeline_width,
-                        animation_progress, is_hovered)
+                # 如果动画系统未生效，保证时间轴内容始终可见
+                if animation_progress <= 0:
+                    animation_progress = 1.0
+                is_hovered = (i == self.hover_segment)
+                self._draw_timeline_entry(
+                    painter, entry, i, margin, timeline_y, timeline_width,
+                    animation_progress, is_hovered)
 
         # 绘制统计信息 - 进一步增加间距，避免与时间段文本重叠
-        # 背景：rgba(168, 216, 234, 0.05)
-        # 边框：顶部1px solid rgba(168, 216, 234, 0.2)
+        # 背景：主题背景
+        # 边框：主题边框
         
         stats_rect = QtCore.QRectF(margin, timeline_y + 220, timeline_width, 120)
         
         # 背景
-        painter.setBrush(QtGui.QColor(168, 216, 234, 13)) # 5%
+        bg_color = QtGui.QColor(DesignTokens.COLORS['background'])
+        bg_color.setAlpha(200) # Slightly transparent
+        painter.setBrush(bg_color)
         painter.setPen(QtCore.Qt.NoPen)
         painter.drawRoundedRect(stats_rect, 12, 12)
         
         # 边框 (顶部1px) - 实际上我们已经画了整个框，用户说"边框：顶部1px solid..."
         # 我们可以画一条线在顶部
-        painter.setPen(QtGui.QPen(QtGui.QColor(168, 216, 234, 51), 1)) # 20%
+        border_color = QtGui.QColor(DesignTokens.COLORS['border'])
+        border_color.setAlpha(100)
+        painter.setPen(QtGui.QPen(border_color, 1))
         painter.drawLine(QtCore.QLineF(stats_rect.left(), stats_rect.top(), stats_rect.right(), stats_rect.top()))
         
         self._draw_statistics(
@@ -1376,15 +1387,12 @@ class TimelineView(QtWidgets.QWidget):
 
         # 时间刻度
         # 文案：保持原"00:00 06:00 12:00 18:00 23:59" (虽然用户这么说，但代码里是 09:00-18:00，我保持代码原逻辑，只改样式)
-        # 用户说 "保持这张时间轴所有时间刻度...一字不改"，但提供的文案例子 "00:00 06:00..." 与代码不符。
-        # 代码是 "09:00" 到 "18:00"。
-        # 鉴于"一字不改"，我保留代码里的刻度。
         
         times = ["09:00", "10:00", "11:00", "12:00", "13:00",
                  "14:00", "15:00", "16:00", "17:00", "18:00"]
         
-        # 莫兰迪蓝 70%
-        painter.setPen(QtGui.QColor(168, 216, 234, 179)) 
+        # 莫兰迪蓝 70% -> 使用主题次要文字颜色 (金色/白色)
+        painter.setPen(DesignTokens.COLORS['text_secondary']) 
         scale_font = QtGui.QFont("Segoe UI", 12) # 字体：保持原12px
         painter.setFont(scale_font)
 
@@ -1392,13 +1400,13 @@ class TimelineView(QtWidgets.QWidget):
             x = margin + (width * i / (len(times) - 1))
 
             # 绘制刻度线
-            painter.setPen(QtGui.QColor(168, 216, 234, 179))
+            painter.setPen(DesignTokens.COLORS['border']) # 使用边框颜色 (绿色)
             painter.drawLine(int(x), y + 20, int(x), y + 30)
 
             # 绘制时间文字
             text_rect = painter.fontMetrics().boundingRect(time_str)
             MorandiTheme.draw_text_at_point_with_shadow(
-                painter, x - text_rect.width()/2, y + 15, time_str, QtGui.QColor(168, 216, 234, 179))
+                painter, x - text_rect.width()/2, y + 15, time_str, DesignTokens.COLORS['text_secondary'])
 
         painter.restore()
 
@@ -1407,12 +1415,15 @@ class TimelineView(QtWidgets.QWidget):
         painter.save()
 
         # 主轴线渐变
-        # 莫兰迪蓝 30% -> 金色 -> 莫兰迪蓝 30%
-        # 用户需求里没细说轴线，但为了匹配风格：
+        # 莫兰迪蓝 30% -> 金色 -> 莫兰迪蓝 30% -> 改为 绿色 -> 金色 -> 绿色
         line_gradient = QtGui.QLinearGradient(margin, y, margin + width, y)
-        line_gradient.setColorAt(0, QtGui.QColor(168, 216, 234, 76))
-        line_gradient.setColorAt(0.5, QtGui.QColor("#ffd700")) 
-        line_gradient.setColorAt(1, QtGui.QColor(168, 216, 234, 76))
+        
+        c_edge = QtGui.QColor(DesignTokens.COLORS['border'])
+        c_edge.setAlpha(76)
+        
+        line_gradient.setColorAt(0, c_edge)
+        line_gradient.setColorAt(0.5, QtGui.QColor("#75B094")) 
+        line_gradient.setColorAt(1, c_edge)
 
         pen = QtGui.QPen()
         pen.setBrush(line_gradient)
@@ -1426,36 +1437,34 @@ class TimelineView(QtWidgets.QWidget):
 
     def _draw_statistics(self, painter: QtGui.QPainter, margin: int, y: int, width: int):
         """绘制统计信息"""
-        if self.stats_anim.value <= 0:
-            return
-
         painter.save()
-        painter.setOpacity(self.stats_anim.value)
+        stats_opacity = self.stats_anim.value
+        if stats_opacity <= 0:
+            stats_opacity = 1.0
+        painter.setOpacity(stats_opacity)
 
         # 统计背景 - 透明或淡色边框
         stats_rect = QtCore.QRectF(margin, y, width, 120)
         
-        # 移除原有的线性渐变，使用莫兰迪主题风格
-        # stats_gradient = QtGui.QLinearGradient(...)
-        
         # 背景 (10%透明)
-        bg_color = QtGui.QColor(168, 216, 234, 25) 
+        bg_color = QtGui.QColor(DesignTokens.COLORS['background'])
+        bg_color.setAlpha(200) # Slightly more opaque for better readability
         painter.setBrush(bg_color)
         
         # 边框
-        painter.setPen(QtGui.QPen(MorandiTheme.COLOR_BORDER, 1))
+        painter.setPen(QtGui.QPen(DesignTokens.COLORS['border'], 1))
         painter.drawRoundedRect(stats_rect, 12, 12)
 
         # 统计数据
         stats_data = [
             {"label": "总专注时长", "value": "6.5小时", "icon": "🎯",
-                "color": "#ffd700"},
+                "color": "#75B094"},
             {"label": "专注效率", "value": "92%", "icon": "⚡",
-                "color": MorandiTheme.COLOR_TEXT_NORMAL},
+                "color": DesignTokens.COLORS['text_primary']},
             {"label": "休息次数", "value": "3次", "icon": "☕",
-                "color": MorandiTheme.COLOR_TEXT_NORMAL},
+                "color": DesignTokens.COLORS['text_primary']},
             {"label": "完成任务", "value": "8项", "icon": "✅",
-                "color": "#ffd700"}
+                "color": "#75B094"}
         ]
 
         item_width = width / len(stats_data)
@@ -1463,28 +1472,28 @@ class TimelineView(QtWidgets.QWidget):
             x = margin + i * item_width + item_width / 2
 
             # 图标
-            painter.setPen(QtGui.QColor("#a8d8ea")) # 标题蓝色
+            painter.setPen(DesignTokens.COLORS['text_secondary']) # 次要文字 (浅色)
             icon_font = QtGui.QFont("Segoe UI Emoji", 20)
             painter.setFont(icon_font)
             icon_rect = painter.fontMetrics().boundingRect(stat["icon"])
             MorandiTheme.draw_text_at_point_with_shadow(
-                painter, x - icon_rect.width()/2, y + 35, stat["icon"], QtGui.QColor("#a8d8ea"))
+                painter, x - icon_rect.width()/2, y + 35, stat["icon"], DesignTokens.COLORS['text_secondary'])
 
             # 数值
-            painter.setPen(QtGui.QColor("#ffd700")) # 数值金色
+            painter.setPen(QtGui.QColor("#75B094"))
             value_font = QtGui.QFont("Segoe UI", 18, QtGui.QFont.Bold)
             painter.setFont(value_font)
             value_rect = painter.fontMetrics().boundingRect(stat["value"])
             MorandiTheme.draw_text_at_point_with_shadow(
-                painter, x - value_rect.width()/2, y + 65, stat["value"], QtGui.QColor("#ffd700"))
+                painter, x - value_rect.width()/2, y + 65, stat["value"], QtGui.QColor("#75B094"))
 
             # 标签
-            painter.setPen(QtGui.QColor("#a8d8ea")) # 标题蓝色
+            painter.setPen(DesignTokens.COLORS['text_secondary']) # 次要文字 (浅色)
             label_font = QtGui.QFont("Segoe UI", 11)
             painter.setFont(label_font)
             label_rect = painter.fontMetrics().boundingRect(stat["label"])
             MorandiTheme.draw_text_at_point_with_shadow(
-                painter, x - label_rect.width()/2, y + 85, stat["label"], QtGui.QColor("#a8d8ea"))
+                painter, x - label_rect.width()/2, y + 85, stat["label"], DesignTokens.COLORS['text_secondary'])
 
         painter.restore()
 
@@ -1492,7 +1501,6 @@ class TimelineView(QtWidgets.QWidget):
                              margin: int, timeline_y: int, timeline_width: int,
                              animation_progress: float = 1.0, is_hovered: bool = False):
         """绘制精美的单个时间段"""
-        # 计算时间段在时间轴上的位置
         start_minutes = self._time_to_minutes(entry.start_time)
         end_minutes = self._time_to_minutes(entry.end_time)
 
@@ -1506,17 +1514,14 @@ class TimelineView(QtWidgets.QWidget):
         x_end = margin + (end_minutes - display_start) / \
             display_range * timeline_width
 
-        # 应用动画效果
         painter.save()
         painter.setOpacity(animation_progress)
 
-        # 悬停效果
         hover_scale = 1.2 if is_hovered else 1.0
         base_height = 40
         segment_height = base_height * hover_scale * animation_progress
         segment_y_offset = (base_height - segment_height) / 2
 
-        # 绘制发光效果（悬停时）
         if is_hovered:
             glow_rect = QtCore.QRectF(x_start - 5, timeline_y - 20 + segment_y_offset - 5,
                                       (x_end - x_start) * animation_progress + 10, segment_height + 10)
@@ -1526,7 +1531,6 @@ class TimelineView(QtWidgets.QWidget):
             painter.setPen(QtCore.Qt.NoPen)
             painter.drawRoundedRect(glow_rect, 8, 8)
 
-        # 绘制阴影
         shadow_rect = QtCore.QRectF(x_start + 3, timeline_y - 20 + segment_y_offset + 3,
                                     (x_end - x_start) * animation_progress, segment_height)
         shadow_color = QtGui.QColor(0, 0, 0, int(40 * animation_progress))
@@ -1534,48 +1538,23 @@ class TimelineView(QtWidgets.QWidget):
         painter.setPen(QtCore.Qt.NoPen)
         painter.drawRoundedRect(shadow_rect, 8, 8)
 
-        # 绘制主时间段条
         segment_rect = QtCore.QRectF(x_start, timeline_y - 20 + segment_y_offset,
                                      (x_end - x_start) * animation_progress, segment_height)
 
-        # 创建精美渐变效果
-        gradient = QtGui.QLinearGradient(
-            segment_rect.topLeft(), segment_rect.bottomLeft())
-        base_color = QtGui.QColor(entry.color)
-
-        # 莫兰迪调整：使用 MorandiTheme 颜色
-        # 根据活动类型调整渐变
         if entry.activity_type == "work":
-            # 亮黄色 (100%不透明)
-            c1 = MorandiTheme.COLOR_CHART_BAR
-            c2 = MorandiTheme.COLOR_CHART_BAR
-            gradient.setColorAt(0, c1)
-            gradient.setColorAt(1, c2)
-            
-            # 蓝色边框 #a8d8ea
-            border_color = QtGui.QColor("#a8d8ea")
+            fill_color = QtGui.QColor("#FFD54F")
+            border_color = QtGui.QColor("#FFA000")
         elif entry.activity_type == "rest":
-            # 莫兰迪蓝 100%不透明
-            c1 = QtGui.QColor(168, 216, 234, 255)
-            c2 = QtGui.QColor(126, 179, 232, 255)
-            gradient.setColorAt(0, c1)
-            gradient.setColorAt(1, c2)
-            border_color = MorandiTheme.COLOR_BORDER
-        else:  # break
-            # 莫兰迪蓝 100%不透明
-            c1 = QtGui.QColor(168, 216, 234, 255)
-            c2 = QtGui.QColor(126, 179, 232, 255)
-            gradient.setColorAt(0, c1)
-            gradient.setColorAt(1, c2)
-            border_color = MorandiTheme.COLOR_BORDER
+            fill_color = QtGui.QColor("#4FC3F7")
+            border_color = QtGui.QColor("#0288D1")
+        else:
+            fill_color = QtGui.QColor("#A5D6A7")
+            border_color = QtGui.QColor("#2E7D32")
 
-        painter.setBrush(gradient)
-
-        # 添加边框
+        painter.setBrush(fill_color)
         painter.setPen(QtGui.QPen(border_color, 1))
         painter.drawRoundedRect(segment_rect, 8, 8)
 
-        # 绘制活动类型图标
         if animation_progress > 0.5:
             icon_alpha = (animation_progress - 0.5) / 0.5
             painter.setOpacity(icon_alpha)
@@ -1583,7 +1562,6 @@ class TimelineView(QtWidgets.QWidget):
             icon_x = x_start + 10
             icon_y = timeline_y - 10
 
-            # 根据活动类型选择图标
             if entry.activity_type == "work":
                 icon = "💻"
             elif entry.activity_type == "rest":
@@ -1619,7 +1597,7 @@ class TimelineView(QtWidgets.QWidget):
             # 描述文字 - 智能换行和位置调整
             desc_font = QtGui.QFont("Segoe UI", 10)
             painter.setFont(desc_font)
-            painter.setPen(QtGui.QColor("#ffd700")) # 数值金色
+            painter.setPen(QtGui.QColor("#F9A825")) # 数值金色
 
             # 限制描述文字长度，避免重叠
             max_width = min(200, int(x_end - x_start))
@@ -1634,7 +1612,7 @@ class TimelineView(QtWidgets.QWidget):
 
             desc_y = timeline_y + 35 + vertical_offset
             MorandiTheme.draw_text_at_point_with_shadow(
-                painter, x_start, desc_y, desc_text, QtGui.QColor("#ffd700"))
+                painter, x_start, desc_y, desc_text, QtGui.QColor("#F9A825"))
 
         # 绘制持续时长指示器 - 调整位置避免重叠
         if animation_progress > 0.8:
@@ -2306,24 +2284,24 @@ class Card1_Focus(QtWidgets.QWidget):
         p.drawRoundedRect(accent_rect, 2, 2)
 
         # 标题 - 使用更现代的字体和颜色
-        p.setPen(QtGui.QColor(DesignTokens.COLORS['text_secondary']))
+        p.setPen(QtGui.QColor("#A05C3B"))
         title_font = QtGui.QFont("Segoe UI", 10, QtGui.QFont.Medium)
         p.setFont(title_font)
         p.drawText(20, 28, "🎯 今日专注时长")
 
         # 主数字 - 增强视觉效果
-        p.setPen(QtGui.QColor(DesignTokens.COLORS['primary']))
+        p.setPen(QtGui.QColor(DesignTokens.COLORS['accent']))
         main_font = QtGui.QFont("Segoe UI", 28, QtGui.QFont.Bold)
         p.setFont(main_font)
 
         # 添加数字阴影效果
-        shadow_color = QtGui.QColor(DesignTokens.COLORS['primary'])
+        shadow_color = QtGui.QColor(DesignTokens.COLORS['accent'])
         shadow_color.setAlpha(50)
         p.setPen(shadow_color)
         p.drawText(22, 67, "4.5小时")
 
         # 主数字
-        p.setPen(QtGui.QColor(DesignTokens.COLORS['primary']))
+        p.setPen(QtGui.QColor(DesignTokens.COLORS['accent']))
         p.drawText(20, 65, "4.5小时")
 
         # 滑入的增长指示器 - 重新设计
@@ -2486,13 +2464,13 @@ class Card2_Distract(QtWidgets.QWidget):
             p.drawRoundedRect(rect, 6, 6)
 
         # 标题
-        p.setPen(QtGui.QColor(DesignTokens.COLORS['text_secondary']))
+        p.setPen(QtGui.QColor("#A05C3B"))
         title_font = QtGui.QFont("Segoe UI", 10, QtGui.QFont.Medium)
         p.setFont(title_font)
         p.drawText(20, 25, "🔔 今日分心次数")
 
         # 主数字
-        p.setPen(QtGui.QColor(DesignTokens.COLORS['text_primary']))
+        p.setPen(QtGui.QColor("#6A4A3F"))
         main_font = QtGui.QFont("Segoe UI", 18, QtGui.QFont.Bold)
         p.setFont(main_font)
         p.drawText(120, 28, "7次")
@@ -2584,15 +2562,15 @@ class Card3_Flow(QtWidgets.QWidget):
         p.setRenderHint(QtGui.QPainter.Antialiasing)
 
         # 标题 - 暗色主题
-        p.setPen(QtGui.QColor(DesignTokens.COLORS['text_secondary']))
+        p.setPen(QtGui.QColor("#6A4A3F"))
         p.setFont(QtGui.QFont("Noto Sans SC", 9))
         p.drawText(20, 25, "⚡ 最长心流时段")
 
         # 内容 - 暗色主题
-        p.setPen(QtGui.QColor("#ffd700"))
+        p.setPen(QtGui.QColor("#75B094"))
         p.setFont(QtGui.QFont("Noto Sans SC", 12, QtGui.QFont.Bold))
         p.drawText(20, 50, "92分钟")
-        p.setPen(QtGui.QColor(DesignTokens.COLORS['text_muted']))
+        p.setPen(QtGui.QColor("#A05C3B"))
         p.setFont(QtGui.QFont("Noto Sans SC", 9))
         p.drawText(100, 50, "（约1.5小时） 9:30-11:02")
 
@@ -2607,7 +2585,7 @@ class Card3_Flow(QtWidgets.QWidget):
 
         # 刻度 - 暗色主题
         times = ["00:00", "06:00", "12:00", "18:00", "23:59"]
-        p.setPen(QtGui.QColor(DesignTokens.COLORS['text_muted']))
+        p.setPen(QtGui.QColor("#A05C3B"))
         p.setFont(QtGui.QFont("Arial", 7))
         for i, t in enumerate(times):
             x = margin_x + (w * i / (len(times)-1))
@@ -2637,12 +2615,12 @@ class Card4_Rest(QtWidgets.QWidget):
         p.setRenderHint(QtGui.QPainter.Antialiasing)
 
         # 标题 - 暗色主题
-        p.setPen(QtGui.QColor(DesignTokens.COLORS['text_secondary']))
+        p.setPen(QtGui.QColor("#A05C3B"))
         p.setFont(QtGui.QFont("Noto Sans SC", 9))
         p.drawText(20, 25, "🛋️ 休息达标率")
 
         # 内容 - 暗色主题
-        p.setPen(QtGui.QColor("#2ecc71"))
+        p.setPen(QtGui.QColor("#75B094"))
         p.setFont(QtGui.QFont("Noto Sans SC", 16, QtGui.QFont.Bold))
         p.drawText(120, 25, "85%")
 
@@ -2744,18 +2722,9 @@ class StarryCardWidget(QtWidgets.QWidget):
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         rect = self.rect()
         
-        # 1. 背景径向渐变 + 透明度
-        gradient = QtGui.QRadialGradient(rect.center(), max(rect.width(), rect.height()) / 1.2)
-        
-        # 中心 #a8d8ea (8% opacity) -> 边缘 #7bb3e8 (8% opacity)
-        center_color = QtGui.QColor("#a8d8ea")
-        center_color.setAlphaF(0.08)
-        
-        edge_color = QtGui.QColor("#7bb3e8")
-        edge_color.setAlphaF(0.08)
-        
-        gradient.setColorAt(0, center_color)
-        gradient.setColorAt(1, edge_color)
+        gradient = QtGui.QLinearGradient(rect.topLeft(), rect.bottomRight())
+        gradient.setColorAt(0, QtGui.QColor("#D4E0BB"))
+        gradient.setColorAt(1, QtGui.QColor("#E0E1AC"))
         
         painter.setBrush(gradient)
         painter.setPen(QtCore.Qt.NoPen)
@@ -2822,25 +2791,35 @@ class StarryCardWidget(QtWidgets.QWidget):
         painter.drawRoundedRect(rect.adjusted(2,2,-2,-2), 10, 10)
 
 
-class SimpleDailyReport(QtWidgets.QWidget):
+class SimpleDailyReport(ReportEnvelopeContainer):
     clicked = Signal()
 
     def __init__(self):
-        super().__init__()
-        self.setFixedSize(480, 1000)  # 增加高度到1000以适应展开内容
+        super().__init__(expanded_height=950)
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint |
                             QtCore.Qt.Window | QtCore.Qt.WindowStaysOnTopHint)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         self.drag_start_pos = None
         self.is_timeline_active = False
 
-        # 居中显示
-        screen = QtGui.QGuiApplication.primaryScreen()
+        # 信封渐变改为日报专用配色
+        self.toggle_button.set_gradient("#D4E0BB", "#E0E1AC")
+
+        screen = None
+        if hasattr(QtGui.QGuiApplication, "screenAt"):
+            screen = QtGui.QGuiApplication.screenAt(self.frameGeometry().center())
+        if screen is None:
+            screen = QtGui.QGuiApplication.primaryScreen()
         if screen:
-            self.move(screen.geometry().center() - self.rect().center())
+            available = screen.availableGeometry()
+            target_height = min(1000, max(700, available.height() - 80))
+            self.expanded_height = target_height
+            self.resize(480, self.collapsed_height)
+        else:
+            self.resize(480, self.collapsed_height)
+        self._center_on_screen()
 
         # 初始化新组件
-        self.collapsible_container = CollapsibleContainer(self)
         self.image_exporter = ImageExporter(self)
         self.timeline_view = TimelineView(self)
         self.feedback_system = FeedbackSystem(self)
@@ -2854,18 +2833,9 @@ class SimpleDailyReport(QtWidgets.QWidget):
         self.image_exporter.exportCompleted.connect(self._on_export_success)
         self.image_exporter.exportFailed.connect(self._on_export_failed)
         self.timeline_view.closed.connect(self._on_timeline_closed)
-        self.collapsible_container.stateChanged.connect(
-            self._on_collapse_state_changed)
+        self.stateChanged.connect(self._on_collapse_state_changed)
 
-        # 阴影边距
-        self.shadow_margin = 20
-
-        # 主布局
-        self.main_layout = QtWidgets.QVBoxLayout(self)
-        self.main_layout.setContentsMargins(
-            self.shadow_margin, self.shadow_margin, self.shadow_margin, self.shadow_margin)
-
-        # 现代化卡片容器
+        # 现代化卡片容器作为信封展开后的内容
         self.card_widget = StarryCardWidget()
         
         # 增强的阴影效果
@@ -2875,15 +2845,8 @@ class SimpleDailyReport(QtWidgets.QWidget):
         shadow.setOffset(*DesignTokens.SHADOWS['xl']['offset'])
         self.card_widget.setGraphicsEffect(shadow)
 
-        # 使用折叠容器包装卡片内容
-        self.main_layout.addWidget(self.collapsible_container)
-
-        # 创建紧凑模式内容 - 设置为空，仅显示信封
-        self.collapsible_container.set_compact_content(None)
-
-        # 创建展开模式内容（原有的完整内容）
-        expanded_content = self.card_widget
-        self.collapsible_container.set_expanded_content(expanded_content)
+        # 将卡片设置为 ReportEnvelopeContainer 的内容
+        self.set_content(self.card_widget)
 
         # 内容布局
         content_layout = QtWidgets.QVBoxLayout(self.card_widget)
@@ -2901,12 +2864,11 @@ class SimpleDailyReport(QtWidgets.QWidget):
         lbl_t1 = QtWidgets.QLabel("今天又是努力的一天呢！")
         title_style = f"""
             QLabel {{
-                color: #ffd700;
+                color: #50795D;
                 font-family: 'Segoe UI', 'Microsoft YaHei';
                 font-size: 22px;
                 font-weight: 600;
                 letter-spacing: 0.5px;
-                text-shadow: 0 0 8px rgba(255, 215, 0, 0.3);
             }}
         """
         lbl_t1.setStyleSheet(title_style)
@@ -2915,7 +2877,7 @@ class SimpleDailyReport(QtWidgets.QWidget):
         lbl_t2 = QtWidgets.QLabel("来看看你的进步足迹吧 ✨")
         subtitle_style = f"""
             QLabel {{
-                color: #ffd700;
+                color: #A05C3B;
                 font-family: 'Segoe UI', 'Microsoft YaHei';
                 font-size: 14px;
                 font-weight: 400;
@@ -2961,7 +2923,7 @@ class SimpleDailyReport(QtWidgets.QWidget):
         add_line()
 
         # 文案框1
-        self.msg1 = self.create_msg_box("比昨天多出<span style='color: #2ecc71;'>30分钟</span>！进步看得见！", "#3498db")
+        self.msg1 = self.create_msg_box("比昨天多出<span style='color: #FFA500;'>30分钟</span>！进步看得见！", "#3498db")
         cc_layout.addWidget(self.msg1)
         add_line()
 
@@ -3004,7 +2966,7 @@ class SimpleDailyReport(QtWidgets.QWidget):
         # 使用星空主题的按钮样式
         modern_btn_style = """
             QPushButton {
-                color: #a8d8ea;
+                color: #50795D;
                 background: rgba(168, 216, 234, 0.15);
                 border: 1px solid rgba(168, 216, 234, 0.4);
                 border-radius: 6px;
@@ -3015,13 +2977,13 @@ class SimpleDailyReport(QtWidgets.QWidget):
             }
             QPushButton:hover {
                 background: rgba(168, 216, 234, 0.25);
-                color: #ffd700;
+                color: #FFA500;
                 border: 1px solid rgba(168, 216, 234, 0.6);
                 box-shadow: 0 0 12px rgba(168, 216, 234, 0.3);
             }
             QPushButton:pressed {
                 background: rgba(168, 216, 234, 0.35);
-                color: #ffd700;
+                color: #FFA500;
                 border: 1px solid rgba(168, 216, 234, 0.8);
             }
         """
@@ -3072,11 +3034,10 @@ class SimpleDailyReport(QtWidgets.QWidget):
                 background-color: transparent;
                 border: none;
                 padding: 12px 20px;
-                color: #a8d8ea;
+                color: #75B094;
                 font-size: 16px;
                 font-weight: 500;
                 font-family: 'Segoe UI', 'Microsoft YaHei';
-                text-shadow: 0 0 6px rgba(168, 216, 234, 0.2);
             }}
         """)
         l.addWidget(lbl)
@@ -3241,10 +3202,22 @@ class SimpleDailyReport(QtWidgets.QWidget):
     def showEvent(self, event):
         """窗口显示事件"""
         super().showEvent(event)
-        # 确保粒子覆盖层在最顶层
         if hasattr(self, 'particle_overlay'):
             self.particle_overlay.raise_()
             self.particle_overlay.update_geometry()
+        self._center_on_screen()
+
+    def _center_on_screen(self):
+        screen = None
+        if hasattr(QtGui.QGuiApplication, "screenAt"):
+            screen = QtGui.QGuiApplication.screenAt(self.frameGeometry().center())
+        if screen is None:
+            screen = QtGui.QGuiApplication.primaryScreen()
+        if screen:
+            available = screen.availableGeometry()
+            geo = self.frameGeometry()
+            geo.moveCenter(available.center())
+            self.move(geo.topLeft())
 
     def _create_compact_content(self):
         """创建折叠模式的紧凑内容"""
@@ -3298,7 +3271,7 @@ class SimpleDailyReport(QtWidgets.QWidget):
         focus_value = QtWidgets.QLabel("4.5小时")
         focus_value.setStyleSheet(f"""
             QLabel {{
-                color: {DesignTokens.COLORS['primary']};
+                color: {DesignTokens.COLORS['accent']};
                 font-size: 18px;
                 font-weight: bold;
             }}
@@ -3307,7 +3280,7 @@ class SimpleDailyReport(QtWidgets.QWidget):
         focus_desc = QtWidgets.QLabel("专注时长")
         focus_desc.setStyleSheet(f"""
             QLabel {{
-                color: {DesignTokens.COLORS['text_secondary']};
+                color: #A05C3B;
                 font-size: 10px;
             }}
         """)
@@ -3323,7 +3296,7 @@ class SimpleDailyReport(QtWidgets.QWidget):
         distract_value = QtWidgets.QLabel("7次")
         distract_value.setStyleSheet(f"""
             QLabel {{
-                color: {DesignTokens.COLORS['warning']};
+                color: #6A4A3F;
                 font-size: 18px;
                 font-weight: bold;
             }}
@@ -3332,7 +3305,7 @@ class SimpleDailyReport(QtWidgets.QWidget):
         distract_desc = QtWidgets.QLabel("分心次数")
         distract_desc.setStyleSheet(f"""
             QLabel {{
-                color: {DesignTokens.COLORS['text_secondary']};
+                color: #A05C3B;
                 font-size: 10px;
             }}
         """)
@@ -3400,8 +3373,8 @@ class SimpleDailyReport(QtWidgets.QWidget):
                 self.particle_overlay.raise_()
                 self.particle_overlay.update()
 
-            # 延迟300ms触发粒子效果，配合展开动画
             QtCore.QTimer.singleShot(300, trigger_particles)
+            QtCore.QTimer.singleShot(320, self._center_on_screen)
 
 
 def show_simple_daily():

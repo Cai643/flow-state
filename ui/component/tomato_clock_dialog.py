@@ -32,7 +32,7 @@ def qt_const(name: str) -> Any:
     return None
 
 class TomatoClockDialog(QtWidgets.QDialog):
-    """番茄钟开启确认弹窗 - 沿用娱乐提醒的暖黄风格"""
+    """番茄钟开启确认弹窗"""
     
     if hasattr(QtCore, 'Signal'):
         Signal = QtCore.Signal
@@ -57,15 +57,25 @@ class TomatoClockDialog(QtWidgets.QDialog):
         # 尺寸设置 (比提醒弹窗小一点)
         self.setFixedSize(500, 350)
         
-        # 主容器 - 学生版暖黄主题
         self.container = QtWidgets.QWidget(self)
         self.container.setObjectName("TomatoDialog")
-        self.container.setStyleSheet("""
-            QWidget#TomatoDialog {
-                background-color: #E8F5E9;  /* 淡绿背景，护眼 */
-                border: 2px solid #A5D6A7; /* 柔和边框 */
+        try:
+            from ui.component.report.report_theme import theme as MorandiTheme
+        except ImportError:
+            try:
+                from .report.report_theme import theme as MorandiTheme
+            except ImportError:
+                from ui.component.report.report_theme import theme as MorandiTheme
+        gradient_start = MorandiTheme.HEX_REMINDER_GRADIENT_START
+        gradient_end = MorandiTheme.HEX_REMINDER_GRADIENT_END
+        panel_fill = MorandiTheme.HEX_REMINDER_PANEL_FILL
+        self.container.setStyleSheet(f"""
+            QWidget#TomatoDialog {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                            stop:0 {gradient_start},
+                                            stop:1 {gradient_end});
                 border-radius: 20px;
-            }
+            }}
         """)
         
         # 主布局
@@ -81,14 +91,14 @@ class TomatoClockDialog(QtWidgets.QDialog):
         # 标题
         self.title_label = QtWidgets.QLabel("需要开番茄钟吗？")
         self.title_label.setAlignment(qt_const("AlignCenter"))
-        self.title_label.setStyleSheet("""
-            QLabel { 
-                color: #F57C00;      /* 橙红标题 */ 
-                font-size: 26px; 
-                font-weight: bold; 
+        self.title_label.setStyleSheet(f"""
+            QLabel {{
+                color: #5D4037;
+                font-size: 26px;
+                font-weight: bold;
                 background: transparent;
                 border: none;
-            } 
+            }}
         """)
         layout.addWidget(self.title_label)
         
@@ -96,12 +106,12 @@ class TomatoClockDialog(QtWidgets.QDialog):
         self.desc_label = QtWidgets.QLabel("开启番茄钟，让我们专注25分钟，\n效率倍增！🍅")
         self.desc_label.setAlignment(qt_const("AlignCenter"))
         self.desc_label.setStyleSheet("""
-            QLabel { 
-                color: #5D4037;      /* 深棕文字 */ 
-                font-size: 18px; 
+            QLabel {
+                color: #5D4037;
+                font-size: 18px;
                 background: transparent;
                 border: none;
-            } 
+            }
         """)
         layout.addWidget(self.desc_label)
         
@@ -115,21 +125,21 @@ class TomatoClockDialog(QtWidgets.QDialog):
         yes_button.setMinimumHeight(50)
         yes_button.setMinimumWidth(140)
         yes_button.setCursor(qt_const("PointingHandCursor"))
-        yes_button.setStyleSheet("""
-            QPushButton { 
-                background: #66BB6A; /* 自然绿 */ 
-                color: white; 
-                border-radius: 12px; 
+        yes_button.setStyleSheet(f"""
+            QPushButton {{
+                background: {panel_fill};
+                color: #5D4037;
+                border-radius: 12px;
                 font-size: 18px;
                 font-weight: bold;
-                border: none;
-            } 
-            QPushButton:hover {
-                background: #4CAF50;
-            }
-            QPushButton:pressed {
-                background: #388E3C;
-            }
+                border: 2px solid #5D4037;
+            }}
+            QPushButton:hover {{
+                background: #FFFFFF;
+            }}
+            QPushButton:pressed {{
+                background: {panel_fill};
+            }}
         """)
         yes_button.clicked.connect(self.on_yes)
         button_layout.addWidget(yes_button)
@@ -139,21 +149,21 @@ class TomatoClockDialog(QtWidgets.QDialog):
         no_button.setMinimumHeight(50)
         no_button.setMinimumWidth(140)
         no_button.setCursor(qt_const("PointingHandCursor"))
-        no_button.setStyleSheet("""
-            QPushButton { 
-                background: transparent; 
-                color: #FF7043; 
-                border: 2px solid #FF7043; 
+        no_button.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent;
+                color: #5D4037;
+                border: 2px solid #5D4037;
                 border-radius: 12px;
                 font-size: 18px;
                 font-weight: bold;
-            } 
-            QPushButton:hover {
-                background: rgba(255, 112, 67, 0.1);
-            }
-            QPushButton:pressed {
-                background: rgba(255, 112, 67, 0.2);
-            }
+            }}
+            QPushButton:hover {{
+                background: {panel_fill};
+            }}
+            QPushButton:pressed {{
+                background: #FFFFFF;
+            }}
         """)
         no_button.clicked.connect(self.on_no)
         button_layout.addWidget(no_button)

@@ -7,6 +7,16 @@ except ImportError:
     Signal = QtCore.pyqtSignal
     Property = QtCore.pyqtProperty
 
+# 导入统一主题
+try:
+    from ui.component.report.report_theme import theme as MorandiTheme
+except ImportError:
+    try:
+        from .report.report_theme import theme as MorandiTheme
+    except ImportError:
+        # Fallback if relative import fails
+        from ui.component.report.report_theme import theme as MorandiTheme
+
 class TimeAxisCard(QtWidgets.QWidget):
     """
     时光轴卡片：图标 + 标题 + 数据 (毛玻璃极夜风 - 方案A)
@@ -56,8 +66,13 @@ class TimeAxisCard(QtWidgets.QWidget):
         self.update()
 
     def mousePressEvent(self, event):
+        print(f"[DEBUG] TimeRetroBar mousePressEvent: {event.button()}")
         if event.button() == QtCore.Qt.LeftButton:
+            print("[DEBUG] TimeRetroBar clicked signal emitted")
             self.clicked.emit()
+            event.accept()
+        else:
+            super().mousePressEvent(event)
 
     # --- 属性定义 ---
     @Property(float)
@@ -82,24 +97,34 @@ class TimeAxisCard(QtWidgets.QWidget):
         painter.scale(self._scale, self._scale)
         painter.translate(-cx, -cy)
         
-        # 方案A 参数
-        # 背景：rgba(168, 216, 234, 0.08) -> ~20
-        # 边框：1px solid rgba(168, 216, 234, 0.25) -> ~64
-        # 悬停边框：rgba(168, 216, 234, 0.5) -> ~128
-        
-        bg_alpha = 20
-        border_alpha = 128 if self._hover else 64
-        
-        bg_color = QtGui.QColor(168, 216, 234, bg_alpha)
-        border_color = QtGui.QColor(168, 216, 234, border_alpha)
-        
-        # 增加边距防止缩放截断 (64x64, scale 1.05 -> ~67.2)
-        # 需要预留至少 2px 边距
         rect = QtCore.QRectF(3, 3, w-6, h-6)
         radius = 12
+
+        if self.title_text == "日报":
+            grad_start = QtGui.QColor("#D4E0BB")
+            grad_end = QtGui.QColor("#E0E1AC")
+        elif self.title_text == "周报":
+            grad_start = QtGui.QColor("#7AA97D")
+            grad_end = QtGui.QColor("#C0D6C5")
+        elif self.title_text == "月报":
+            grad_start = QtGui.QColor("#94B267")
+            grad_end = QtGui.QColor("#7AA97D")
+        else:
+            grad_start = QtGui.QColor("#FEFAE0")
+            grad_end = QtGui.QColor("#FEFAE0")
+
+        gradient = QtGui.QLinearGradient(rect.topLeft(), rect.bottomRight())
+        gradient.setColorAt(0, grad_start)
+        gradient.setColorAt(1, grad_end)
+
+        border_color = QtGui.QColor("#7FAE0F")
+        if self._hover:
+            border_color = border_color.darker(110)
+
+        rect = QtCore.QRectF(3, 3, w-6, h-6)
         
         painter.setPen(QtCore.Qt.NoPen)
-        painter.setBrush(bg_color)
+        painter.setBrush(gradient)
         painter.drawRoundedRect(rect, radius, radius)
         
         painter.setPen(QtGui.QPen(border_color, 1))
@@ -111,26 +136,26 @@ class TimeAxisCard(QtWidgets.QWidget):
         if hasattr(font_icon, "setStyleHint"):
             font_icon.setStyleHint(QtGui.QFont.TypeWriter)
         painter.setFont(font_icon)
-        painter.setPen(QtGui.QColor(255, 255, 255))
+        painter.setPen(QtGui.QColor("#5D4037"))
         
         # 图标位置：顶部偏下一点
         icon_rect = QtCore.QRectF(0, 8, w, 24)
         painter.drawText(icon_rect, QtCore.Qt.AlignCenter, self.icon_text)
         
-        # 2. 绘制标题 (12px, 600, #a8d8ea)
+        # 2. 绘制标题 (12px, 600, #1B5E20)
         font_title = QtGui.QFont("Microsoft YaHei", 9) # 9pt approx 12px
         font_title.setWeight(QtGui.QFont.DemiBold) # 600
         painter.setFont(font_title)
-        painter.setPen(QtGui.QColor("#a8d8ea"))
+        painter.setPen(QtGui.QColor("#5D4037"))
         
         title_rect = QtCore.QRectF(0, 32, w, 16)
         painter.drawText(title_rect, QtCore.Qt.AlignCenter, self.title_text)
         
-        # 3. 绘制数据 (10px, 400, rgba(168,216,234,0.6))
+        # 3. 绘制数据 (10px, 400, rgba(165,214,167,0.6))
         font_data = QtGui.QFont("Microsoft YaHei", 8) # 8pt approx 10-11px
         font_data.setWeight(QtGui.QFont.Normal)
         painter.setFont(font_data)
-        painter.setPen(QtGui.QColor(168, 216, 234, 153)) # 0.6 * 255
+        painter.setPen(QtGui.QColor("#5D4037"))
         
         data_rect = QtCore.QRectF(0, 48, w, 14)
         painter.drawText(data_rect, QtCore.Qt.AlignCenter, self.data_text)
@@ -165,8 +190,13 @@ class TimeRetroBar(QtWidgets.QWidget):
         super().leaveEvent(event)
         
     def mousePressEvent(self, event):
+        print(f"[DEBUG] TimeRetroBar (Bar) mousePressEvent: {event.button()}")
         if event.button() == QtCore.Qt.LeftButton:
+            print("[DEBUG] TimeRetroBar (Bar) clicked signal emitted")
             self.clicked.emit()
+            event.accept()
+        else:
+            super().mousePressEvent(event)
             
     def start_anim(self, hover):
         if self.anim:
@@ -189,6 +219,9 @@ class TimeRetroBar(QtWidgets.QWidget):
         
     def paintEvent(self, event):
         p = QtGui.QPainter(self)
+        # 绘制几乎透明的背景以捕获鼠标事件 (防止点击穿透)
+        p.fillRect(self.rect(), QtGui.QColor(0, 0, 0, 1))
+        
         p.setRenderHint(QtGui.QPainter.Antialiasing)
         p.setRenderHint(QtGui.QPainter.TextAntialiasing)
         
@@ -201,10 +234,10 @@ class TimeRetroBar(QtWidgets.QWidget):
         p.scale(self._scale, self._scale)
         p.translate(-cx, -cy)
         
-        # 蓝色透明玻璃风格 (参考 Scheme A 调色)
-        # 稍微提高不透明度以保证文字可见性
-        bg_color = QtGui.QColor(168, 216, 234, 40) # 0.15 * 255
-        border_color = QtGui.QColor(168, 216, 234, 100) # 0.4 * 255
+        bg_color = QtGui.QColor("#FEFAE0")
+        border_color = QtGui.QColor("#96C24B")
+        if self._hover:
+            border_color = border_color.darker(110)
         
         # 增加边距以防止缩放时被截断
         # 宽度 200 * 1.05 ≈ 210，左右各需留出 5px 以上
@@ -215,12 +248,12 @@ class TimeRetroBar(QtWidgets.QWidget):
         p.setBrush(bg_color)
         p.drawRoundedRect(rect, radius, radius)
         
-        p.setPen(QtGui.QPen(border_color, 1))
+        p.setPen(QtGui.QPen(border_color, 2))
         p.setBrush(QtCore.Qt.NoBrush)
         p.drawRoundedRect(rect, radius, radius)
         
         # 绘制文字
-        p.setPen(QtGui.QColor("#a8d8ea"))
+        p.setPen(QtGui.QColor("#5D4037"))
         font = QtGui.QFont("Microsoft YaHei", 10)
         font.setBold(True)
         p.setFont(font)
@@ -281,6 +314,7 @@ class HistoryEntryWidget(QtWidgets.QWidget):
 
     def show_icons(self):
         """切换到图标显示模式"""
+        print("[DEBUG] show_icons called")
         self.bar.hide()
         self.icons_container.show()
         
@@ -324,7 +358,7 @@ if __name__ == "__main__":
     layout = QtWidgets.QVBoxLayout(test_win)
     
     label = QtWidgets.QLabel("Scheme A Test")
-    label.setStyleSheet("color: #a8d8ea;")
+    label.setStyleSheet("color: #1B5E20;")
     layout.addWidget(label)
     
     entry = HistoryEntryWidget()

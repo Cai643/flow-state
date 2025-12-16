@@ -18,6 +18,16 @@ else:
         from PyQt5 import QtCore, QtGui, QtWidgets  # type: ignore
         QT_LIB = "PyQt5"
 
+# 导入统一主题
+try:
+    from ui.component.report.report_theme import theme as MorandiTheme
+except ImportError:
+    try:
+        from .report.report_theme import theme as MorandiTheme
+    except ImportError:
+        # Fallback if relative import fails
+        from ui.component.report.report_theme import theme as MorandiTheme
+
 def qt_const(name: str) -> Any:
     qt = getattr(QtCore, "Qt", None)
     if qt is None:
@@ -89,15 +99,18 @@ class ReminderOverlay(QtWidgets.QDialog):
         center_y = geometry.top() + (geometry.height() - window_height) // 2
         self.setGeometry(center_x, center_y, window_width, window_height)
         
-        # 主容器 - 学生版暖黄主题
         self.container = QtWidgets.QWidget(self)
         self.container.setObjectName("VideoReminderDialog")  # 为了匹配 QSS
-        self.container.setStyleSheet("""
-            QWidget#VideoReminderDialog {
-                background-color: #E8F5E9;  /* 淡绿背景，护眼 */
-                border: 2px solid #A5D6A7; /* 柔和边框 */
+        gradient_start = MorandiTheme.HEX_REMINDER_GRADIENT_START
+        gradient_end = MorandiTheme.HEX_REMINDER_GRADIENT_END
+        panel_fill = MorandiTheme.HEX_REMINDER_PANEL_FILL
+        self.container.setStyleSheet(f"""
+            QWidget#VideoReminderDialog {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                            stop:0 {gradient_start},
+                                            stop:1 {gradient_end});
                 border-radius: 20px;
-            }
+            }}
         """)
         
         # 主布局
@@ -112,12 +125,14 @@ class ReminderOverlay(QtWidgets.QDialog):
         
         # 1. 历史回顾区域 (新增)
         history_frame = QtWidgets.QFrame()
-        history_frame.setStyleSheet("""
-            QFrame {
-                background-color: rgba(66, 165, 245, 0.1);
+        panel_border = MorandiTheme.COLOR_BORDER.name()
+        panel_fill = MorandiTheme.HEX_REMINDER_PANEL_FILL
+        history_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {panel_fill};
                 border-radius: 15px;
-                border: 1px solid rgba(66, 165, 245, 0.2);
-            }
+                border: 1px solid {panel_border};
+            }}
         """)
         history_layout = QtWidgets.QVBoxLayout(history_frame)
         history_layout.setContentsMargins(25, 20, 25, 20)
@@ -127,14 +142,17 @@ class ReminderOverlay(QtWidgets.QDialog):
         self.focus_summary_label = QtWidgets.QLabel("📚 刚才你专注了32分钟")
         self.focus_summary_label.setObjectName("focus_summary")
         self.focus_summary_label.setAlignment(qt_const("AlignLeft"))
-        self.focus_summary_label.setStyleSheet("""
-            QLabel#focus_summary { 
-                color: #1565C0;      /* 深蓝色 */ 
+        
+        accent_color = MorandiTheme.COLOR_ACCENT_DARK.name() # #FBC02D (Golden)
+        
+        self.focus_summary_label.setStyleSheet(f"""
+            QLabel#focus_summary {{ 
+                color: {accent_color};      /* 金色 */ 
                 font-size: 18px; 
                 font-weight: bold; 
                 background: transparent;
                 border: none;
-            } 
+            }} 
         """)
         history_layout.addWidget(self.focus_summary_label)
         
@@ -142,13 +160,14 @@ class ReminderOverlay(QtWidgets.QDialog):
         self.focus_task_label = QtWidgets.QLabel("   在做：论文写作")
         self.focus_task_label.setObjectName("focus_task")
         self.focus_task_label.setAlignment(qt_const("AlignLeft"))
-        self.focus_task_label.setStyleSheet("""
-            QLabel#focus_task { 
-                color: #546E7A;      /* 蓝灰色 */ 
+        
+        self.focus_task_label.setStyleSheet(f"""
+            QLabel#focus_task {{ 
+                color: #5D4037; 
                 font-size: 16px; 
                 background: transparent;
                 border: none;
-            } 
+            }} 
         """)
         history_layout.addWidget(self.focus_task_label)
         
@@ -156,12 +175,12 @@ class ReminderOverlay(QtWidgets.QDialog):
 
         # 2. 消息内容区域 (Frame包裹)
         msg_frame = QtWidgets.QFrame()
-        msg_frame.setStyleSheet("""
-            QFrame {
-                background-color: rgba(255, 255, 255, 0.6); /* 更清透的白色 */
+        msg_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {panel_fill};
                 border-radius: 15px;
-                border: 1px solid rgba(165, 214, 167, 0.3); /* 绿色微边框 */
-            }
+                border: 1px solid {panel_border};
+            }}
         """)
         msg_layout = QtWidgets.QVBoxLayout(msg_frame)
         msg_layout.setContentsMargins(30, 25, 30, 25)
@@ -228,21 +247,25 @@ class ReminderOverlay(QtWidgets.QDialog):
         work_button.setMinimumHeight(55)
         work_button.setMinimumWidth(180)
         work_button.setCursor(qt_const("PointingHandCursor"))
-        work_button.setStyleSheet("""
-            QPushButton#primary { 
-                background: #66BB6A; /* 自然绿按钮 */ 
-                color: white; 
-                border-radius: 15px; 
+        
+        btn_primary_bg = MorandiTheme.COLOR_BG_PANEL.name() # #50795D
+        btn_primary_hover = MorandiTheme.COLOR_PRIMARY_LIGHT.name() # #547C7E
+        
+        work_button.setStyleSheet(f"""
+            QPushButton#primary {{
+                background: {btn_primary_bg};
+                color: #F9F5F5;
+                border-radius: 15px;
                 font-size: 16px;
                 font-weight: bold;
-                border: none;
-            } 
-            QPushButton#primary:hover {
-                background: #4CAF50;
-            }
-            QPushButton#primary:pressed {
-                background: #388E3C;
-            }
+                border: 1px solid {accent_color};
+            }}
+            QPushButton#primary:hover {{
+                background: {btn_primary_hover};
+            }}
+            QPushButton#primary:pressed {{
+                background: {btn_primary_bg};
+            }}
         """)
         work_button.clicked.connect(self.on_work_button)
         button_layout.addWidget(work_button)
@@ -253,21 +276,23 @@ class ReminderOverlay(QtWidgets.QDialog):
         snooze_button.setMinimumHeight(55)
         snooze_button.setMinimumWidth(180)
         snooze_button.setCursor(qt_const("PointingHandCursor"))
-        snooze_button.setStyleSheet("""
-            QPushButton#secondary { 
-                background: transparent; 
-                color: #66BB6A; 
-                border: 2px solid #66BB6A; /* 加粗一点边框 */
+        snooze_button.setStyleSheet(f"""
+            QPushButton#secondary {{
+                background: transparent;
+                color: #5D4037;
+                border: 2px solid {accent_color};
                 border-radius: 15px;
                 font-size: 16px;
                 font-weight: bold;
-            } 
-            QPushButton#secondary:hover {
-                background: rgba(102, 187, 106, 0.1);
-            }
-            QPushButton#secondary:pressed {
-                background: rgba(102, 187, 106, 0.2);
-            }
+            }}
+            QPushButton#secondary:hover {{
+                background: rgba(80, 121, 93, 0.3);
+                border-color: {accent_color};
+                color: {accent_color};
+            }}
+            QPushButton#secondary:pressed {{
+                background: rgba(80, 121, 93, 0.5);
+            }}
         """)
         snooze_button.clicked.connect(self.on_snooze_button)
         button_layout.addWidget(snooze_button)
@@ -277,17 +302,17 @@ class ReminderOverlay(QtWidgets.QDialog):
         # 底部：暂时禁用 (更隐蔽的设计)
         disable_button = QtWidgets.QPushButton("今天不再提醒")
         disable_button.setCursor(qt_const("PointingHandCursor"))
-        disable_button.setStyleSheet("""
-            QPushButton {
+        disable_button.setStyleSheet(f"""
+            QPushButton {{
                 background: transparent;
-                color: #A1887F;
+                color: {MorandiTheme.COLOR_TEXT_SECONDARY.name()};
                 border: none;
                 font-size: 13px;
                 text-decoration: underline;
-            }
-            QPushButton:hover {
-                color: #8D6E63;
-            }
+            }}
+            QPushButton:hover {{
+                color: #5D4037;
+            }}
         """)
         disable_button.clicked.connect(self.on_disable_button)
         layout.addWidget(disable_button, 0, qt_const("AlignCenter"))

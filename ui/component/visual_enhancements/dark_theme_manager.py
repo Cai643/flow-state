@@ -36,16 +36,16 @@ class DarkThemeManager(QtCore.QObject):
         'text_disabled': '#666666',           # 禁用文字颜色 - 深灰色
 
         # 强调色系
-        'accent_green': '#a8d8ea',            # 主强调色 - 莫兰迪蓝
-        'accent_green_dark': '#8ec5db',       # 深莫兰迪蓝
-        'accent_green_light': '#bfe6f2',      # 浅莫兰迪蓝
-        'accent_blue': '#a8d8ea',             # 辅助色 - 莫兰迪蓝
+        'accent_green': '#66BB6A',            # 主强调色 - 鲜绿 (Fresh Green)
+        'accent_green_dark': '#2E7D32',       # 深绿 (Dark Green)
+        'accent_green_light': '#A5D6A7',      # 浅绿 (Light Green)
+        'accent_blue': '#66BB6A',             # 辅助色 - 鲜绿 (原莫兰迪蓝)
         'accent_yellow': '#FFD700',           # 警告黄色 (保持不变)
         'accent_red': '#FF6B6B',              # 错误红色 (保持不变)
 
         # 边框和分隔线
         'border_color': '#4a4a4a',            # 默认边框颜色
-        'border_focus': '#a8d8ea',            # 焦点边框颜色
+        'border_focus': '#66BB6A',            # 焦点边框颜色
         'border_error': '#FF6B6B',            # 错误边框颜色
         'separator_color': '#333333',         # 分隔线颜色
 
@@ -55,10 +55,10 @@ class DarkThemeManager(QtCore.QObject):
         'glass_color': 'rgba(58, 58, 58, 0.8)',  # 毛玻璃颜色
 
         # 状态色系
-        'success_color': '#a8d8ea',           # 成功状态色 - 莫兰迪蓝
+        'success_color': '#66BB6A',           # 成功状态色 - 鲜绿
         'warning_color': '#FFD700',           # 警告状态色
         'error_color': '#FF6B6B',             # 错误状态色
-        'info_color': '#a8d8ea',              # 信息状态色 - 莫兰迪蓝
+        'info_color': '#66BB6A',              # 信息状态色 - 鲜绿
     }
 
     # 字体配置

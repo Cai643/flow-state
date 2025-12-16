@@ -1,4 +1,3 @@
-
 try:
     from PySide6 import QtGui
 except ImportError:
@@ -7,40 +6,65 @@ except ImportError:
 class ReportTheme:
     """
     Unified Color Theme for Reports (Daily, Weekly, Monthly).
-    Based on 'Morandi Blue Starry' theme.
+    Based on 'Dark Fairy Forest' theme.
+    Palette:
+    - #547C7E (Muted Teal/Green) - Secondary / Borders
+    - #50795D (Forest Green)     - Panels / Buttons
+    - #2D5256 (Dark Deep Teal)   - Global Background
+    - #C2E3B8 (Pale Green)       - Highlights / Light Backgrounds
+    - #EBE4C3 (Beige/Cream)      - Text
+    - #FBC02D (Golden Yellow)    - Accents
     """
 
     # --- Base Colors (Hex) ---
-    _C_MORANDI_BLUE_LIGHT = "#A8D8EA"  # 168, 216, 234
-    _C_MORANDI_BLUE_DARK  = "#7EB3E8"  # 126, 179, 232 (approx)
-    _C_GOLD               = "#FFD700"  # 255, 215, 0
-    _C_GOLD_LIGHT         = "#FFE033"
-    _C_GOLD_DARK          = "#CCAC00"
-    c = "#FAD209"
-    _C_ACCENT_LIGHT       = "#BFE6F2"
-    _C_RED                = "#FF6B6B"
-    _C_RED_DARK           = "#FF4444"
-    _C_ORANGE             = "#FFAA00"
-    _C_CYAN               = "#4ECDC4"
-    _C_BLUE               = "#45B7D1"
-    _C_YELLOW             = "#F9CA24"
-    _C_BRIGHT_YELLOW      = "#FFEA00"  # 亮黄色 (用于时间轴高亮)
+    _C_MORANDI_BLUE_LIGHT = "#547C7E"  # Muted Teal (Secondary/Border)
+    _C_MORANDI_BLUE_DARK  = "#50795D"  # Forest Green (Primary/Panel)
+    _C_GOLD               = "#EBE4C3"
+    _C_GOLD_LIGHT         = "#C2E3B8"
+    _C_GOLD_DARK          = "#FBC02D"
+    _C_GRADIENT_START     = "#D4E0BB"
+    _C_GRADIENT_END       = "#E0E1AC"
+    _C_PANEL_FILL         = "#F9F5F5"
+    c = "#FBC02D"
+    _C_ACCENT_LIGHT       = "#C2E3B8"  # Pale Green
+    _C_RED                = "#EF5350"
+    _C_RED_DARK           = "#C62828"
+    _C_ORANGE             = "#FB8C00"
+    _C_CYAN               = "#26A69A"
+    _C_BLUE               = "#42A5F5"
+    _C_YELLOW             = "#FBC02D"
+    _C_BRIGHT_YELLOW      = "#FFEB3B"  # Bright Yellow
     _C_WHITE              = "#FFFFFF"
     _C_BLACK              = "#000000"
 
     # --- 2. 背景系统 (Background System) ---
     # [全局背景] (用于: 窗口最底层的背景)
-    _CFG_BG_GLOBAL_COLOR = _C_MORANDI_BLUE_DARK 
-    _CFG_BG_GLOBAL_ALPHA = 153       # 透明度 0-255 (约60% 不透明)
+    _CFG_BG_GLOBAL_COLOR = "#2D5256" # Dark Deep Teal
+    _CFG_BG_GLOBAL_ALPHA = 255       # Opaque
 
     # [背景板] (用于: 卡片, 列表项, 浮层, 按钮背景)
-    _CFG_BG_PANEL_COLOR = _C_MORANDI_BLUE_LIGHT
-    _CFG_BG_PANEL_ALPHA = 153        # 透明度 0-255 (约60% 不透明)
+    _CFG_BG_PANEL_COLOR = "#50795D"  # Forest Green
+    _CFG_BG_PANEL_ALPHA = 200        # Semi-Opaque
+
+    @property
+    def COLOR_BG_GLOBAL_COLOR(self): return self.color(self._CFG_BG_GLOBAL_COLOR)
+
+    @property
+    def COLOR_BG_PANEL(self): return self.color(self._CFG_BG_PANEL_COLOR)
+
+    @property
+    def HEX_REMINDER_GRADIENT_START(self): return self._C_GRADIENT_START
+
+    @property
+    def HEX_REMINDER_GRADIENT_END(self): return self._C_GRADIENT_END
+
+    @property
+    def HEX_REMINDER_PANEL_FILL(self): return self._C_PANEL_FILL
 
     # --- 3. 图表系统 (Chart System) ---
     # [柱状图] (用于: 数据条, 进度条)
-    _CFG_CHART_COLOR = _C_BRIGHT_YELLOW # 使用亮黄色
-    _CFG_CHART_ALPHA = 255           # 透明度 0-255 (约90% 不透明)
+    _CFG_CHART_COLOR = "#C2E3B8"     # Pale Green
+    _CFG_CHART_ALPHA = 255           
 
     # --- Semantic Colors (QColor with Alpha) ---
 
@@ -53,175 +77,87 @@ class ReportTheme:
 
     # Extended Palette for Daily Report
     @property
-    def COLOR_PRIMARY_LIGHT(self): return self.color(self._C_GOLD_LIGHT)
+    def COLOR_PRIMARY_LIGHT(self): return self.color(self._C_MORANDI_BLUE_LIGHT)
     @property
-    def COLOR_PRIMARY_DARK(self): return self.color(self._C_GOLD_DARK)
+    def COLOR_PRIMARY_DARK(self): return self.color(self._C_MORANDI_BLUE_DARK)
     @property
     def COLOR_ACCENT_LIGHT(self): return self.color(self._C_ACCENT_LIGHT)
+    @property
+    def COLOR_ACCENT_DARK(self): return self.color(self._C_GOLD_DARK)
     @property
     def COLOR_WARNING(self): return self.color(self._C_ORANGE)
     @property
     def COLOR_DANGER(self): return self.color(self._C_RED_DARK)
     
     @property
-    def COLOR_TEXT_SECONDARY(self): return self.color(self._C_MORANDI_BLUE_LIGHT, 204) # 80%
+    def COLOR_TEXT_SECONDARY(self): return self.color(self._C_GOLD, 200) # Beige 80%
     @property
-    def COLOR_TEXT_MUTED(self): return self.color(self._C_MORANDI_BLUE_LIGHT, 153) # 60%
+    def COLOR_TEXT_MUTED(self): return self.color(self._C_ACCENT_LIGHT, 150) # Pale Green 60%
     
     @property
-    def COLOR_SURFACE(self): return self.color(self._C_MORANDI_BLUE_DARK, 20) # 8%
+    def COLOR_SURFACE(self): return self.color(self._CFG_BG_PANEL_COLOR, 255) # Forest Green
     @property
-    def COLOR_SHADOW(self): return self.color(self._C_BLACK, 25) # 0.1 approx
+    def COLOR_SHADOW(self): return self.color(self._C_BLACK, 60) # Dark Shadow
     @property
-    def COLOR_OVERLAY(self): return self.color(self._C_MORANDI_BLUE_LIGHT, 25) # 0.1 approx
+    def COLOR_OVERLAY(self): return self.color(self._CFG_BG_GLOBAL_COLOR, 200) # Dark Teal Overlay
 
     # Backgrounds
     @property
     def COLOR_BG_CENTER(self):
-        return self.color(self._C_MORANDI_BLUE_LIGHT, 20)  # 8%
+        return self.color(self._CFG_BG_GLOBAL_COLOR, 255)  # Dark Deep Teal
 
     @property
     def COLOR_BG_EDGE(self):
-        return self.color(self._C_MORANDI_BLUE_DARK, 20)   # 8%
+        return self.color("#1A3538", 255)   # Darker Teal/Black Edge
 
     @property
     def COLOR_BORDER(self):
-        return self.color(self._C_MORANDI_BLUE_LIGHT, 76)  # 30%
+        return self.color(self._C_MORANDI_BLUE_LIGHT, 255) # Muted Teal Border
 
     @property
     def COLOR_INNER_SHADOW(self):
-        return self.color(self._C_MORANDI_BLUE_LIGHT, 12)
+        return self.color(self._C_BLACK, 50)
 
     # Text
     @property
     def COLOR_TEXT_TITLE(self):
-        return self.color(self._C_GOLD, 255) # Gold 100%
-
-    @property
-    def COLOR_TEXT_TITLE_ALT(self):
-        """Alternative title color (e.g. for Weekly report)"""
-        return self.color(self._C_MORANDI_BLUE_LIGHT, 230) # 90%
-
-    @property
-    def COLOR_TEXT_SUBTITLE(self):
-        return self.color(self._C_MORANDI_BLUE_LIGHT, 204) # 80%
+        return self.color(self._C_GOLD, 255) # Beige/Cream
 
     @property
     def COLOR_TEXT_NORMAL(self):
-        return self.color(self._C_MORANDI_BLUE_LIGHT, 230) # 90%
+        return self.color("#FFFFFF", 230) # White-ish
 
     @property
-    def COLOR_TEXT_DESC(self):
-        return self.color(self._C_MORANDI_BLUE_LIGHT, 204) # 80%
-
-    @property
-    def COLOR_TEXT_DATE(self):
-        return self.color(self._C_MORANDI_BLUE_LIGHT, 178) # 70%
+    def COLOR_TEXT_SUBTITLE(self):
+        return self.color(self._C_ACCENT_LIGHT, 200) # Pale Green
 
     @property
     def COLOR_TEXT_LOCKED(self):
-        return self.color(self._C_MORANDI_BLUE_LIGHT, 128) # 50%
-    
-    @property
-    def COLOR_TEXT_VALUE(self):
-        return self.color(self._C_GOLD, 255)
-
-    # Charts & Progress
-    @property
-    def COLOR_FILL_GOLD(self):
-        return self.color(self._C_GOLD, 153)    # 60%
-
-    @property
-    def COLOR_FILL_GOLD_DIM(self):
-        return self.color(self._C_GOLD, 128)    # 50%
-
-    @property
-    def COLOR_CHART_BAR(self):
-        return self.color(self._CFG_CHART_COLOR, self._CFG_CHART_ALPHA)
-
-    @property
-    def COLOR_CHART_BORDER(self):
-        return self.color(self._C_MORANDI_BLUE_LIGHT, 102) # 40%
+        return self.color(self._C_MORANDI_BLUE_LIGHT, 150) # Muted Teal
 
     @property
     def COLOR_GRID(self):
-        return self.color(self._C_MORANDI_BLUE_LIGHT, 38)  # 15% (Month uses 25/10%)
-
-    # Buttons
-    @property
-    def COLOR_BTN_BG(self):
-        return self.color(self._C_MORANDI_BLUE_LIGHT, 30)  # 12%
+        return self.color(self._C_ACCENT_LIGHT, 30) # Faint Pale Green Grid
 
     @property
-    def COLOR_BTN_BORDER(self):
-        return self.color(self._C_MORANDI_BLUE_LIGHT, 76)  # 30%
+    def COLOR_CHART_BAR(self):
+        return self.color(self._C_GOLD_DARK, 255) # Golden Yellow
 
-    @property
-    def COLOR_BTN_HOVER(self):
-        return self.color(self._C_MORANDI_BLUE_LIGHT, 64)  # 25%
-    
-    @property
-    def COLOR_BTN_TEXT(self):
-        return self.color(self._C_MORANDI_BLUE_LIGHT, 230) # 90%
-
-    # Particle Colors (List of hex strings)
-    @property
-    def PARTICLE_COLORS(self):
-        return [
-            self._C_MORANDI_BLUE_LIGHT,
-            self._C_GOLD,
-            self._C_MORANDI_BLUE_DARK,
-            self._C_RED,
-            self._C_CYAN,
-            self._C_BLUE,
-            self._C_YELLOW
-        ]
-
-    # --- Raw Hex Access (if needed for stylesheets) ---
-    @property
-    def HEX_GOLD(self): return self._C_GOLD
+    # Missing from Daily Report?
     @property
     def HEX_BLUE_LIGHT(self): return self._C_MORANDI_BLUE_LIGHT
-    
-    # Singleton instance
-    _instance = None
-
-    @classmethod
-    def get_instance(cls):
-        if cls._instance is None:
-            cls._instance = cls()
-        return cls._instance
 
     @staticmethod
-    def draw_text_with_shadow(painter, rect, flags, text, color, shadow_color=None, offset=(1, 1)):
-        """Helper to draw text with shadow."""
+    def draw_text_at_point_with_shadow(painter, x, y, text, color, shadow_color=None):
         if shadow_color is None:
-            # Default shadow: black with 50% opacity (128)
-            shadow_color = QtGui.QColor(0, 0, 0, 128)
-        
-        # Draw Shadow
-        painter.setPen(shadow_color)
-        shadow_rect = QtCore.QRectF(rect)
-        shadow_rect.translate(offset[0], offset[1])
-        painter.drawText(shadow_rect, flags, text)
-        
-        # Draw Text
-        painter.setPen(color)
-        painter.drawText(rect, flags, text)
-        
-    @staticmethod
-    def draw_text_at_point_with_shadow(painter, x, y, text, color, shadow_color=None, offset=(1, 1)):
-        """Helper to draw text at specific point with shadow."""
-        if shadow_color is None:
-            shadow_color = QtGui.QColor(0, 0, 0, 128)
-            
-        # Draw Shadow
-        painter.setPen(shadow_color)
-        painter.drawText(int(x + offset[0]), int(y + offset[1]), text)
-        
-        # Draw Text
-        painter.setPen(color)
-        painter.drawText(int(x), int(y), text)
+            shadow_color = QtGui.QColor(0, 0, 0, 160)
+        painter.save()
+        painter.setPen(QtGui.QPen(shadow_color))
+        offset = 1
+        painter.drawText(x + offset, y + offset, text)
+        painter.setPen(QtGui.QPen(color))
+        painter.drawText(x, y, text)
+        painter.restore()
 
-# Global instance for easy import
-theme = ReportTheme.get_instance()
+# Create global instance
+theme = ReportTheme()

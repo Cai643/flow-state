@@ -9,6 +9,16 @@ except ImportError:
     Signal = QtCore.pyqtSignal
     Property = QtCore.pyqtProperty
 
+# 导入统一主题
+try:
+    from ui.component.report.report_theme import theme as MorandiTheme
+except ImportError:
+    try:
+        from ..report.report_theme import theme as MorandiTheme
+    except ImportError:
+        # Fallback if relative import fails
+        from ui.component.report.report_theme import theme as MorandiTheme
+
 class StarryEnvelopeWidget(QtWidgets.QWidget):
     clicked = Signal()
 
@@ -25,8 +35,10 @@ class StarryEnvelopeWidget(QtWidgets.QWidget):
         
         self.border_alpha = 102 # 40%
         self.border_width = 3.0
-        self.border_color = QtGui.QColor("#a8d8ea")
+        self.border_color = QtGui.QColor(MorandiTheme.COLOR_BORDER) # Light Green
         self.border_color.setAlpha(self.border_alpha)
+        self.grad_start = QtGui.QColor(165, 214, 167)
+        self.grad_end = QtGui.QColor(200, 230, 201)
         
         # 星星数据
         self.stars = self._init_stars()
@@ -102,6 +114,11 @@ class StarryEnvelopeWidget(QtWidgets.QWidget):
                 
         self.update()
 
+    def set_gradient(self, start_color: str, end_color: str):
+        self.grad_start = QtGui.QColor(start_color)
+        self.grad_end = QtGui.QColor(end_color)
+        self.update()
+
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
@@ -116,12 +133,9 @@ class StarryEnvelopeWidget(QtWidgets.QWidget):
         
         rect = self.rect()
         
-        # 1. 背景渐变 (更新为带透明度的蓝->紫，饱和度降低)
-        gradient = QtGui.QLinearGradient(0, 0, 0, 200) # 从上到下
-        # 起始: 深蓝 (透明) - 降低饱和度
-        gradient.setColorAt(0, QtGui.QColor(30, 40, 85, 150))
-        # 结束: 深紫 (透明) - 降低饱和度
-        gradient.setColorAt(1, QtGui.QColor(70, 30, 70, 150))
+        gradient = QtGui.QLinearGradient(0, 0, 0, 200)
+        gradient.setColorAt(0, self.grad_start)
+        gradient.setColorAt(1, self.grad_end)
         painter.setBrush(gradient)
         painter.setPen(QtCore.Qt.NoPen)
         painter.drawRoundedRect(rect, 8, 8)
@@ -153,7 +167,7 @@ class StarryEnvelopeWidget(QtWidgets.QWidget):
 
         # 4. 文本
         # 主标题 (位置针对新尺寸调整)
-        painter.setPen(QtGui.QColor("#ffd700"))
+        painter.setPen(QtGui.QColor("#5D4037"))
         font = QtGui.QFont("Noto Sans SC", 14, QtGui.QFont.Bold)
         font.setPixelSize(18)
         font.setLetterSpacing(QtGui.QFont.AbsoluteSpacing, 0.5)
@@ -166,17 +180,17 @@ class StarryEnvelopeWidget(QtWidgets.QWidget):
         painter.translate(0, 0) # 发光无偏移
         painter.restore()
         
-        painter.drawText(rect.adjusted(0, 45, 0, 0), QtCore.Qt.AlignTop | QtCore.Qt.AlignHCenter, "一封来自星星的信")
+        painter.drawText(rect.adjusted(0, 45, 0, 0), QtCore.Qt.AlignTop | QtCore.Qt.AlignHCenter, "一封来自森林的信")
         
         # 副标题 (位置针对新尺寸调整)
-        painter.setPen(QtGui.QColor(168, 216, 234, 204))
+        painter.setPen(QtGui.QColor(27, 94, 32, 204))
         font_sub = QtGui.QFont("Noto Sans SC")
         font_sub.setPixelSize(12)
         painter.setFont(font_sub)
         painter.drawText(rect.adjusted(0, 75, 0, 0), QtCore.Qt.AlignTop | QtCore.Qt.AlignHCenter, "点开有惊喜哟！")
         
         # 5. Emoji 装饰 (位置针对新尺寸调整)
-        painter.setPen(QtGui.QColor("#ffd700"))
+        painter.setPen(QtGui.QColor("#F9A825"))
         font_emoji = QtGui.QFont("Segoe UI Emoji")
         font_emoji.setPixelSize(20)
         painter.setFont(font_emoji)
@@ -217,7 +231,7 @@ class StarryEnvelopeWidget(QtWidgets.QWidget):
     def mousePressEvent(self, event):
         if not self.disappearing:
             self.scale_factor = 0.98
-            self.border_color = QtGui.QColor("#ffd700")
+            self.border_color = QtGui.QColor(MorandiTheme.COLOR_ACCENT_DARK)
             self.border_width = 4.0
             self.shadow.setBlurRadius(8)
             self.shadow.setOffset(0, 2)

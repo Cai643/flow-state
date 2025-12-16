@@ -12,8 +12,8 @@ import math
 
 class SuspensionBall(QtWidgets.QWidget):
     """
-    莫兰迪蓝单色悬浮球 (v2.0 - 水滴晶体版)
-    - 视觉：水滴晶体 (52x52px, 莫兰迪蓝 #a8d8ea)
+    清新森林单色悬浮球 (v2.0 - 水滴晶体版)
+    - 视觉：水滴晶体 (52x52px, 清新绿 #66BB6A)
     - 交互：呼吸、微旋转、缩放反馈
     - 信息：微文字、微进度环
     """
@@ -106,8 +106,8 @@ class SuspensionBall(QtWidgets.QWidget):
                 font-family: "Microsoft YaHei";
                 font-size: 10px;
                 font-weight: 600;
-                color: rgba(255, 255, 255, 0.95);
-                background-color: rgba(168, 216, 234, 0.4);
+                color: rgba(27, 94, 32, 0.95);
+                background-color: rgba(232, 245, 233, 0.9);
                 border-radius: 4px;
                 padding: 1px 3px;
             }
@@ -206,62 +206,61 @@ class SuspensionBall(QtWidgets.QWidget):
         # 限制在 0.1 - 1.0 之间
         current_alpha = max(0.1, min(1.0, self._opacity_level + self._breath_offset))
         
-        # --- 2. 绘制外阴影 (极淡) ---
-        # 模拟 box-shadow: 0 2px 8px rgba(0,0,0,0.08)
-        # 简单起见，画一个稍大的半透明圆
+        # --- 1. 绘制主体 (水晶球) ---
+        # 径向渐变模拟球体光感
+        # 焦点稍微偏左上 (-0.3, -0.3)
+        radial_grad = QtGui.QRadialGradient(radius * -0.3, radius * -0.3, radius * 1.5)
+        
+        # 颜色配置 (清新绿单色系)
+        # 核心高光: 白色
+        # 主体: 清新绿 (#66BB6A) -> rgb(102, 187, 106)
+        # 阴影: 深绿
+        
+        base_color = QtGui.QColor(102, 187, 106) # #66BB6A
+        base_color.setAlphaF(self._opacity_level)
+        
+        highlight = QtGui.QColor(255, 255, 255, int(255 * 0.9))
+        shadow = QtGui.QColor(56, 142, 60, int(255 * 0.8)) # #388E3C
+        
+        radial_grad.setColorAt(0.0, highlight)
+        radial_grad.setColorAt(0.2, base_color)
+        radial_grad.setColorAt(1.0, shadow)
+        
         painter.setPen(QtCore.Qt.NoPen)
-        shadow_color = QtGui.QColor(0, 0, 0, int(255 * 0.08))
-        painter.setBrush(shadow_color)
-        painter.drawEllipse(QtCore.QPointF(0, 2), radius + 2, radius + 2)
-        
-        # --- 3. 绘制主体 (毛玻璃水滴) ---
-        # background: qradialgradient(...)
-        # 莫兰迪蓝基色: rgba(168, 216, 234) -> #a8d8ea
-        
-        gradient = QtGui.QRadialGradient(0, 0, radius, -radius * 0.3, -radius * 0.3)
-        
-        # 根据状态设置颜色
-        if self._state == 'distract_heavy':
-            # 黄色警告色: #F1C40F
-            base_color = QtGui.QColor(241, 196, 15)
-            edge_color = QtGui.QColor(243, 156, 18)
-        else:
-            # 默认莫兰迪蓝: #a8d8ea
-            base_color = QtGui.QColor(168, 216, 234)
-            edge_color = QtGui.QColor(127, 179, 232)
-            
-        # stop:0
-        c1 = base_color
-        c1.setAlphaF(current_alpha * 0.95) # 稍微调整系数
-        
-        # stop:1
-        c2 = edge_color
-        c2.setAlphaF(current_alpha * 0.7)
-        
-        gradient.setColorAt(0.0, c1)
-        gradient.setColorAt(1.0, c2)
-        
-        painter.setBrush(gradient)
-        
-        # 边框
-        border_color = base_color
-        border_color.setAlpha(int(255 * 0.9))
-        border_pen = QtGui.QPen(border_color, 2)
-        painter.setPen(border_pen)
-        
+        painter.setBrush(radial_grad)
         painter.drawEllipse(QtCore.QPointF(0, 0), radius, radius)
         
-        # --- 4. 绘制内阴影 (凹陷感) ---
-        # 模拟 box-shadow: inset 0 1px 2px rgba(0,0,0,0.1)
-        # 在顶部绘制一个半月形或渐变来模拟
-        # 这里用一个简单的线性渐变覆盖层
-        inner_shadow = QtGui.QLinearGradient(0, -radius, 0, radius)
-        inner_shadow.setColorAt(0.0, QtGui.QColor(0, 0, 0, 20))
-        inner_shadow.setColorAt(0.2, QtGui.QColor(0, 0, 0, 0))
-        inner_shadow.setColorAt(1.0, QtGui.QColor(0, 0, 0, 0))
+        # --- 2. 绘制高光 (Glossy) ---
+        # 顶部反光
+        gloss_grad = QtGui.QLinearGradient(0, -radius, 0, 0)
+        gloss_grad.setColorAt(0.0, QtGui.QColor(255, 255, 255, 220))
+        gloss_grad.setColorAt(1.0, QtGui.QColor(255, 255, 255, 0))
         
-        painter.setPen(QtCore.Qt.NoPen)
-        painter.setBrush(inner_shadow)
+        painter.setBrush(gloss_grad)
+        # 稍微缩小的椭圆作为高光区域
+        painter.drawEllipse(QtCore.QPointF(0, -radius * 0.5), radius * 0.7, radius * 0.4)
+        
+        # --- 3. 绘制边缘光 (Rim Light) ---
+        # 底部边缘微发光，增加立体感
+        border_pen = QtGui.QPen(QtGui.QColor(255, 255, 255, 100), 1.5)
+        painter.setPen(border_pen)
+        painter.setBrush(QtCore.Qt.NoBrush)
+        painter.drawEllipse(QtCore.QPointF(0, 0), radius - 1, radius - 1)
+        
+        # 外部柔光晕 (呼吸效果的一部分)
+        if self._state == 'focus':
+            glow_color = QtGui.QColor(102, 187, 106)
+            glow_color.setAlphaF(0.3 + self._breath_offset) # 呼吸变化
+            
+            painter.setPen(QtCore.Qt.NoPen)
+            painter.setBrush(glow_color)
+            # 绘制一个稍大的同心圆作为光晕
+            painter.drawEllipse(QtCore.QPointF(0, 0), radius + 4, radius + 4)
+            
+        # 恢复画笔绘制主体边框
+        border_pen = QtGui.QPen(QtGui.QColor(102, 187, 106, 50), 1)
+        painter.setPen(border_pen)
+        
         painter.drawEllipse(QtCore.QPointF(0, 0), radius, radius)
         
         # --- 5. 绘制进度环 (悬停时) ---
@@ -271,14 +270,14 @@ class SuspensionBall(QtWidgets.QWidget):
     def _draw_progress_ring(self, painter, radius):
         """绘制微进度环"""
         # 背景环
-        pen_bg = QtGui.QPen(QtGui.QColor(168, 216, 234, 80), 2)
+        pen_bg = QtGui.QPen(QtGui.QColor(102, 187, 106, 80), 2) # Green bg
         painter.setPen(pen_bg)
         painter.setBrush(QtCore.Qt.NoBrush)
         painter.drawEllipse(QtCore.QPointF(0, 0), radius, radius)
         
-        # 进度环 (100% 蓝)
+        # 进度环 (100% Green)
         if self._progress > 0:
-            pen_fill = QtGui.QPen(QtGui.QColor(168, 216, 234, 255), 2)
+            pen_fill = QtGui.QPen(QtGui.QColor(102, 187, 106, 255), 2) # Green fill
             pen_fill.setCapStyle(QtCore.Qt.RoundCap)
             painter.setPen(pen_fill)
             

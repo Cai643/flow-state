@@ -88,12 +88,24 @@ class FatigueReminderDialog(QDialog):
         
         # 背景框架
         self.bg_frame = QFrame()
-        self.bg_frame.setStyleSheet("""
-            QFrame {
-                background-color: white;
+        try:
+            from ui.component.report.report_theme import theme as MorandiTheme
+        except ImportError:
+            try:
+                from .report.report_theme import theme as MorandiTheme
+            except ImportError:
+                from ui.component.report.report_theme import theme as MorandiTheme
+        gradient_start = MorandiTheme.HEX_REMINDER_GRADIENT_START
+        gradient_end = MorandiTheme.HEX_REMINDER_GRADIENT_END
+        panel_fill = MorandiTheme.HEX_REMINDER_PANEL_FILL
+        self.bg_frame.setStyleSheet(f"""
+            QFrame {{
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                            stop:0 {gradient_start},
+                                            stop:1 {gradient_end});
                 border-radius: 20px;
                 border: none;
-            }
+            }}
         """)
         
         bg_layout = QVBoxLayout()
@@ -129,16 +141,16 @@ class FatigueReminderDialog(QDialog):
         # 头部整体区域（图标+标题）
         header_frame = QFrame()
         header_frame.setObjectName("headerFrame")
-        header_frame.setStyleSheet("""
-            QFrame#headerFrame {
-                background-color: rgba(248, 249, 250, 200);
+        header_frame.setStyleSheet(f"""
+            QFrame#headerFrame {{
+                background-color: {panel_fill};
                 border-radius: 20px;
                 border: 1px solid rgba(0, 0, 0, 0.03);
-            }
-            QFrame#headerFrame:hover {
-                background-color: rgba(240, 242, 245, 220);
+            }}
+            QFrame#headerFrame:hover {{
+                background-color: #FFFFFF;
                 border: 1px solid rgba(0, 0, 0, 0.08);
-            }
+            }}
         """)
         
         header_layout = QVBoxLayout(header_frame)
@@ -156,7 +168,7 @@ class FatigueReminderDialog(QDialog):
         # 标题 (居中)
         title = QLabel("嘿，学霸～")
         title.setFont(QFont("Microsoft YaHei", 22, QFont.Bold))
-        title.setStyleSheet("color: #2c3e50; background: transparent; border: none;")
+        title.setStyleSheet("color: #1B5E20; background: transparent; border: none;")
         title.setAlignment(Qt.AlignCenter)
         header_layout.addWidget(title)
         
@@ -184,7 +196,7 @@ class FatigueReminderDialog(QDialog):
             "⏱️",
             "连续工作",
             f"{self.duration}分钟",
-            "#3498db"
+            "#66BB6A"
         )
         stats_layout.addWidget(duration_widget)
         
@@ -205,7 +217,7 @@ class FatigueReminderDialog(QDialog):
         
         progress_label = QLabel("疲劳指数")
         progress_label.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
-        progress_label.setStyleSheet("color: #2c3e50;")
+        progress_label.setStyleSheet("color: #1B5E20;")
         
         score_val = self._calculate_fatigue_score()
         score_label = QLabel(f"{score_val}%")
@@ -226,7 +238,7 @@ class FatigueReminderDialog(QDialog):
         self.progress.setStyleSheet(f"""
             QProgressBar {{
                 border: none;
-                background-color: #ecf0f1;
+                background-color: #E8F5E9;
                 border-radius: 4px;
             }}
             QProgressBar::chunk {{
@@ -240,16 +252,16 @@ class FatigueReminderDialog(QDialog):
         # 建议文本区域
         suggestion_frame = QFrame()
         suggestion_frame.setObjectName("suggestionFrame")
-        suggestion_frame.setStyleSheet("""
-            QFrame#suggestionFrame {
-                background-color: rgba(248, 249, 250, 200);
+        suggestion_frame.setStyleSheet(f"""
+            QFrame#suggestionFrame {{
+                background-color: {panel_fill};
                 border-radius: 16px;
                 border: 1px solid rgba(0, 0, 0, 0.03);
-            }
-            QFrame#suggestionFrame:hover {
-                background-color: rgba(240, 242, 245, 220);
+            }}
+            QFrame#suggestionFrame:hover {{
+                background-color: #FFFFFF;
                 border: 1px solid rgba(0, 0, 0, 0.08);
-            }
+            }}
         """)
         
         sugg_layout = QVBoxLayout(suggestion_frame)
@@ -358,7 +370,7 @@ class FatigueReminderDialog(QDialog):
         
         title = QLabel("选择一种休息方式")
         title.setFont(QFont("Microsoft YaHei", 18, QFont.Bold))
-        title.setStyleSheet("color: #2c3e50;")
+        title.setStyleSheet("color: #1B5E20;")
         
         header_layout.addWidget(back_btn)
         header_layout.addWidget(title)
@@ -496,7 +508,7 @@ class FatigueReminderDialog(QDialog):
         # 倒计时显示
         self.timer_display_label = QLabel("00:00")
         self.timer_display_label.setFont(QFont("Arial", 64, QFont.Bold))
-        self.timer_display_label.setStyleSheet("color: #2c3e50;")
+        self.timer_display_label.setStyleSheet("color: #1B5E20;")
         self.timer_display_label.setAlignment(Qt.AlignCenter)
         
         # 完成消息 (初始隐藏)
@@ -654,7 +666,7 @@ class FatigueReminderDialog(QDialog):
     def _get_severity_color(self) -> str:
         """获取严重程度颜色"""
         colors = {
-            'low': '#3498db',
+            'low': '#66BB6A',
             'medium': '#f39c12',
             'high': '#e74c3c'
         }
