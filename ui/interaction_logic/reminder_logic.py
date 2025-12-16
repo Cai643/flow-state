@@ -204,8 +204,8 @@ class EntertainmentReminder(QtCore.QObject):
             print(f"[ERROR] 语音播报失败: {e}")
     
     def on_work_button(self):
-        """用户点击'回去工作'按钮"""
-        print("[INFO] 用户选择回去工作")
+        """用户点击'继续努力'按钮"""
+        print("[INFO] 用户选择继续努力")
         self.reminder_count = 0
         self.show_work_encouragement = True
     

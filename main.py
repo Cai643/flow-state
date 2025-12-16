@@ -19,7 +19,7 @@ import ui.component.focus_card as cardgen
 from ui.interaction_logic.reminder_logic import EntertainmentReminder
 
 # 导入 AI 模块
-from ai.tool.tool import CameraAnalyzer, ScreenAnalyzer
+from ai.tool.tool import CameraAnalyzer
 from ai.model import API
 
 class MonitorThread(QtCore.QThread):
@@ -29,53 +29,29 @@ class MonitorThread(QtCore.QThread):
         super().__init__(parent)
         self.running = True
         self.analyzer = CameraAnalyzer()
-        self.screen_analyzer = ScreenAnalyzer()
         self.last_frame = None
 
     def run(self):
-        # 尝试启动摄像头，但即使失败也继续运行（为了支持纯屏幕监控）
-        camera_active = self.analyzer.start()
-        if not camera_active:
-            print("[MonitorThread] Camera init failed, running in screen-only mode.")
+        if not self.analyzer.start():
+            print("[MonitorThread] Failed to start camera. Exiting thread.")
+            return
 
         while self.running:
-            # 1. Capture Camera Data (if active)
-            monitor_data = {}
-            cam_change_val = 0.0
-            is_complex = False
+            # 1. Capture Data
+            frame = self.analyzer.capture_frame()
+            analysis_stats = self.analyzer.analyze_frame(frame)
+            content_type, change_val = self.analyzer.detect_content_type(frame, self.last_frame)
+            self.last_frame = frame
             
-            if camera_active:
-                frame = self.analyzer.capture_frame()
-                analysis_stats = self.analyzer.analyze_frame(frame)
-                _, cam_change_val = self.analyzer.detect_content_type(frame, self.last_frame)
-                self.last_frame = frame
-                is_complex = analysis_stats.get('is_complex_scene', False) if analysis_stats else False
-
-            # 2. Capture Screen Data (Core Logic for Video vs Work)
-            screen_change_val = self.screen_analyzer.get_change_rate()
-            
-            # 3. Prepare Data for API
-            # 注意：API 目前主要使用 screen_change_rate 进行判断
-            # 如果屏幕变化率显著（>1%），优先使用屏幕变化率（更准确判断视频/工作）
-            # 否则（如屏幕静止但人在动），使用摄像头变化率（判断是否在做操/离开）
-            
-            final_change_rate = screen_change_val
-            
-            # 简单的融合逻辑：
-            # - 如果屏幕在动 (screen > 0.01)，说明有内容输出 (Video/Work) -> 用 screen
-            # - 如果屏幕静止 (screen < 0.01)，检查人是否在动 -> 用 camera
-            if screen_change_val < 0.01 and cam_change_val > 0.01:
-                final_change_rate = cam_change_val
-                # 可选：可以在 monitor_data 中增加字段区分源，但 API 目前只看 screen_change_rate
-
+            # 2. Prepare Data for API
             monitor_data = {
-                'key_presses': 0,
+                'key_presses': 0, # Camera only mode, no input monitoring
                 'mouse_clicks': 0,
-                'screen_change_rate': final_change_rate, 
-                'is_complex_scene': is_complex
+                'screen_change_rate': change_val, # Now represents camera movement/change
+                'is_complex_scene': analysis_stats.get('is_complex_scene', False) if analysis_stats else False
             }
 
-            # 4. Call API
+            # 3. Call API
             if API:
                 try:
                     result = API.get_analysis(monitor_data)
@@ -185,24 +161,10 @@ def main():
         status = result.get('status', 'idle')
         duration = result.get('duration', 0)
         
-        print(f"[MAIN] 状态: {status} | 持续: {duration}s | {result.get('message', '')}")
-        
         # ========== 疲劳休息提醒逻辑 ==========
         # 初始化：程序启动时设置开始时间
         if not hasattr(on_status_update, 'app_start_time'):
             on_status_update.app_start_time = time.time()
-
-        # [新增] 强制测试：程序运行3秒后弹出娱乐提醒
-        if not hasattr(on_status_update, 'test_entertainment_shown'):
-            on_status_update.test_entertainment_shown = False
-            
-        elapsed_time = time.time() - on_status_update.app_start_time
-        
-        if elapsed_time >= 3 and not on_status_update.test_entertainment_shown:
-            on_status_update.test_entertainment_shown = True
-            print("[MAIN] 程序运行已达3秒，强制触发娱乐提醒（测试）")
-            # 模拟触发：状态=entertainment, 持续=10秒, 程度=low
-            entertainment_reminder._handle_entertainment_warning('entertainment', 10, 'low')
         
         # 程序运行 15 秒后弹出疲劳提醒（仅显示一次）
         if not hasattr(on_status_update, 'fatigue_reminder_shown'):
@@ -222,6 +184,18 @@ def main():
                 on_status_update.fatigue_dialog = FatigueReminderDialog(severity='medium', duration=minutes)
                 on_status_update.fatigue_dialog.show()
         
+        # [新增] 强制测试：程序运行5秒后弹出娱乐提醒
+        if not hasattr(on_status_update, 'test_entertainment_shown'):
+            on_status_update.test_entertainment_shown = False
+            
+        elapsed_time = time.time() - on_status_update.app_start_time
+        
+        if elapsed_time >= 5 and not on_status_update.test_entertainment_shown:
+            on_status_update.test_entertainment_shown = True
+            print("[MAIN] 程序运行已达5秒，强制触发娱乐提醒（测试）")
+            # 模拟触发：状态=entertainment, 持续=10秒, 程度=low
+            entertainment_reminder._handle_entertainment_warning('entertainment', 10, 'low')
+
         # ========== 娱乐时间过长提醒逻辑 ==========
         # 使用 EntertainmentReminder 模块处理
         entertainment_reminder.on_status_update(result)

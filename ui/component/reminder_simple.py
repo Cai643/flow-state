@@ -89,13 +89,14 @@ class ReminderOverlay(QtWidgets.QDialog):
         center_y = geometry.top() + (geometry.height() - window_height) // 2
         self.setGeometry(center_x, center_y, window_width, window_height)
         
-        # 主容器 - 使用疲劳提醒的白色主题
+        # 主容器 - 学生版护眼绿主题
         self.container = QtWidgets.QWidget(self)
+        self.container.setObjectName("VideoReminderDialog")  # 为了匹配 QSS
         self.container.setStyleSheet("""
-            QWidget {
-                background-color: white;
+            QWidget#VideoReminderDialog {
+                background-color: #E8F5E9;  /* 淡绿背景，护眼 */
+                border: 2px solid #A5D6A7;  /* 柔和边框 */
                 border-radius: 20px;
-                border: none;
             }
         """)
         
@@ -104,168 +105,195 @@ class ReminderOverlay(QtWidgets.QDialog):
         main_layout.setAlignment(qt_const("AlignCenter"))
         main_layout.addWidget(self.container)
         
-        # 容器内布局 - 增加内边距和间距
+        # 容器内布局
         layout = QtWidgets.QVBoxLayout(self.container)
-        layout.setContentsMargins(80, 60, 80, 60)
-        layout.setSpacing(20)
+        layout.setContentsMargins(60, 40, 60, 40)
+        layout.setSpacing(25)
         
-        # 消息区域包装 - 仿照疲劳提醒的头部样式
+        # 1. 历史回顾区域 (新增)
+        history_frame = QtWidgets.QFrame()
+        history_frame.setStyleSheet("""
+            QFrame {
+                background-color: rgba(66, 165, 245, 0.1);
+                border-radius: 15px;
+                border: 1px solid rgba(66, 165, 245, 0.2);
+            }
+        """)
+        history_layout = QtWidgets.QVBoxLayout(history_frame)
+        history_layout.setContentsMargins(25, 20, 25, 20)
+        history_layout.setSpacing(8)
+        
+        # 上次专注时长
+        self.focus_summary_label = QtWidgets.QLabel("📚 刚才你专注了32分钟")
+        self.focus_summary_label.setObjectName("focus_summary")
+        self.focus_summary_label.setAlignment(qt_const("AlignLeft"))
+        self.focus_summary_label.setStyleSheet("""
+            QLabel#focus_summary { 
+                color: #1565C0;      /* 深蓝色 */ 
+                font-size: 18px; 
+                font-weight: bold; 
+                background: transparent;
+                border: none;
+            } 
+        """)
+        history_layout.addWidget(self.focus_summary_label)
+        
+        # 专注内容
+        self.focus_task_label = QtWidgets.QLabel("   在做：论文写作")
+        self.focus_task_label.setObjectName("focus_task")
+        self.focus_task_label.setAlignment(qt_const("AlignLeft"))
+        self.focus_task_label.setStyleSheet("""
+            QLabel#focus_task { 
+                color: #546E7A;      /* 蓝灰色 */ 
+                font-size: 16px; 
+                background: transparent;
+                border: none;
+            } 
+        """)
+        history_layout.addWidget(self.focus_task_label)
+        
+        layout.addWidget(history_frame)
+
+        # 2. 消息内容区域 (Frame包裹)
         msg_frame = QtWidgets.QFrame()
         msg_frame.setStyleSheet("""
             QFrame {
-                background-color: rgba(248, 249, 250, 200);
-                border-radius: 20px;
-                border: 1px solid rgba(0, 0, 0, 0.03);
-            }
-            QFrame:hover {
-                background-color: rgba(240, 242, 245, 220);
-                border: 1px solid rgba(0, 0, 0, 0.08);
+                background-color: rgba(255, 255, 255, 0.4);
+                border-radius: 15px;
+                border: 1px solid rgba(255, 213, 79, 0.3);
             }
         """)
         msg_layout = QtWidgets.QVBoxLayout(msg_frame)
-        msg_layout.setContentsMargins(20, 20, 20, 20)
+        msg_layout.setContentsMargins(30, 25, 30, 25)
+        msg_layout.setSpacing(12)
         
-        # 主消息 - 深色文字
-        self.main_message = QtWidgets.QLabel("该休息一下了")
-        self.main_message.setStyleSheet("""
-            QLabel {
-                color: #2c3e50;
-                font-size: 32px;
-                font-weight: bold;
-                letter-spacing: 1px;
-                background: transparent;
-                border: none;
-            }
-        """)
-        self.main_message.setAlignment(qt_const("AlignCenter"))
+        # 主消息
+        self.main_message = QtWidgets.QLabel("🌿 电量充得差不多啦！")
+        self.main_message.setObjectName("message")
+        self.main_message.setAlignment(qt_const("AlignLeft")) # 改为左对齐
         self.main_message.setWordWrap(True)
-        self.main_message.setMinimumHeight(80)
-        msg_layout.addWidget(self.main_message)
-        layout.addWidget(msg_frame)
-        
-        # 鼓励语句 - 单独的浅灰色方框
-        enc_frame = QtWidgets.QFrame()
-        enc_frame.setStyleSheet("""
-            QFrame {
-                background-color: rgba(248, 249, 250, 200);
-                border-radius: 12px;
-                border: 1px solid rgba(0, 0, 0, 0.03);
-            }
-        """)
-        enc_layout = QtWidgets.QVBoxLayout(enc_frame)
-        enc_layout.setContentsMargins(20, 15, 20, 15)
-
-        self.encouragement = QtWidgets.QLabel("💪 坚持就是胜利，休息是为了走得更远")
-        self.encouragement.setStyleSheet("""
-            QLabel {
-                color: #7f8c8d;
-                font-size: 18px;
+        self.main_message.setStyleSheet("""
+            QLabel#message { 
+                color: #2E7D32;      /* 深绿色 */ 
+                font-size: 22px; 
                 font-weight: bold;
                 background: transparent;
                 border: none;
-            }
+            } 
         """)
-        self.encouragement.setAlignment(qt_const("AlignCenter"))
+        msg_layout.addWidget(self.main_message)
+        
+        # 建议详情
+        self.suggestion_detail = QtWidgets.QLabel("   休息8分钟后，现在回去效率最高！")
+        self.suggestion_detail.setAlignment(qt_const("AlignLeft"))
+        self.suggestion_detail.setWordWrap(True)
+        self.suggestion_detail.setStyleSheet("""
+            QLabel { 
+                color: #4E342E;      /* 深棕色 */ 
+                font-size: 16px; 
+                background: transparent;
+                border: none;
+                margin-top: 5px;
+            } 
+        """)
+        msg_layout.addWidget(self.suggestion_detail)
+        
+        # 鼓励语 (原 encouragement)
+        self.encouragement = QtWidgets.QLabel("   论文思路还在热乎中，现在回去刚刚好！")
+        self.encouragement.setAlignment(qt_const("AlignLeft"))
         self.encouragement.setWordWrap(True)
-        enc_layout.addWidget(self.encouragement)
-        layout.addWidget(enc_frame)
+        self.encouragement.setStyleSheet("""
+            QLabel { 
+                color: #5D4037;      /* 棕色 */ 
+                font-size: 16px; 
+                background: transparent;
+                border: none;
+            } 
+        """)
+        msg_layout.addWidget(self.encouragement)
+        
+        layout.addWidget(msg_frame)
         
         # 添加伸缩空间
         layout.addStretch()
         
-        # 操作按钮栏 - 更柔和的按钮样式
+        # 3. 操作按钮栏
         button_layout = QtWidgets.QHBoxLayout()
-        button_layout.setSpacing(16)
+        button_layout.setSpacing(20)
         button_layout.setAlignment(qt_const("AlignCenter"))
         
-        # 按钮1：继续工作 - 温暖的黄色
-        work_button = QtWidgets.QPushButton("继续工作 💪")
-        work_button.setMinimumHeight(52)
-        work_button.setMinimumWidth(150)
+        # 按钮1：继续努力 (Primary)
+        work_button = QtWidgets.QPushButton("继续努力 💪")
+        work_button.setObjectName("primary")
+        work_button.setMinimumHeight(55)
+        work_button.setMinimumWidth(180)
+        work_button.setCursor(qt_const("PointingHandCursor"))
         work_button.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #fbbf24, stop:1 #f59e0b);
-                color: white;
-                border: none;
-                border-radius: 10px;
-                padding: 12px 24px;
-                font-size: 14px;
+            QPushButton#primary { 
+                background: #66BB6A; /* 自然绿按钮 */ 
+                color: white; 
+                border-radius: 15px; 
+                font-size: 16px;
                 font-weight: bold;
-                letter-spacing: 0.5px;
+                border: none;
+            } 
+            QPushButton#primary:hover {
+                background: #4CAF50;
             }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #fcd34d, stop:1 #fbbf24);
-            }
-            QPushButton:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #f59e0b, stop:1 #d97706);
+            QPushButton#primary:pressed {
+                background: #388E3C;
             }
         """)
         work_button.clicked.connect(self.on_work_button)
         button_layout.addWidget(work_button)
         
-        # 按钮2：再休息5分钟 - 柔和的蓝色
-        snooze_button = QtWidgets.QPushButton("再休息5分钟 ☕")
-        snooze_button.setMinimumHeight(52)
-        snooze_button.setMinimumWidth(150)
+        # 按钮2：再充5分钟 (Secondary)
+        snooze_button = QtWidgets.QPushButton("再充5分钟电 🔋")
+        snooze_button.setObjectName("secondary")
+        snooze_button.setMinimumHeight(55)
+        snooze_button.setMinimumWidth(180)
+        snooze_button.setCursor(qt_const("PointingHandCursor"))
         snooze_button.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #60a5fa, stop:1 #3b82f6);
-                color: white;
-                border: none;
-                border-radius: 10px;
-                padding: 12px 24px;
-                font-size: 14px;
+            QPushButton#secondary { 
+                background: transparent; 
+                color: #66BB6A; 
+                border: 2px solid #66BB6A; /* 加粗一点边框 */
+                border-radius: 15px;
+                font-size: 16px;
                 font-weight: bold;
-                letter-spacing: 0.5px;
+            } 
+            QPushButton#secondary:hover {
+                background: rgba(102, 187, 106, 0.1);
             }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #93c5fd, stop:1 #60a5fa);
-            }
-            QPushButton:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #3b82f6, stop:1 #1d4ed8);
+            QPushButton#secondary:pressed {
+                background: rgba(102, 187, 106, 0.2);
             }
         """)
         snooze_button.clicked.connect(self.on_snooze_button)
         button_layout.addWidget(snooze_button)
         
-        # 按钮3：禁用提醒 - 柔和的灰色
-        disable_button = QtWidgets.QPushButton("暂时禁用 ✕")
-        disable_button.setMinimumHeight(52)
-        disable_button.setMinimumWidth(150)
+        layout.addLayout(button_layout)
+        
+        # 底部：暂时禁用 (更隐蔽的设计)
+        disable_button = QtWidgets.QPushButton("今天不再提醒")
+        disable_button.setCursor(qt_const("PointingHandCursor"))
         disable_button.setStyleSheet("""
             QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #d1d5db, stop:1 #9ca3af);
-                color: #374151;
+                background: transparent;
+                color: #A1887F;
                 border: none;
-                border-radius: 10px;
-                padding: 12px 24px;
                 font-size: 13px;
-                font-weight: bold;
-                letter-spacing: 0.5px;
+                text-decoration: underline;
             }
             QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #e5e7eb, stop:1 #d1d5db);
-            }
-            QPushButton:pressed {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                    stop:0 #9ca3af, stop:1 #6b7280);
+                color: #8D6E63;
             }
         """)
         disable_button.clicked.connect(self.on_disable_button)
-        button_layout.addWidget(disable_button)
-        
-        layout.addLayout(button_layout)
+        layout.addWidget(disable_button, 0, qt_const("AlignCenter"))
         
         # 点击关闭
-        self.setCursor(qt_const("PointingHandCursor"))
+        # self.setCursor(qt_const("PointingHandCursor")) # 移除全局手型，避免干扰
         
         # 动画效果
         self.fade_animation = QtCore.QPropertyAnimation(self, b"windowOpacity")
