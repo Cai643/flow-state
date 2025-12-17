@@ -211,8 +211,8 @@ class InsightCard(QtWidgets.QWidget):
         p.drawRoundedRect(rect, 12, 12)
 
         # 文字绘制
-        # 标题 - 莫兰迪蓝 100%
-        p.setPen(QtGui.QColor(MorandiTheme.COLOR_TEXT_TITLE))
+        # 标题
+        p.setPen(QtGui.QColor(MorandiTheme.COLOR_WARNING))
         font = QtGui.QFont("Noto Sans SC", 11, QtGui.QFont.Bold)
         p.setFont(font)
         p.drawText(rect.adjusted(15, 15, -15, 0),
@@ -222,10 +222,10 @@ class InsightCard(QtWidgets.QWidget):
         if "✨" not in self.title: 
             pass
 
-        # 副标题 (数据值) + 发光
+        # 副标题 (数据值)
         font_sub = QtGui.QFont("Noto Sans SC", 12)
         p.setFont(font_sub)
-        p.setPen(QtGui.QColor("#5D4037"))
+        p.setPen(QtGui.QColor(MorandiTheme.COLOR_WARNING))
         
         # 绘制文字阴影 (模拟发光)
         p.save()
@@ -251,7 +251,7 @@ class InsightCard(QtWidgets.QWidget):
             p.setOpacity(progress)
             font_hint = QtGui.QFont("Noto Sans SC", 10)
             p.setFont(font_hint)
-            p.setPen(QtGui.QColor("#5D4037"))
+            p.setPen(QtGui.QColor(MorandiTheme.COLOR_WARNING))
             p.drawText(rect.adjusted(15, 0, -15, -10), QtCore.Qt.AlignLeft |
                        QtCore.Qt.AlignBottom, self.detail_hint)
             p.setOpacity(1.0)
@@ -768,8 +768,8 @@ class WeeklyReportMain(QtWidgets.QWidget):
 
         # 添加 "AI建议" 标题
         title_label = QtWidgets.QLabel("AI建议")
-        title_label.setStyleSheet("""
-            color: #5D4037;
+        title_label.setStyleSheet(f"""
+            color: {MorandiTheme.COLOR_WARNING.name()};
             font-family: 'Noto Sans SC';
             font-size: 18px;
             font-weight: bold;
@@ -937,7 +937,7 @@ class WeeklyReportMain(QtWidgets.QWidget):
                                    title_rect_w, title_rect_h)
 
         # 标题文字
-        p.setPen(QtGui.QColor("#8D6E63"))
+        p.setPen(QtGui.QColor("#5D4037"))
         font_title = QtGui.QFont("Noto Sans SC", 24, QtGui.QFont.Bold)
         p.setFont(font_title)
         p.drawText(title_rect, QtCore.Qt.AlignCenter, "本周战绩")

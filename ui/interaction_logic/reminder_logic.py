@@ -1,7 +1,7 @@
 try:
-    from PySide6 import QtCore  # type: ignore
+    from PySide6 import QtCore, QtGui  # type: ignore
 except ImportError:
-    from PyQt5 import QtCore  # type: ignore
+    from PyQt5 import QtCore, QtGui  # type: ignore
 
 import time
 from typing import Optional
@@ -10,6 +10,7 @@ from ui.component.reminder_simple import ReminderOverlay
 from ui.component.tomato_clock_dialog import TomatoClockDialog
 from ui.component.smart_reminder_generator import SmartReminderGenerator
 from data.activity_history_manager import ActivityHistoryManager
+from ui.component.focus_card import TimerDialog
 
 
 class EntertainmentReminder(QtCore.QObject):
@@ -29,6 +30,7 @@ class EntertainmentReminder(QtCore.QObject):
         # UI组件
         self.overlay = ReminderOverlay(parent)
         self.tomato_dialog = None  # 延迟创建
+        self.tomato_timer_dialog: Optional[TimerDialog] = None
         
         # 智能组件
         self.message_generator = SmartReminderGenerator()
@@ -48,6 +50,10 @@ class EntertainmentReminder(QtCore.QObject):
         # 用户选择记录（用于正强化）
         self.last_entertainment_duration = 0  # 上次娱乐持续时长
         self.show_work_encouragement = False  # 是否需要在下次专注时显示鼓励
+        self.tomato_remaining_seconds = 0
+        self.tomato_timer = QtCore.QTimer(self)
+        self.tomato_timer.setInterval(1000)
+        self.tomato_timer.timeout.connect(self._update_tomato_timer)
         
         # 连接按钮信号
         self.overlay.work_clicked.connect(self.on_work_button)
@@ -223,19 +229,108 @@ class EntertainmentReminder(QtCore.QObject):
     def _start_tomato_clock(self):
         """用户确认开启番茄钟"""
         print("[INFO] 用户确认开启番茄钟")
-        # 这里应该调用实际的番茄钟启动逻辑
-        # 由于目前没有直接的番茄钟接口，我们打印一条消息并重置状态
         self.reminder_count = 0
         self.show_work_encouragement = True
-        
-        # TODO: 集成实际的番茄钟启动代码
-        # e.g., self.parent().start_tomato_clock(25)
+
+        if self.tomato_timer.isActive():
+            self.tomato_timer.stop()
+
+        if self.tomato_timer_dialog:
+            try:
+                self.tomato_timer_dialog.close()
+            except Exception:
+                pass
+            self.tomato_timer_dialog = None
+
+        duration_minutes = 25
+        total_seconds = duration_minutes * 60
+
+        try:
+            self.tomato_timer_dialog = TimerDialog(self.overlay.parent())
+            goal_text = f"番茄钟专注 {duration_minutes} 分钟"
+            self.tomato_timer_dialog.end_session_requested.connect(self._cancel_tomato_clock)
+            self.tomato_timer_dialog.start_session(goal_text, total_seconds)
+
+            screen = None
+            anchor_widget = None
+
+            if self.tomato_dialog is not None and self.tomato_dialog.isVisible():
+                anchor_widget = self.tomato_dialog
+            elif self.overlay is not None and self.overlay.isVisible():
+                anchor_widget = self.overlay
+
+            if anchor_widget is not None:
+                try:
+                    geo = anchor_widget.frameGeometry()
+                except Exception:
+                    geo = anchor_widget.geometry()
+
+                center = geo.center()
+                if hasattr(QtGui.QGuiApplication, "screenAt"):
+                    screen = QtGui.QGuiApplication.screenAt(center)
+
+            if screen is None and hasattr(QtGui.QGuiApplication, "primaryScreen"):
+                screen = QtGui.QGuiApplication.primaryScreen()
+
+            if screen is not None:
+                available = screen.availableGeometry()
+                dialog_size = self.tomato_timer_dialog.size()
+                if dialog_size.width() <= 0 or dialog_size.height() <= 0:
+                    dialog_size = self.tomato_timer_dialog.sizeHint()
+                x = available.right() - dialog_size.width() - 20
+                y = available.bottom() - dialog_size.height() - 40
+                min_x = available.left()
+                max_x = available.right() - dialog_size.width()
+                min_y = available.top()
+                max_y = available.bottom() - dialog_size.height()
+                if max_x < min_x:
+                    max_x = min_x
+                if max_y < min_y:
+                    max_y = min_y
+                x = max(min_x, min(x, max_x))
+                y = max(min_y, min(y, max_y))
+                self.tomato_timer_dialog.move(int(x), int(y))
+
+            self.tomato_timer_dialog.show()
+            try:
+                self.tomato_timer_dialog.raise_()
+                self.tomato_timer_dialog.activateWindow()
+            except Exception:
+                pass
+        except Exception as e:
+            print(f"[WARN] 无法创建番茄钟计时弹窗: {e}")
+            self.tomato_timer_dialog = None
+
+        self.tomato_remaining_seconds = total_seconds
+        if self.tomato_remaining_seconds > 0:
+            self.tomato_timer.start()
+
+    def _update_tomato_timer(self):
+        if self.tomato_remaining_seconds <= 0:
+            self.tomato_timer.stop()
+            return
+
+        self.tomato_remaining_seconds -= 1
+
+        if self.tomato_timer_dialog:
+            try:
+                self.tomato_timer_dialog.update_display(self.tomato_remaining_seconds)
+            except Exception as e:
+                print(f"[WARN] 更新番茄钟计时显示失败: {e}")
+
+        if self.tomato_remaining_seconds <= 0:
+            self.tomato_timer.stop()
         
     def _cancel_tomato(self):
         """用户取消开启番茄钟"""
         print("[INFO] 用户取消开启番茄钟，但仍视为回归工作")
         self.reminder_count = 0
         self.show_work_encouragement = True
+
+    def _cancel_tomato_clock(self):
+        if self.tomato_timer.isActive():
+            self.tomato_timer.stop()
+        self.tomato_remaining_seconds = 0
     
     def on_snooze_button(self):
         """用户点击'再休息5分钟'按钮"""

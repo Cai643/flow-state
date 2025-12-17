@@ -965,6 +965,109 @@ class GoalSettingDialog(QtWidgets.QDialog):
         app.installEventFilter(self._outside_filter)
 
 
+class PomodoroStripWidget(QtWidgets.QWidget):
+    clicked = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setCursor(QtCore.Qt.PointingHandCursor)
+        self.setMouseTracking(True)
+        self.text = "00:00"
+        self._hover = False
+        self._scale = 1.0
+        self.anim = None
+
+    def sizeHint(self):
+        return QtCore.QSize(240, 50)
+
+    def set_time_text(self, text: str):
+        self.text = text
+        self.update()
+
+    def enterEvent(self, event):
+        self._hover = True
+        self._start_anim(True)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._hover = False
+        self._start_anim(False)
+        super().leaveEvent(event)
+
+    def mousePressEvent(self, event):
+        if event.button() == QtCore.Qt.LeftButton:
+            self.clicked.emit()
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def _start_anim(self, hover: bool):
+        if self.anim:
+            self.anim.stop()
+        self.anim = QtCore.QPropertyAnimation(self, b"scale_val")
+        self.anim.setDuration(200)
+        self.anim.setEndValue(1.05 if hover else 1.0)
+        self.anim.setEasingCurve(QtCore.QEasingCurve.OutQuad)
+        self.anim.start()
+
+    @QtCore.Property(float)
+    def scale_val(self):
+        return self._scale
+
+    @scale_val.setter
+    def scale_val(self, value: float):
+        self._scale = value
+        self.update()
+
+    def paintEvent(self, event):
+        p = QtGui.QPainter(self)
+        p.fillRect(self.rect(), QtGui.QColor(0, 0, 0, 1))
+
+        p.setRenderHint(QtGui.QPainter.Antialiasing)
+        p.setRenderHint(QtGui.QPainter.TextAntialiasing)
+
+        w = self.width()
+        h = self.height()
+        cx = w / 2
+        cy = h / 2
+
+        p.translate(cx, cy)
+        p.scale(self._scale, self._scale)
+        p.translate(-cx, -cy)
+
+        rect = QtCore.QRectF(6, 4, w - 12, h - 8)
+        radius = rect.height() / 2
+
+        try:
+            grad_start = QtGui.QColor(MorandiTheme.HEX_REMINDER_GRADIENT_START)
+            grad_end = QtGui.QColor(MorandiTheme.HEX_REMINDER_GRADIENT_END)
+        except Exception:
+            grad_start = QtGui.QColor("#F4AF86")
+            grad_end = QtGui.QColor("#F4AF86")
+
+        gradient = QtGui.QLinearGradient(rect.topLeft(), rect.bottomRight())
+        gradient.setColorAt(0, grad_start)
+        gradient.setColorAt(1, grad_end)
+
+        border_color = QtGui.QColor("#5D4037")
+        if self._hover:
+            border_color = border_color.darker(110)
+
+        p.setPen(QtCore.Qt.NoPen)
+        p.setBrush(gradient)
+        p.drawRoundedRect(rect, radius, radius)
+
+        p.setPen(QtGui.QPen(border_color, 2))
+        p.setBrush(QtCore.Qt.NoBrush)
+        p.drawRoundedRect(rect, radius, radius)
+
+        p.setPen(QtGui.QColor("#5D4037"))
+        font = QtGui.QFont("Microsoft YaHei", 10)
+        font.setBold(True)
+        p.setFont(font)
+        p.drawText(rect, QtCore.Qt.AlignCenter, self.text)
+
+
 class TimerDialog(QtWidgets.QDialog):
     """计时弹窗"""
     end_session_requested = Signal()  # 结束会话请求信号
@@ -972,10 +1075,27 @@ class TimerDialog(QtWidgets.QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("专注计时")
-        self.setModal(False)  # 非模态，允许与主窗口交互
-        self.setFixedSize(280, 200)
+        self.setModal(False)
+        flags = (
+            QtCore.Qt.FramelessWindowHint
+            | QtCore.Qt.Tool
+            | QtCore.Qt.WindowStaysOnTopHint
+        )
+        self.setWindowFlags(flags)
+        if hasattr(QtCore.Qt, "WA_TranslucentBackground"):
+            self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+        self._full_size = QtCore.QSize(280, 200)
+        self._collapsed_size = QtCore.QSize(280, 80)
+        self.setFixedSize(self._full_size)
+        self._drag_pos = None
+        self._collapsed = False
 
-        # 呼吸动画
+        self.container = QtWidgets.QWidget(self)
+        self.container.setObjectName("TimerDialogContainer")
+        outer_layout = QtWidgets.QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.addWidget(self.container)
+
         self.breath_value = 0.0
         self.breath_direction = 1
         self.breath_timer = QtCore.QTimer(self)
@@ -1057,57 +1177,57 @@ class TimerDialog(QtWidgets.QDialog):
                 )
 
     def _build_ui(self):
-        """构建用户界面"""
-        layout = QtWidgets.QVBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout(self.container)
         layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(12)
+        layout.setSpacing(8)
 
-        # 目标显示
+        self.strip_widget = PomodoroStripWidget(self.container)
+        layout.addWidget(self.strip_widget)
+
+        self.content_widget = QtWidgets.QWidget(self.container)
+        content_layout = QtWidgets.QVBoxLayout(self.content_widget)
+        content_layout.setContentsMargins(0, 8, 0, 0)
+        content_layout.setSpacing(12)
+
         self.goal_label = QtWidgets.QLabel("🎯 目标：准备开始...")
-        self.goal_label.setFont(QtGui.QFont(
-            "Microsoft YaHei", 10, QtGui.QFont.DemiBold))
+        self.goal_label.setFont(QtGui.QFont("Microsoft YaHei", 10, QtGui.QFont.DemiBold))
         self.goal_label.setAlignment(QtCore.Qt.AlignCenter)
         self.goal_label.setWordWrap(True)
-        layout.addWidget(self.goal_label)
+        content_layout.addWidget(self.goal_label)
 
-        # 时间显示
         self.time_label = QtWidgets.QLabel("25:00")
         time_font = QtGui.QFont("Microsoft YaHei", 24, QtGui.QFont.Bold)
         self.time_label.setFont(time_font)
         self.time_label.setAlignment(QtCore.Qt.AlignCenter)
-        layout.addWidget(self.time_label)
+        content_layout.addWidget(self.time_label)
 
-        # 进度条
         self.progress_bar = QtWidgets.QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(100)
         self.progress_bar.setTextVisible(False)
         self.progress_bar.setFixedHeight(8)
-        layout.addWidget(self.progress_bar)
+        content_layout.addWidget(self.progress_bar)
 
-        # 状态标签
         self.status_label = QtWidgets.QLabel("⚡ 专注进行中...")
         self.status_label.setFont(QtGui.QFont("Microsoft YaHei", 9))
         self.status_label.setAlignment(QtCore.Qt.AlignCenter)
-        layout.addWidget(self.status_label)
+        content_layout.addWidget(self.status_label)
 
-        # 结束按钮
         self.end_button = QtWidgets.QPushButton("结束专注")
         self.end_button.setFont(QtGui.QFont("Microsoft YaHei", 9))
         self.end_button.setFixedHeight(36)
         self.end_button.setCursor(QtCore.Qt.PointingHandCursor)
         self.end_button.clicked.connect(self._on_end_clicked)
-        layout.addWidget(self.end_button)
+        content_layout.addWidget(self.end_button)
+
+        layout.addWidget(self.content_widget)
+        self.strip_widget.clicked.connect(self._toggle_collapsed)
 
     def _apply_style(self):
         """应用清新森林样式"""
-        # 呼吸动画效果
-        breath_delta = int(3 * self.breath_value)
-        bg_alpha = max(0, min(255, 240 + breath_delta))
-
         dialog_style = f"""
-            QDialog {{
-                background-color: rgba(232, 245, 233, {bg_alpha});
+            QWidget#TimerDialogContainer {{
+                background-color: #EFE9D2;
                 border-radius: 16px;
                 border: none;
             }}
@@ -1129,7 +1249,7 @@ class TimerDialog(QtWidgets.QDialog):
                 background-color: rgba(255, 100, 100, 70);
                 border: none;
                 border-radius: 8px;
-                color: #ffffff;
+                color: #5D4037;
                 padding: 6px 16px;
             }}
             QPushButton:hover {{
@@ -1154,13 +1274,30 @@ class TimerDialog(QtWidgets.QDialog):
             self.breath_direction = 1
         self._apply_style()
 
+    def mousePressEvent(self, event):
+        if event.button() == QtCore.Qt.LeftButton:
+            self._drag_pos = event.globalPos() - self.frameGeometry().topLeft()
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._drag_pos is not None and event.buttons() & QtCore.Qt.LeftButton:
+            self.move(event.globalPos() - self._drag_pos)
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self._drag_pos = None
+        super().mouseReleaseEvent(event)
+
     def start_session(self, goal: str, duration_seconds: int):
         """开始计时会话"""
         self.goal_text = goal
         self.total_duration = duration_seconds
         self.remaining_time = duration_seconds
 
-        # 更新显示
         self.goal_label.setText(f"🎯 目标：{goal}")
         self.update_display(duration_seconds)
 
@@ -1173,6 +1310,8 @@ class TimerDialog(QtWidgets.QDialog):
         seconds = remaining_seconds % 60
         time_text = f"{minutes:02d}:{seconds:02d}"
         self.time_label.setText(time_text)
+        if hasattr(self, "strip_widget") and self.strip_widget is not None:
+            self.strip_widget.set_time_text(time_text)
 
         # 更新进度条
         if self.total_duration > 0:
@@ -1213,6 +1352,12 @@ class TimerDialog(QtWidgets.QDialog):
         """执行结束会话"""
         self.end_session_requested.emit()
         self.close()
+
+    def _toggle_collapsed(self):
+        self._collapsed = not self._collapsed
+        self.content_widget.setVisible(not self._collapsed)
+        target_size = self._collapsed_size if self._collapsed else self._full_size
+        self.setFixedSize(target_size)
 
     def closeEvent(self, event):
         """关闭事件"""

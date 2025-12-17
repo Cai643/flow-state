@@ -1422,7 +1422,7 @@ class TimelineView(QtWidgets.QWidget):
         c_edge.setAlpha(76)
         
         line_gradient.setColorAt(0, c_edge)
-        line_gradient.setColorAt(0.5, QtGui.QColor("#75B094")) 
+        line_gradient.setColorAt(0.5, QtGui.QColor("#5E8E79")) 
         line_gradient.setColorAt(1, c_edge)
 
         pen = QtGui.QPen()
@@ -1458,13 +1458,13 @@ class TimelineView(QtWidgets.QWidget):
         # 统计数据
         stats_data = [
             {"label": "总专注时长", "value": "6.5小时", "icon": "🎯",
-                "color": "#75B094"},
+                "color": "#5E8E79"},
             {"label": "专注效率", "value": "92%", "icon": "⚡",
                 "color": DesignTokens.COLORS['text_primary']},
             {"label": "休息次数", "value": "3次", "icon": "☕",
                 "color": DesignTokens.COLORS['text_primary']},
             {"label": "完成任务", "value": "8项", "icon": "✅",
-                "color": "#75B094"}
+                "color": "#5E8E79"}
         ]
 
         item_width = width / len(stats_data)
@@ -1480,12 +1480,12 @@ class TimelineView(QtWidgets.QWidget):
                 painter, x - icon_rect.width()/2, y + 35, stat["icon"], DesignTokens.COLORS['text_secondary'])
 
             # 数值
-            painter.setPen(QtGui.QColor("#75B094"))
+            painter.setPen(QtGui.QColor("#5E8E79"))
             value_font = QtGui.QFont("Segoe UI", 18, QtGui.QFont.Bold)
             painter.setFont(value_font)
             value_rect = painter.fontMetrics().boundingRect(stat["value"])
             MorandiTheme.draw_text_at_point_with_shadow(
-                painter, x - value_rect.width()/2, y + 65, stat["value"], QtGui.QColor("#75B094"))
+                painter, x - value_rect.width()/2, y + 65, stat["value"], QtGui.QColor("#5E8E79"))
 
             # 标签
             painter.setPen(DesignTokens.COLORS['text_secondary']) # 次要文字 (浅色)
@@ -2499,13 +2499,13 @@ class Card2_Distract(QtWidgets.QWidget):
 
         # 数据：5个成功控制，2个分心
         dot_data = [
-            {'color': DesignTokens.COLORS['secondary'], 'type': 'success'},
-            {'color': DesignTokens.COLORS['secondary'], 'type': 'success'},
-            {'color': DesignTokens.COLORS['secondary'], 'type': 'success'},
-            {'color': DesignTokens.COLORS['secondary'], 'type': 'success'},
-            {'color': DesignTokens.COLORS['secondary'], 'type': 'success'},
             {'color': DesignTokens.COLORS['warning'], 'type': 'distraction'},
-            {'color': DesignTokens.COLORS['warning'], 'type': 'distraction'}
+            {'color': DesignTokens.COLORS['warning'], 'type': 'distraction'},
+            {'color': DesignTokens.COLORS['warning'], 'type': 'distraction'},
+            {'color': DesignTokens.COLORS['warning'], 'type': 'distraction'},
+            {'color': DesignTokens.COLORS['warning'], 'type': 'distraction'},
+            {'color': DesignTokens.COLORS['secondary'], 'type': 'success'},
+            {'color': DesignTokens.COLORS['secondary'], 'type': 'success'}
         ]
 
         for i, dot in enumerate(dot_data):
@@ -2567,7 +2567,7 @@ class Card3_Flow(QtWidgets.QWidget):
         p.drawText(20, 25, "⚡ 最长心流时段")
 
         # 内容 - 暗色主题
-        p.setPen(QtGui.QColor("#75B094"))
+        p.setPen(QtGui.QColor("#5E8E79"))
         p.setFont(QtGui.QFont("Noto Sans SC", 12, QtGui.QFont.Bold))
         p.drawText(20, 50, "92分钟")
         p.setPen(QtGui.QColor("#A05C3B"))
@@ -2600,7 +2600,7 @@ class Card3_Flow(QtWidgets.QWidget):
         x1 = margin_x + (start_min / total_min) * w
         x2 = margin_x + (end_min / total_min) * w
 
-        p.setBrush(QtGui.QColor(DesignTokens.COLORS['primary']))
+        p.setBrush(QtGui.QColor(DesignTokens.COLORS['warning']))
         p.setPen(QtCore.Qt.NoPen)
         p.drawRect(QtCore.QRectF(x1, line_y - 4, x2-x1, 8))
 
@@ -2620,7 +2620,7 @@ class Card4_Rest(QtWidgets.QWidget):
         p.drawText(20, 25, "🛋️ 休息达标率")
 
         # 内容 - 暗色主题
-        p.setPen(QtGui.QColor("#75B094"))
+        p.setPen(QtGui.QColor("#5E8E79"))
         p.setFont(QtGui.QFont("Noto Sans SC", 16, QtGui.QFont.Bold))
         p.drawText(120, 25, "85%")
 
@@ -3034,7 +3034,7 @@ class SimpleDailyReport(ReportEnvelopeContainer):
                 background-color: transparent;
                 border: none;
                 padding: 12px 20px;
-                color: #75B094;
+                color: #5E8E79;
                 font-size: 16px;
                 font-weight: 500;
                 font-family: 'Segoe UI', 'Microsoft YaHei';
