@@ -1,6 +1,51 @@
-# 项目结构：心境 (Flow State)
+# 项目结构：骁流 (Flow State)
 
 本文档说明了代码库的组织结构，该结构采用了模块化和面向服务的架构。
+
+## 目录树概览
+
+```
+c:/心境项目/flow_state/
+├── app/                  # 主应用程序包
+│   ├── core/             # 核心基础设施
+│   │   ├── config.py     # 应用程序配置设置
+│   │   └── ...
+│   ├── data/             # 数据持久化层
+│   │   ├── dao/          # 数据访问对象 (DAO)
+│   │   │   ├── activity_dao.py # 活动日志 SQL 操作
+│   │   │   ├── user_dao.py     # 用户 SQL 操作
+│   │   │   └── ...
+│   │   ├── base.py       # 数据库连接管理
+│   │   ├── history.py    # 活动历史业务逻辑
+│   │   └── ...
+│   ├── 
+│   │   ├── reminder/     # 提醒系统
+│   │   │   ├── generator.py # 提醒内容生成
+│   │   │   ├── manager.py   # 提醒管理器
+│   │   │   └── ...services/         # 业务逻辑服务层
+│   │   ├── ai/           # AI 相关服务
+│   │   │   ├── inference.py # AI 推理逻辑
+│   │   │   ├── vision.py    # 视觉处理逻辑
+│   │   │   └── ...
+│   │   ├── monitor_service.py # 监控后台线程
+│   │   └── ...
+│   └── ui/               # 用户界面层
+│       ├── views/        # 视图控制器
+│       │   ├── popup_view.py # 弹窗视图逻辑
+│       │   └── ...
+│       └── widgets/      # 可复用组件
+│           ├── dialogs/  # 对话框组件
+│           ├── report/   # 报表组件
+│           ├── visuals/  # 视觉特效组件
+│           ├── float_ball.py # 悬浮球
+│           ├── focus_card.py # 专注卡片
+│           └── ...
+├── assets/               # 静态资源文件
+├── focus_app.db          # SQLite 数据库文件
+├── run.py                # 启动入口脚本
+├── PROJECT_STRUCTURE.md  # 项目结构文档
+└── TEAM_ROLES.md         # 团队分工文档
+```
 
 ## 根目录
 - `run.py`: 启动应用程序的入口脚本。
