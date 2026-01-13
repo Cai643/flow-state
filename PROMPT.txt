@@ -1,0 +1,133 @@
+# 骁流 (Flow State) 架构协作协议与关键词集
+
+这份文档是团队协作的“通天塔”蓝图。请根据你的角色，复制对应的代码块到你的模块中，以确保整个系统能像精密齿轮一样咬合运行。
+
+---
+
+## 1. 全局数据协议 (The Esperanto)（后端）（前端）
+**所有角色必须遵守的数据格式**。无论是 AI 发给 UI，还是后端发给前端，状态对象必须长这样。
+
+### A. 实时状态对象 (Real-time Status Object)
+> **适用场景**: 进程间通信 (Queue)、Websocket 推送、前端轮询状态
+
+```python
+{
+    "status": "focus",          # 枚举: "focus" | "entertainment" | "idle" | "distracted"
+    "duration": 120,            # 当前状态持续秒数 (int)
+    "confidence": 0.95,         # AI 置信度 (float 0.0-1.0)
+    "message": "深度专注中...",   # 给用户看的提示语 (str)
+    "timestamp": 1705046400.0,  # Unix 时间戳 (float)
+    "metadata": {               # 可选扩展字段
+        "app_name": "PyCharm",  # 当前前台应用
+        "is_complex_scene": False 
+    }
+}
+```
+
+### B. 数据库表结构 (Database Schema)（后端）
+> **适用场景**: 后端存取、数据分析师写 SQL
+
+*   **表名**: `activity_logs`
+*   **字段**:
+    *   `id` (PK, Auto Inc)
+    *   `timestamp` (DateTime) -> 记录时刻
+    *   `status` (Text) -> 上述枚举值
+    *   `duration` (Int) -> 持续时长
+*   **表名**: `ocr_records` (未来扩展)
+    *   `content` (Text) -> 识别到的文字
+    *   `app_name` (Text) -> 来源应用
+
+---
+
+## 2. 角色分工与关键词 (Role-Specific Prompts)
+
+### 👮‍♂️ 角色 A: AI 工程师 (AI Worker)
+**你的任务**: 盯着摄像头，产出状态，丢进队列。
+
+> **复制这段代码到 `app/services/ai_worker.py`**:
+```python
+# [PROTOCOL] AI Output Format
+monitor_data = {
+    "status": detected_status,  # "focus" / "entertainment"
+    "duration": current_duration,
+    "message": status_message,
+    "timestamp": time.time()
+}
+# [ACTION] Push to Queue
+# 必须使用非阻塞方式，防止卡死 AI 进程
+if not msg_queue.full():
+    msg_queue.put_nowait(monitor_data)
+```
+
+### 🖥️ 角色 B: 桌面 UI 工程师 (Main Process)
+**你的任务**: 从队列拿数据，更新悬浮球，不准卡顿。
+
+> **复制这段代码到 `app/main.py`**:
+```python
+# [PROTOCOL] UI Update Loop
+def check_queue():
+    try:
+        while not msg_queue.empty():
+            data = msg_queue.get_nowait()
+            # [KEYWORD] Update UI Components
+            status = data.get('status', 'idle')
+            popup.update_focus_status(data)
+            ball.update_state(status)
+    except queue.Empty:
+        pass
+# [ACTION] Timer Setup
+timer = QtCore.QTimer()
+timer.timeout.connect(check_queue)
+timer.start(100) # 10Hz Refresh Rate
+```
+
+### 🌐 角色 C: Web 后端工程师 (Flask Server)
+**你的任务**: 只读数据库，提供 API，不准直接碰 UI 线程。
+
+> **复制这段代码到 `app/services/web_server.py`**:
+```python
+# [PROTOCOL] API Response Format
+@app.route('/api/status/current')
+def get_current_status():
+    # [KEYWORD] Read-Only Access
+    # Web 进程不应直接读取 Queue，应查询数据库最新一条记录或共享内存
+    # 这里演示标准 JSON 响应
+    return jsonify({
+        "code": 200,
+        "data": {
+            "status": "focus",
+            "date": "2026-01-13"
+        }
+    })
+```
+
+### 🎨 角色 D: Web 前端工程师 (Vue/JS)
+**你的任务**: 调用 API，画漂亮的图表。
+
+> **复制这段代码到 `app/web/frontend/src/api.js`**:
+```javascript
+// [PROTOCOL] Frontend Fetcher
+async function fetchHistory(dateStr) {
+    // [KEYWORD] Endpoint
+    const response = await fetch(`http://localhost:5000/api/history?date=${dateStr}`);
+    const json = await response.json();
+    // Expected JSON: { "focus_time": 120, "distract_time": 30, ... }
+    return json;
+}
+```
+
+---
+角色 E: 架构师 
+
+## 3. 进程间通信关键词 (IPC Keywords)
+
+*   **`msg_queue`**: 唯一的单向通道。**AI 进程只管写 (Put)，UI 进程只管读 (Get)**。
+*   **`running_event`**: 全局的“自毁按钮”。任何进程看到 `running_event.is_set() == False` 时，必须立即清理资源并退出。
+*   **`sqlite_lock`**: 虽然 SQLite 支持并发读，但**写操作**最好由 AI 进程独占。如果 Web 端将来要写数据（如用户备注），必须做好数据库锁处理。
+
+## 4. 调试暗号 (Debug Signals)
+
+*   当控制台打印 `【AI监控进程】...` -> 说明摄像头和算法活着。
+*   当控制台打印 `【Web服务进程】...` -> 说明网页能打开。
+*   当悬浮球变色 -> 说明 `msg_queue` 通路畅通。
+*   如果悬浮球不动但控制台在刷屏 -> 说明 UI 线程的 `QTimer` 挂了或者队列堵塞。

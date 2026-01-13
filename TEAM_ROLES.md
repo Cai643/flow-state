@@ -8,92 +8,72 @@
 
 | 角色 | 人数 | 核心职责 | 关键词 |
 | :--- | :---: | :--- | :--- |
-| **产品体验官 ** | 1 | 需求分析、质量验收 | 方向、验收 |
-| **TPM** | 1 | 架构设计、核心胶水代码、DevOps | 架构、兜底 |
-| **AI 算法工程师** | 2 | 视觉算法、OCR、状态判定模型 | 智能、识别 |
-| **后端/数据工程师** | 2 | 数据库设计、数据统计、API 开发 | 存储、统计 |
-
+| **产品体验官 ** | 1 | 需求分析、质量验收| 方向、验收 |
+| **TPM (架构师/集成)** | 1 | 架构设计、核心胶水代码、DevOps、IPC 通信、进度管理  | 架构、兜底 |
+| **AI 算法工程师** | 2 | 视觉算法、OCR、状态判定模型、AI Worker 进程 | 智能、识别 |
+| **后端/数据工程师** | 2 | 数据库设计、数据统计、Web 后端 (Flask) | 存储、统计 |
+| **前端/UI 工程师** | 1 | 桌面端 (PyQt) 交互与视觉、Web 前端 (Vue) | 交互、颜值 |
 
 ---
 
 ## 2. 详细职责与模块分配
 
-### 2.2 系统集成工程师 (Tech Lead - 你)
+### 2.1 TPM (架构师/集成 - 你)
 *   **职责**:
-    *   **架构把控**: 维护项目结构 (`PROJECT_STRUCTURE.md`)，制定代码规范。
-    *   **核心串联**: 负责将 AI、数据、UI 模块组装在一起。
-    *   **基础设施**: 负责 `app/core/` 配置管理、`app/main.py` 入口逻辑。
-    *   **监控服务**: 维护 `app/services/monitor_service.py` 线程逻辑。
-    *   **发布运维**: 负责 Python 环境管理、打包 (PyInstaller) 与发布。
+    *   **顶层设计**: 维护 `PROJECT_STRUCTURE.md` 和 `PROMPT.txt`，制定跨进程通信 (IPC) 协议和全局数据格式。
+    *   **流程调度**: 负责 `run.py` 的多进程管理，确保 AI 生产数据、Web 托管数据、UI 消费数据的闭环畅通。
+    *   **系统稳定性**: 监控子进程健康状况，通过“调试暗号”进行快速故障定位。
+    *   **环境构建**: 负责依赖管理、PyInstaller 打包发布及 CI/CD 流程。
 *   **核心模块**:
-    *   `app/core/` (Config)
-    *   `app/main.py` (App Entry)
-    *   `app/services/monitor_service.py` (Monitor Thread)
-    *   `run.py`
+    *   `run.py`: 进程指挥中心。
+    *   `app/core/`: 全局配置与基础设施。
+    *   `PROMPT.txt`: 架构契约文档。
 
-### 2.3 AI 算法工程师
-*   **职责**:
-    *   **状态检测**: 优化疲劳/专注/娱乐的判定算法（引入人脸/视线检测）。
-    *   **视觉分析**: 维护 `app/services/ai/vision.py`，处理摄像头帧流。
-    *   **OCR 识别**: 实现屏幕文字识别功能，清洗 OCR 结果。
-    *   **智能总结**: 利用 LLM 生成日报/周报的自然语言评语。
-*   **核心模块**:
-    *   `app/services/ai/vision.py` (Camera Analyzer)
-    *   `app/services/ai/inference.py` (Logic & Classification)
-    *   `app/services/reminder/generator.py` (Smart Content Gen)
+### 2.2 AI 算法工程师 (2人)
+*   **AI A (视觉计算)**:
+    *   **职责**: 优化 `vision.py` 中的人脸/视线检测算法，提高疲劳与专注度判定的准确率。
+    *   **模块**: `app/services/ai/vision.py`
+*   **AI B (Worker 与 OCR)**:
+    *   **职责**: 维护 `ai_worker.py` 独立进程，实现屏幕内容 OCR 识别，并负责对接 LLM 生成智能点评。
+    *   **模块**: `app/services/ai_worker.py`, `app/services/reminder/generator.py`
+*   **共同产出**: 负责将实时状态通过 `msg_queue` 推送给主进程。
 
-### 2.4 后端/数据工程师
-*   **职责**:
-    *   **数据存储**: 设计与维护 SQLite 表结构 (`app/core/database.py`)。
-    *   **DAO 层开发**: 编写高效的 SQL 操作 (`app/data/dao/`)。
-    *   **统计分析**: 编写复杂 SQL 聚合查询（日报/周报数据源）。
-    *   **数据清理**: 开发磁盘清理策略，防止截图占满硬盘。
-    *   **API 服务**: (如有云同步需求) 开发 Flask/FastAPI 接口。
-*   **核心模块**:
-    *   `app/data/base.py` (DB Init)
-    *   `app/data/dao/` (All DAOs)
-    *   `app/data/history.py` (Business Logic for Data)
-    *   `app/services/ai/inference.py` (User Auth API parts)
+### 2.3 后端/数据工程师 (2人)
+*   **后端 A (Web Server)**:
+    *   **职责**: 负责 `web_server.py` 的 API 开发，为网页端提供历史记录查询、AI 报告生成等 RESTful 接口。
+    *   **模块**: `app/services/web_server.py`
+*   **后端 B (Data Layer)**:
+    *   **职责**: 负责高度模块化的 `app/data` 目录。设计数据库表结构，编写高效的 DAO 层代码，实现数据的持久化与清理策略。
+    *   **模块**: `app/data/` (DAO, Core, Services)
+*   **共同产出**: 确保数据的准确存储与高效检索，严禁在 Web 进程中写入实时状态。
 
-<!-- ### 2.5 UI 工程师 A (交互方向)
-*   **职责**:
-    *   **悬浮球交互**: 开发悬浮球的拖拽、吸附、状态切换逻辑。
-    *   **功能弹窗**: 负责番茄钟、疲劳提醒、设置界面的逻辑实现。
-    *   **用户流程**: 确保用户点击流畅，无交互死角。
-*   **核心模块**:
-    *   `app/ui/widgets/float_ball.py`
-    *   `app/ui/views/popup_view.py`
-    *   `app/ui/widgets/dialogs/` (Tomato, Fatigue, Settings)
-    *   `app/ui/widgets/focus_card.py` (Interaction logic) -->
-
-<!-- ### 2.6 UI 工程师 B (视觉/报表方向)
-*   **职责**:
-    *   **数据可视化**: 将后端提供的统计数据渲染为图表 (Matplotlib/PyQtGraph)。
-    *   **视觉特效**: 开发粒子系统、星空背景、呼吸动效。
-    *   **主题管理**: 负责深色/浅色模式切换及全局样式。
-*   **核心模块**:
-    *   `app/ui/widgets/report/` (Daily, Weekly, Monthly Reports)
-    *   `app/ui/widgets/visuals/` (Particle Systems, Effects)
-    *   `app/ui/widgets/report/theme.py` -->
+### 2.4 前端/UI 工程师 (1人)
+*   **职责 (桌面端)**:
+    *   负责 PyQt 悬浮球及弹窗的交互逻辑。通过定时器监听 `msg_queue`，实现 UI 状态的实时更新。
+    *   **模块**: `app/ui/`
+*   **职责 (网页端)**:
+    *   负责 `app/web/` 下的 Vue 仪表盘开发。实现日历导航、时间轴可视化及 AI 助手聊天界面。
+    *   **模块**: `app/web/`
+*   **核心挑战**: 维护桌面端与网页端视觉语言的高度统一。
 
 ---
 
 ## 3. 关键跨部门协作流程
 
-### 3.1 日报/周报功能开发
-1.  **PM**: 定义报表里要展示哪些数据（如：专注时长、拉回次数）。
-2.  **后端**: 在 `StatsDAO` 中写好 SQL 查询，提供 `get_daily_summary()` 接口。
-3.  **AI**: (可选) 提供 `generate_comment()` 接口生成智能评语。
-4.  **UI (B)**: 调用上述接口，画出图表并展示评语。
-5.  **集成 (你)**: 确保数据流转通畅，无卡顿。
+### 3.1 实时数据闭环 (从采集到展示)
+1.  **AI 工程师**: 在 `ai_worker` 进程中分析摄像头数据，产生 `status` 对象，调用 `ActivityHistoryManager` 写入数据库，并 `put` 到 `msg_queue`。
+2.  **架构师**: 确保 `run.py` 开启了正确的通信通道。
+3.  **UI 工程师**: 主进程轮询 `msg_queue`，拿到数据后立即更新悬浮球颜色。
 
-### 3.2 疲劳检测优化
-1.  **AI**: 升级 `vision.py` 算法，增加“闭眼检测”逻辑。
-2.  **后端**: 提供 `get_recent_focus_time()` 接口，辅助 AI 判断（专注太久更容易疲劳）。
-3.  **集成 (你)**: 在 `monitor_service.py` 中串联逻辑，触发提醒信号。
-4.  **UI (A)**: 优化疲劳提醒弹窗 (`fatigue.py`) 的展示效果。
+### 3.2 历史报表与 AI 生成 (从存储到网页)
+1.  **产品经理**: 确定报表所需的维度（如：专注效率分布）。
+2.  **后端工程师 (B)**: 在 `StatsDAO` 中实现聚合统计查询。
+3.  **后端工程师 (A)**: 在 `web_server.py` 中暴露 `/api/history` 接口。
+4.  **UI 工程师**: 在 Vue 页面调用接口，使用图表库展示数据。
+5.  **AI 工程师 (B)**: 提供 `POST /api/generate_report` 接口，结合后端查询到的数据，调用大模型生成文本总结。
 
-### 3.3 数据清理与存储
-1.  **集成 (你)**: 制定策略（如：截图只存 7 天）。
-2.  **后端**: 编写清理脚本，并在 `app/data/` 中实现。
-3.  **PM**: 确认该策略不会引起用户投诉。
+### 3.3 系统退出与资源清理
+1.  **架构师**: 在 `run.py` 捕获退出信号，设置 `running_event.clear()`。
+2.  **AI 工程师**: 在 `ai_worker` 中检测到事件后，优雅关闭摄像头并退出。
+3.  **后端工程师**: 确保 Web 进程被 `terminate()`，数据库连接安全关闭。
+4.  **UI 工程师**: 销毁所有 PyQt 窗口。

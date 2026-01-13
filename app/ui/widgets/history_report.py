@@ -264,11 +264,9 @@ class HistoryEntryWidget(QtWidgets.QWidget):
     """
     历史记录入口组件
     状态1: 显示 '是否时光回溯？' 长条 (TimeRetroBar)
-    状态2: 点击后显示三层时光轴 (TimeAxisCard x 3)
+    状态2: 点击后直接展示日报信息窗口
     """
-    daily_clicked = Signal()
-    weekly_clicked = Signal()
-    monthly_clicked = Signal()
+    daily_clicked = Signal() # 保留信号，虽然现在直接打开窗口，但保留接口一致性
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -282,61 +280,26 @@ class HistoryEntryWidget(QtWidgets.QWidget):
         
         # 状态1组件：长条按钮
         self.bar = TimeRetroBar(self)
-        self.bar.clicked.connect(self.show_icons)
+        self.bar.clicked.connect(self.show_daily_report)
         self.layout.addWidget(self.bar)
-        
-        # 状态2组件容器：图标组 (初始隐藏)
-        self.icons_container = QtWidgets.QWidget(self)
-        self.icons_layout = QtWidgets.QHBoxLayout(self.icons_container)
-        self.icons_layout.setContentsMargins(0, 0, 0, 0)
-        self.icons_layout.setSpacing(16) # 间距 16px (Scheme A)
-        
-        # 每日卡片
-        self.card_daily = TimeAxisCard("📅", "日报", "7天", "昨日专注4.5h")
-        self.card_daily.clicked.connect(self.daily_clicked.emit)
-        self.icons_layout.addWidget(self.card_daily)
-        
-        # 每周卡片
-        self.card_weekly = TimeAxisCard("📆", "周报", "4周", "本周29h")
-        self.card_weekly.clicked.connect(self.weekly_clicked.emit)
-        self.icons_layout.addWidget(self.card_weekly)
-        
-        # 每月卡片
-        self.card_monthly = TimeAxisCard("🗓️", "月报", "1月", "本月98h")
-        self.card_monthly.clicked.connect(self.monthly_clicked.emit)
-        self.icons_layout.addWidget(self.card_monthly)
-        
-        self.layout.addWidget(self.icons_container)
-        self.icons_container.hide()
         
         # 整体高度适应
         self.setFixedHeight(64) # 匹配卡片高度
 
-    def show_icons(self):
-        """切换到图标显示模式"""
-        print("[DEBUG] show_icons called")
-        self.bar.hide()
-        self.icons_container.show()
-        
-        # 触发动画：依次淡入/缩放
-        self.animate_card(self.card_daily, 0)
-        self.animate_card(self.card_weekly, 100)
-        self.animate_card(self.card_monthly, 200)
-        
-    def animate_card(self, card, delay):
-        anim = QtCore.QPropertyAnimation(card, b"scale_factor", self)
-        anim.setDuration(400)
-        anim.setStartValue(0.0)
-        anim.setEndValue(1.0)
-        anim.setEasingCurve(QtCore.QEasingCurve.OutBack)
-        QtCore.QTimer.singleShot(delay, anim.start)
-        
-        # 确保初始状态正确
-        card._scale = 0.0
+    def show_daily_report(self):
+        """点击时光回溯后，直接显示日报信息"""
+        print("[DEBUG] show_daily_report called")
+        # 实例化并显示 SimpleDailyReport
+        try:
+            from app.ui.widgets.report.daily import SimpleDailyReport
+            self.daily_report_window = SimpleDailyReport()
+            self.daily_report_window.show()
+            self.daily_clicked.emit() # 发出信号通知外部（可选）
+        except ImportError as e:
+            print(f"[ERROR] Failed to import SimpleDailyReport: {e}")
         
     def reset(self):
         """重置回长条状态 (可供外部调用)"""
-        self.icons_container.hide()
         self.bar.show()
         
     def sizeHint(self):

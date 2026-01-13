@@ -1,4 +1,4 @@
-from app.data.base import get_db_connection
+from app.data import get_db_connection
 
 class UserDAO:
     """用户数据访问对象"""

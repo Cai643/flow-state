@@ -15,8 +15,8 @@ import time
 from dataclasses import dataclass
 from typing import Dict, Optional
 
-# 使用新的 DAO
-from app.data.dao.user_dao import UserDAO
+# 使用新的 DAO (统一从 app.data 导入)
+from app.data import UserDAO
 
 app = Flask(__name__)
 CORS(app)

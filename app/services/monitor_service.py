@@ -8,7 +8,7 @@ except ImportError:
 
 from app.services.ai.vision import CameraAnalyzer
 from app.services.ai import inference as API
-from app.data.history import ActivityHistoryManager
+from app.data import ActivityHistoryManager
 
 class MonitorThread(QtCore.QThread):
     status_updated = Signal(dict)

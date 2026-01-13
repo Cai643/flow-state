@@ -78,7 +78,7 @@ class CardPopup(QtWidgets.QWidget):
     """
     request_full_report = Signal()
 
-    def __init__(self, image_path=None, target_margin=(5, 7), ball_size=64):
+    def __init__(self, target_margin=(5, 7), ball_size=64):
         super().__init__()
         # 设置窗口标志：无边框 | 工具窗口（不在任务栏显示） | 始终置顶
         self.setWindowFlags(
@@ -93,11 +93,9 @@ class CardPopup(QtWidgets.QWidget):
         self.card = FocusStatusCard(self)
         self.orig_pix_size = self.card.sizeHint()
         
-        # 历史记录入口组件 (三层时光轴)
+        # 历史记录入口组件 (时光回溯)
         self.history_entry = HistoryEntryWidget(self)
         self.history_entry.daily_clicked.connect(self.show_daily_report)
-        self.history_entry.weekly_clicked.connect(self.show_weekly_report)
-        self.history_entry.monthly_clicked.connect(self.show_monthly_report)
         
         # 初始化布局几何
         self.updateLayout()
@@ -118,8 +116,6 @@ class CardPopup(QtWidgets.QWidget):
         
         # 报告窗口引用
         self.daily_report_window = None
-        self.weekly_report_window = None
-        self.monthly_report_window = None
 
     def update_focus_status(self, result: dict):
         """
@@ -131,10 +127,6 @@ class CardPopup(QtWidgets.QWidget):
     def close_other_reports(self, exclude=None):
         if exclude != 'daily' and self.daily_report_window is not None and self.daily_report_window.isVisible():
             self.daily_report_window.close()
-        if exclude != 'weekly' and self.weekly_report_window is not None and self.weekly_report_window.isVisible():
-            self.weekly_report_window.close()
-        if exclude != 'monthly' and self.monthly_report_window is not None and self.monthly_report_window.isVisible():
-            self.monthly_report_window.close()
 
     def show_daily_report(self):
         try:
@@ -146,28 +138,6 @@ class CardPopup(QtWidgets.QWidget):
             self.daily_report_window.show()
         except Exception as e:
             print(f"Error showing daily report: {e}")
-
-    def show_weekly_report(self):
-        try:
-            from app.ui.widgets.report.weekly import WeeklyDashboard
-            self.close_other_reports(exclude='weekly')
-            if self.weekly_report_window is None or not self.weekly_report_window.isVisible():
-                self.weekly_report_window = WeeklyDashboard()
-                self.weekly_report_window.clicked.connect(self.weekly_report_window.close)
-            self.weekly_report_window.show()
-        except Exception as e:
-            print(f"Error showing weekly report: {e}")
-
-    def show_monthly_report(self):
-        try:
-            from app.ui.widgets.report.monthly import MilestoneReport
-            self.close_other_reports(exclude='monthly')
-            if self.monthly_report_window is None or not self.monthly_report_window.isVisible():
-                self.monthly_report_window = MilestoneReport()
-                self.monthly_report_window.clicked.connect(self.monthly_report_window.close)
-            self.monthly_report_window.show()
-        except Exception as e:
-            print(f"Error showing monthly report: {e}")
 
     def _checkMousePos(self):
         """

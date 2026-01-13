@@ -9,7 +9,7 @@ from typing import Optional
 from app.ui.widgets.dialogs.reminder import ReminderOverlay
 from app.ui.widgets.dialogs.tomato_clock import TomatoClockDialog
 from app.services.reminder.generator import SmartReminderGenerator
-from app.data.history import ActivityHistoryManager
+from app.data import ActivityHistoryManager
 from app.ui.widgets.focus_card import TimerDialog
 
 
