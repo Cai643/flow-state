@@ -86,6 +86,16 @@ class ActivityHistoryManager:
             formatted.append((status, duration, desc))
         return formatted
     
+    def get_daily_logs(self, day: date = None):
+        """获取某日的详细活动日志"""
+        if day is None:
+            day = date.today()
+        try:
+            return ActivityDAO.get_logs_by_date(day)
+        except Exception as e:
+            print(f"[HistoryManager] Logs Error: {e}")
+            return []
+
     def get_daily_summary(self, day: date = None):
         """获取统计摘要"""
         if day is None:

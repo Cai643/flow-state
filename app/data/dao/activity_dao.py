@@ -12,6 +12,19 @@ class ActivityDAO:
             )
             conn.commit()
 
+    @staticmethod
+    def get_logs_by_date(date_obj):
+        """获取某日的所有活动日志"""
+        start_time = f"{date_obj} 00:00:00"
+        end_time = f"{date_obj} 23:59:59"
+        with get_db_connection() as conn:
+            rows = conn.execute(
+                'SELECT * FROM activity_logs WHERE timestamp BETWEEN ? AND ? ORDER BY timestamp ASC',
+                (start_time, end_time)
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+
 class StatsDAO:
     """统计数据访问对象"""
     

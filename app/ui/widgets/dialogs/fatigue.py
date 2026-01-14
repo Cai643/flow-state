@@ -15,12 +15,10 @@ try:
     from PySide6.QtGui import QFont, QColor
     from PySide6.QtWidgets import QApplication, QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QProgressBar, QFrame, QStackedLayout
 except ImportError:
-    from PyQt5 import QtCore, QtGui, QtWidgets
-    from PyQt5.QtCore import Qt, QTimer
-    from PyQt5.QtGui import QFont, QColor
-    from PyQt5.QtWidgets import QApplication, QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QProgressBar, QFrame, QStackedLayout
-
-from app.ui.widgets.visuals.startup_particle_system import StartupParticleSystem
+        from PyQt5 import QtCore, QtGui, QtWidgets
+        from PyQt5.QtCore import Qt, QTimer
+        from PyQt5.QtGui import QFont, QColor
+        from PyQt5.QtWidgets import QApplication, QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QProgressBar, QFrame, QStackedLayout
 
 
 class FatigueReminderDialog(QDialog):
@@ -38,12 +36,6 @@ class FatigueReminderDialog(QDialog):
         
         self.setup_ui()
         self._center_window()
-        
-        # 粒子系统
-        self.particle_system = StartupParticleSystem(self)
-        self.particle_system.resize(self.size())
-        self.particle_system.raise_()
-        self.particle_system.hide()
         
         # 休息计时器
         self.rest_timer = QTimer(self)
@@ -210,44 +202,6 @@ class FatigueReminderDialog(QDialog):
         stats_layout.addWidget(severity_widget)
         
         bg_layout.addLayout(stats_layout)
-        
-        # 进度条
-        score_layout = QHBoxLayout()
-        score_layout.setSpacing(10)
-        
-        progress_label = QLabel("疲劳指数")
-        progress_label.setFont(QFont("Microsoft YaHei", 11, QFont.Bold))
-        progress_label.setStyleSheet("color: #1B5E20;")
-        
-        score_val = self._calculate_fatigue_score()
-        score_label = QLabel(f"{score_val}%")
-        score_label.setFont(QFont("Microsoft YaHei", 14, QFont.Bold))
-        score_label.setStyleSheet(f"color: {self._get_severity_color()};")
-        
-        score_layout.addWidget(progress_label)
-        score_layout.addWidget(score_label)
-        score_layout.addStretch()
-        
-        bg_layout.addLayout(score_layout)
-        
-        self.progress = QProgressBar()
-        self.progress.setMaximum(100)
-        self.progress.setValue(score_val)
-        self.progress.setFixedHeight(8)
-        self.progress.setTextVisible(False)  # 隐藏进度条上的文字
-        self.progress.setStyleSheet(f"""
-            QProgressBar {{
-                border: none;
-                background-color: #E8F5E9;
-                border-radius: 4px;
-            }}
-            QProgressBar::chunk {{
-                background-color: {self._get_severity_color()};
-                border-radius: 4px;
-            }}
-        """)
-        
-        bg_layout.addWidget(self.progress)
         
         # 建议文本区域
         suggestion_frame = QFrame()
@@ -600,14 +554,6 @@ class FatigueReminderDialog(QDialog):
         self.timer_message_label.show()
         self.timer_activity_label.setText("休息完成")
         self.timer_skip_btn.hide() # 隐藏按钮，让用户专注看特效
-        
-        # 触发粒子特效
-        # 确保粒子系统在最上层
-        self.particle_system.raise_()
-        self.particle_system.show()
-        # 在窗口中心触发
-        center = QtCore.QPoint(self.width() // 2, self.height() // 2)
-        self.particle_system.trigger_startup_effect(center)
         
         # 3秒后自动关闭
         QTimer.singleShot(3000, self.accept)
