@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import sys
 import os
 
@@ -10,18 +11,18 @@ from app.services.ai_worker import ai_monitor_worker
 import multiprocessing
 
 if __name__ == "__main__":
-    # Windows ÏÂ¶à½ø³Ì±ØĞëÔÚ __main__ ÖĞÆô¶¯
-    # Ê¹ÓÃ freeze_support() ÒÔÖ§³Ö PyInstaller ´ò°ü
+    # Windows ä¸‹å¤šè¿›ç¨‹å¿…é¡»åœ¨ __main__ ä¿æŠ¤ä¸‹
+    # ä½¿ç”¨ freeze_support() æ¥æ”¯æŒ PyInstaller æ‰“åŒ…
     multiprocessing.freeze_support()
     
-    # 1. ´´½¨½ø³Ì¼äÍ¨ĞÅ¶ÓÁĞ (ÓÃÓÚ AI ½ø³ÌÏò UI ½ø³Ì·¢ËÍ×´Ì¬)
+    # 1. åˆ›å»ºè¿›ç¨‹é—´é€šä¿¡é˜Ÿåˆ— (ç”¨äº AI è¿›ç¨‹å‘ UI è¿›ç¨‹å‘é€çŠ¶æ€)
     msg_queue = multiprocessing.Queue()
     
-    # 2. ´´½¨¿ØÖÆÊÂ¼ş (ÓÃÓÚÓÅÑÅÍË³ö)
+    # 2. åˆ›å»ºè¿è¡Œæ ‡å¿—äº‹ä»¶ (æ§åˆ¶è¿›ç¨‹é€€å‡º)
     running_event = multiprocessing.Event()
     running_event.set()
     
-    # 3. Æô¶¯ AI ¼à¿Ø½ø³Ì
+    # 3. å¯åŠ¨ AI ç›‘æ§è¿›ç¨‹
     ai_process = multiprocessing.Process(
         target=ai_monitor_worker, 
         args=(msg_queue, running_event),
@@ -29,7 +30,7 @@ if __name__ == "__main__":
     )
     ai_process.start()
     
-    # 4. Æô¶¯ Web ·şÎñ½ø³Ì (ÍêÈ«¶ÀÁ¢£¬²»ĞèÒª Queue)
+    # 4. å¯åŠ¨ Web æœåŠ¡è¿›ç¨‹ (å®Œå…¨ç‹¬ç«‹ï¼Œä¸éœ€è¦ Queue)
     web_process = multiprocessing.Process(
         target=run_server, 
         kwargs={'port': 8080},
@@ -37,23 +38,23 @@ if __name__ == "__main__":
     )
     web_process.start()
     
-    # 5. Æô¶¯Ö÷³ÌĞò GUI (Ö÷½ø³Ì)
-    # ½«¶ÓÁĞ´«µİ¸ø main£¬ÒÔ±ã UI ÄÜ¹»¶ÁÈ¡ AI ½ø³ÌµÄÊı¾İ
+    # 5. å¯åŠ¨ä¸»ç¨‹åº GUI (ä¸»è¿›ç¨‹)
+    # å°†é˜Ÿåˆ—ä¼ ç»™ mainï¼Œä»¥ä¾¿ UI èƒ½å¤Ÿè¯»å– AI è¿›ç¨‹çš„æ•°æ®
     try:
         main(msg_queue)
     except KeyboardInterrupt:
         pass
     finally:
-        print("¡¾Ö÷½ø³Ì¡¿ÕıÔÚÍË³ö£¬ÇåÀí×Ó½ø³Ì...")
-        running_event.clear() # Í¨Öª AI ½ø³ÌÍË³ö
+        print("ä¸»è¿›ç¨‹ï¼šæ­£åœ¨é€€å‡ºï¼Œæ¸…ç†å­è¿›ç¨‹...")
+        running_event.clear() # é€šçŸ¥ AI è¿›ç¨‹é€€å‡º
         
-        # Ç¿ÖÆÖÕÖ¹ Web ½ø³Ì (ÒòÎª Flask Ã»ÓĞ¼òµ¥µÄÍ£Ö¹·½·¨)
+        # å¼ºåˆ¶åœæ­¢ Web æœåŠ¡ (å› ä¸º Flask æ²¡æœ‰ç®€å•çš„åœæ­¢æ–¹æ³•)
         if web_process.is_alive():
             web_process.terminate()
             
-        # µÈ´ı AI ½ø³ÌÓÅÑÅÍË³ö
+        # ç­‰å¾… AI ç›‘æ§è¿›ç¨‹é€€å‡º
         ai_process.join(timeout=2)
         if ai_process.is_alive():
             ai_process.terminate()
             
-        print("¡¾Ö÷½ø³Ì¡¿ËùÓĞ×Ó½ø³ÌÒÑ¹Ø±Õ")
+        print("ä¸»è¿›ç¨‹ï¼šæ‰€æœ‰å­è¿›ç¨‹å·²å…³é—­")

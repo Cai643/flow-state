@@ -1,7 +1,8 @@
+# -*- coding: utf-8 -*-
 from app.data import get_db_connection
 
 class ActivityDAO:
-    """»î¶¯ÈÕÖ¾Êı¾İ·ÃÎÊ¶ÔÏó"""
+    """æ´»åŠ¨æ—¥å¿—æ•°æ®è®¿é—®å¯¹è±¡"""
     
     @staticmethod
     def insert_log(status: str, duration: int):
@@ -26,13 +27,13 @@ class ActivityDAO:
 
 
 class StatsDAO:
-    """Í³¼ÆÊı¾İ·ÃÎÊ¶ÔÏó"""
+    """ç»Ÿè®¡æ•°æ®è®¿é—®å¯¹è±¡"""
     
     @staticmethod
     def update_daily_stats(date_obj, status: str, duration: int):
-        """ÔöÁ¿¸üĞÂÃ¿ÈÕÍ³¼Æ"""
+        """æ›´æ–°æ¯æ—¥ç»Ÿè®¡"""
         col_name = f"total_{status}_time"
-        # ½ö´¦ÀíÓĞĞ§×´Ì¬×Ö¶Î
+        # æ£€æŸ¥æœ‰æ•ˆçŠ¶æ€å­—æ®µ
         if status not in ['focus', 'work', 'entertainment']:
             return
 
@@ -48,7 +49,7 @@ class StatsDAO:
 
     @staticmethod
     def get_daily_summary(date_obj):
-        """»ñÈ¡Ä³ÈÕµÄÍ³¼ÆÊı¾İ"""
+        """è·å–æŸæ—¥çš„ç»Ÿè®¡æ‘˜è¦"""
         with get_db_connection() as conn:
             row = conn.execute(
                 'SELECT * FROM daily_stats WHERE date = ?', (date_obj,)
@@ -58,7 +59,7 @@ class StatsDAO:
         return None
 
 class OcrDAO:
-    """OCR ¼ÇÂ¼Êı¾İ·ÃÎÊ¶ÔÏó"""
+    """OCR è®°å½•æ•°æ®è®¿é—®å¯¹è±¡"""
     
     @staticmethod
     def insert_record(content: str, app_name: str, screenshot_path: str = None):
@@ -71,7 +72,7 @@ class OcrDAO:
 
     @staticmethod
     def get_recent_records(limit=50):
-        """»ñÈ¡×î½üµÄ OCR/ä¯ÀÀ¼ÇÂ¼"""
+        """è·å–æœ€è¿‘çš„ OCR/å±å¹•è®°å½•"""
         with get_db_connection() as conn:
             rows = conn.execute(
                 'SELECT id, timestamp, app_name, window_title, content FROM ocr_records ORDER BY timestamp DESC LIMIT ?',
