@@ -65,7 +65,6 @@ def fetch_logs_by_date(date_str: str) -> list:
         (start_ts, end_ts)
     ).fetchall()
     conn.close()
-    # 返回协议格式
     return [
         {"status": r[0], "timestamp": r[1], "duration": r[2]}
         for r in rows
@@ -76,3 +75,26 @@ def _date_str_to_ts(date_str: str) -> int:
     import time, datetime
     y, m, d = map(int, date_str.split('-'))
     return int(time.mktime(datetime.datetime(y, m, d, 0, 0, 0).timetuple()))
+
+# --------- 以下保留主库新加的重要业务 ---------
+class OcrDAO:
+    """OCR 记录数据访问对象"""
+
+    @staticmethod
+    def insert_record(content: str, app_name: str, screenshot_path: str = None):
+        with _get_conn() as conn:
+            conn.execute(
+                'INSERT INTO ocr_records (content, app_name, screenshot_path) VALUES (?, ?, ?)',
+                (content, app_name, screenshot_path)
+            )
+            conn.commit()
+
+    @staticmethod
+    def get_recent_records(limit=50):
+        """获取最近的 OCR/截图记录"""
+        with _get_conn() as conn:
+            rows = conn.execute(
+                'SELECT id, timestamp, app_name, window_title, content FROM ocr_records ORDER BY timestamp DESC LIMIT ?',
+                (limit,)
+            ).fetchall()
+            return [dict(zip([c[0] for c in rows.cursor_description], row)) for row in rows] if rows else []
