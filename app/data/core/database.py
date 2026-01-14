@@ -3,7 +3,7 @@ import os
 from contextlib import contextmanager
 
 # 数据库文件路径
-DB_PATH = os.path.join(os.getcwd(), 'focus_app.db')
+DB_PATH = os.path.join(os.getcwd(), 'data', 'xiaoliu.db')
 
 @contextmanager
 def get_db_connection():
