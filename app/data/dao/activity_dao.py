@@ -1,17 +1,42 @@
 # -*- coding: utf-8 -*-
-from app.data import get_db_connection
+from app.data.core.database import get_db_connection
+
+from datetime import datetime
 
 class ActivityDAO:
     """活动日志数据访问对象"""
     
     @staticmethod
-    def insert_log(status: str, duration: int):
+    def insert_log(status: str, duration: int, timestamp=None):
         with get_db_connection() as conn:
-            conn.execute(
-                'INSERT INTO activity_logs (status, duration) VALUES (?, ?)',
-                (status, duration)
-            )
+            if timestamp:
+                # 如果是 float/int 时间戳，转换为字符串
+                if isinstance(timestamp, (float, int)):
+                    ts_str = datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
+                else:
+                    ts_str = timestamp
+                    
+                conn.execute(
+                    'INSERT INTO activity_logs (status, duration, timestamp) VALUES (?, ?, ?)',
+                    (status, duration, ts_str)
+                )
+            else:
+                conn.execute(
+                    'INSERT INTO activity_logs (status, duration) VALUES (?, ?)',
+                    (status, duration)
+                )
             conn.commit()
+
+    @staticmethod
+    def get_latest_log():
+        """获取最新的一条活动日志"""
+        with get_db_connection() as conn:
+            row = conn.execute(
+                'SELECT * FROM activity_logs ORDER BY timestamp DESC LIMIT 1'
+            ).fetchone()
+            if row:
+                return dict(row)
+        return None
 
     @staticmethod
     def get_logs_by_date(date_obj):
