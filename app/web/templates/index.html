@@ -1,40 +1,1400 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang='zh-CN'>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ÂøÉÂ¢É Flow State - ‰ª™Ë°®Áõò</title>
+    <meta charset='UTF-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <title>Flow State Assistant</title>
     <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        :root {
+            --color-bg-light: #fff5cf;
+            --color-green-light: #a4bf5a;
+            --color-green-dark: #4f6610;
+            --color-green-mid: #789035;
+            --color-accent-gold: #c9b365;
+            --color-text-main: #4f6610;
+            --color-text-sub: #789035;
+            --color-white: #ffffff;
+            --color-hover: #f0f7e6;
+        }
+
+        body, html {
             margin: 0;
             padding: 0;
-            background-color: #f5f7fa;
-            color: #333;
+            height: 100%;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background-color: var(--color-bg-light);
+            color: var(--color-text-main);
+            overflow: hidden;
+        }
+
+        #app {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+            position: relative;
+        }
+
+        /* --- Sidebar --- */
+        .sidebar {
+            flex: 0 0 60px;
+            height: 100%;
+            background-color: var(--color-white);
+            border-right: 1px solid rgba(164, 191, 90, 0.3);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 20px;
+            z-index: 20;
+        }
+        .sidebar-icon {
+            width: 40px;
+            height: 40px;
+            margin-bottom: 20px;
+            border-radius: 8px;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--color-green-mid);
+            position: relative;
         }
-        .container {
-            text-align: center;
-            background: white;
-            padding: 40px;
+        .sidebar-icon:hover, .sidebar-icon.active {
+            background-color: var(--color-bg-light);
+            color: var(--color-green-dark);
+        }
+        .sidebar-icon svg {
+            width: 24px;
+            height: 24px;
+            fill: currentColor;
+        }
+
+        /* --- Left Panel --- */
+        .left-panel {
+            flex: 0 0 auto;
+            width: 50%;
+            height: 100%;
+            background-color: var(--color-bg-light);
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--color-green-light);
+            position: relative;
+            overflow: hidden;
+            min-width: 300px;
+            max-width: 80vw;
+        }
+
+        /* --- Panel Views --- */
+        .panel-view {
+            display: none;
+            flex-direction: column;
+            height: 100%;
+        }
+        .panel-view.active {
+            display: flex;
+        }
+
+        /* Nav Tabs (History View) */
+        .nav-tabs {
+            display: flex;
+            padding: 15px 20px 0 20px;
+            gap: 10px;
+            background-color: var(--color-bg-light);
+        }
+        .nav-btn {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            border: 1px solid var(--color-green-light);
+            background-color: transparent;
+            color: var(--color-green-mid);
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .nav-btn:hover {
+            background-color: var(--color-hover);
+        }
+        .nav-btn.active {
+            background-color: var(--color-green-dark);
+            color: var(--color-white);
+            border-color: var(--color-green-dark);
+        }
+
+        /* History List */
+        .history-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        .history-header {
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--color-green-dark);
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(164, 191, 90, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .history-item {
+            background-color: var(--color-white);
             border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(79, 102, 16, 0.05);
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+            border: 1px solid transparent;
         }
-        h1 { color: #409EFF; }
-        p { color: #666; }
+        .history-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(79, 102, 16, 0.1);
+            border-color: var(--color-green-light);
+        }
+        .item-icon {
+            width: 40px;
+            height: 40px;
+            background-color: var(--color-bg-light);
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-right: 15px;
+            color: var(--color-green-mid);
+            font-weight: bold;
+            font-size: 18px;
+        }
+        .item-content {
+            flex: 1;
+            overflow: hidden;
+        }
+        .item-title {
+            font-weight: bold;
+            color: var(--color-green-dark);
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .item-subtitle {
+            font-size: 12px;
+            color: var(--color-text-sub);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .item-time {
+            background-color: rgba(164, 191, 90, 0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        /* --- AI Search View --- */
+        .ai-search-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 30px;
+            background-color: var(--color-bg-light);
+        }
+        .ai-search-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .ai-search-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--color-green-dark);
+            margin-bottom: 10px;
+        }
+        .ai-search-subtitle {
+            font-size: 14px;
+            color: var(--color-green-mid);
+        }
+        .ai-input-box {
+            background-color: var(--color-white);
+            border-radius: 16px;
+            box-shadow: 0 4px 15px rgba(79, 102, 16, 0.1);
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            border: 2px solid transparent;
+            transition: all 0.3s;
+        }
+        .ai-input-box:focus-within {
+            border-color: var(--color-green-light);
+            box-shadow: 0 8px 25px rgba(79, 102, 16, 0.15);
+            transform: translateY(-2px);
+        }
+        .ai-input {
+            flex: 1;
+            border: none;
+            outline: none;
+            font-size: 16px;
+            color: var(--color-green-dark);
+            margin-left: 10px;
+        }
+        .ai-input::placeholder {
+            color: rgba(120, 144, 53, 0.5);
+        }
+        .filter-tags {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+            margin-bottom: 30px;
+        }
+        .filter-tag {
+            padding: 6px 16px;
+            background-color: rgba(255, 255, 255, 0.6);
+            border-radius: 20px;
+            font-size: 13px;
+            color: var(--color-green-mid);
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+        .filter-tag:hover, .filter-tag.active {
+            background-color: var(--color-green-dark);
+            color: white;
+        }
+        .search-results-area {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .ai-summary-card {
+            background: linear-gradient(135deg, #f0f7e6, #fff);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid var(--color-green-light);
+            display: none; /* Hidden by default */
+        }
+        .ai-summary-title {
+            font-weight: bold;
+            color: var(--color-green-dark);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .ai-summary-content {
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--color-text-main);
+        }
+        .result-group-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: var(--color-green-mid);
+            margin-bottom: 10px;
+            padding-left: 5px;
+        }
+
+        /* --- Advanced AI Search Styles --- */
+        .citation-ref {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            width: 16px;
+            height: 16px;
+            background-color: var(--color-green-light);
+            color: var(--color-white);
+            border-radius: 50%;
+            font-size: 10px;
+            margin: 0 2px;
+            vertical-align: text-top;
+            cursor: pointer;
+        }
+        .citation-ref:hover {
+            background-color: var(--color-green-dark);
+        }
+
+        .follow-up-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+            border-top: 1px solid rgba(164, 191, 90, 0.1);
+            padding-top: 15px;
+        }
+        .follow-up-chip {
+            padding: 8px 16px;
+            background-color: var(--color-white);
+            border: 1px solid var(--color-green-light);
+            border-radius: 20px;
+            font-size: 13px;
+            color: var(--color-green-dark);
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .follow-up-chip:hover {
+            background-color: var(--color-bg-light);
+            transform: translateY(-1px);
+        }
+        
+        .recent-searches {
+            margin-top: 20px;
+        }
+        .recent-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 15px;
+            cursor: pointer;
+            border-radius: 8px;
+            color: var(--color-text-main);
+            transition: background 0.2s;
+        }
+        .recent-item:hover {
+            background-color: rgba(255,255,255,0.5);
+        }
+        .recent-icon {
+            color: var(--color-green-mid);
+        }
+
+        .typing-cursor::after {
+            content: '®É';
+            display: inline-block;
+            vertical-align: baseline;
+            animation: blink 1s step-end infinite;
+            color: var(--color-green-dark);
+            font-size: 14px;
+        }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        /* --- Settings Modal --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.3);
+            z-index: 1000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .settings-modal {
+            background-color: var(--color-white);
+            width: 400px;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes popIn {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .settings-header {
+            font-size: 20px;
+            font-weight: bold;
+            color: var(--color-green-dark);
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .close-btn {
+            cursor: pointer;
+            padding: 5px;
+            color: var(--color-text-sub);
+        }
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+        .setting-label {
+            color: var(--color-text-main);
+        }
+        
+        .settings-section-title {
+            font-size: 12px;
+            font-weight: bold;
+            color: var(--color-green-mid);
+            margin-top: 20px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .settings-select {
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(164, 191, 90, 0.3);
+            background-color: var(--color-bg-light);
+            color: var(--color-green-dark);
+            outline: none;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .color-options {
+            display: flex;
+            gap: 12px;
+        }
+        .color-circle {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid var(--color-white);
+            box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+        }
+        .color-circle:hover {
+            transform: scale(1.1);
+        }
+        .color-circle.active {
+            transform: scale(1.1);
+            box-shadow: 0 0 0 2px var(--color-green-dark);
+        }
+
+        /* Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--color-green-mid); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        /* --- Resizer --- */
+        .resizer {
+            flex: 0 0 10px;
+            background-color: transparent;
+            cursor: col-resize;
+            position: relative;
+            z-index: 100;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 -5px;
+        }
+        .resizer::before {
+            content: '';
+            width: 1px;
+            height: 100%;
+            background-color: var(--color-green-light);
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        .resizer-handle {
+            width: 24px;
+            height: 24px;
+            background-color: var(--color-white);
+            border: 1px solid var(--color-green-light);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            z-index: 11;
+            position: relative;
+        }
+        .resizer-handle svg {
+            width: 12px;
+            height: 12px;
+            fill: var(--color-green-mid);
+        }
+
+        /* --- Right Panel --- */
+        .right-panel {
+            flex: 1;
+            height: 100%;
+            background-color: var(--color-white);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            min-width: 300px;
+            padding-left: 5px;
+        }
+
+        /* --- Chat Area --- */
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--color-white);
+        }
+        .chat-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(164, 191, 90, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chat-title {
+            font-weight: bold;
+            font-size: 16px;
+            color: var(--color-green-dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .chat-title::before {
+            content: '';
+            display: block;
+            width: 8px;
+            height: 8px;
+            background-color: var(--color-green-light);
+            border-radius: 50%;
+        }
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .message {
+            max-width: 70%;
+            padding: 15px 20px;
+            border-radius: 12px;
+            line-height: 1.6;
+            position: relative;
+        }
+        .message.ai {
+            align-self: flex-start;
+            background-color: var(--color-bg-light); 
+            color: var(--color-green-dark);
+            border-top-left-radius: 2px;
+            border: 1px solid rgba(164, 191, 90, 0.1);
+        }
+        .message.user {
+            align-self: flex-end;
+            background-color: var(--color-green-dark);
+            color: var(--color-white);
+            border-top-right-radius: 2px;
+        }
+        .input-area {
+            padding: 20px 30px;
+            border-top: 1px solid rgba(164, 191, 90, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .input-wrapper {
+            flex: 1;
+            background-color: var(--color-bg-light);
+            border-radius: 25px;
+            padding: 5px 20px;
+            display: flex;
+            align-items: center;
+            border: 1px solid transparent;
+            transition: border 0.2s;
+        }
+        .input-wrapper:focus-within {
+            border-color: var(--color-green-light);
+        }
+        .input-box {
+            flex: 1;
+            border: none;
+            background: transparent;
+            padding: 10px 0;
+            outline: none;
+            font-size: 14px;
+            color: var(--color-green-dark);
+        }
+        .input-box::placeholder {
+            color: var(--color-green-mid);
+            opacity: 0.6;
+        }
+        .send-btn {
+            width: 40px;
+            height: 40px;
+            background-color: var(--color-green-dark);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .send-btn:hover {
+            transform: scale(1.1);
+            background-color: var(--color-green-mid);
+        }
+        .send-btn svg {
+            fill: white;
+            width: 18px;
+            height: 18px;
+            margin-left: 2px;
+        }
+        body.resizing {
+            cursor: col-resize;
+            user-select: none;
+        }
+
+        /* --- Compact Mode --- */
+        body.compact .sidebar-icon {
+            margin-bottom: 10px;
+            width: 36px;
+            height: 36px;
+        }
+        body.compact .nav-tabs {
+            padding-top: 10px;
+        }
+        body.compact .nav-btn {
+            padding: 4px 12px;
+            font-size: 13px;
+        }
+        body.compact .history-item {
+            padding: 10px;
+            gap: 10px;
+        }
+        body.compact .item-icon {
+            width: 32px;
+            height: 32px;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        body.compact .ai-search-container {
+            padding: 15px;
+        }
+        body.compact .ai-search-header {
+            margin-bottom: 15px;
+        }
+        body.compact .chat-messages {
+            padding: 15px;
+        }
+        body.compact .message {
+            padding: 10px 15px;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>üöÄ Êú¨Âú∞‰ª™Ë°®ÁõòÂáÜÂ§áÂ∞±Áª™</h1>
-        <p>Vue ÂâçÁ´ØÂ∞öÊú™ÈõÜÊàêÔºåËøôÊòØÂêéÁ´ØËøîÂõûÁöÑÈªòËÆ§È°µÈù¢„ÄÇ</p>
-        <p>ÂΩìÂâçÊó∂Èó¥: <span id="time"></span></p>
+    <div id='app'>
+        
+        <!-- Sidebar -->
+        <div class='sidebar'>
+            <div class='sidebar-icon active' id='sidebar-history' title='History' onclick='showPanel("history")'>
+                <svg viewBox='0 0 24 24'><path d='M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z'/></svg>
+            </div>
+            <div class='sidebar-icon' id='sidebar-search' title='AI Search' onclick='showPanel("search")'>
+                <svg viewBox='0 0 24 24'><path d='M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z'/></svg>
+            </div>
+            <div class='sidebar-icon' id='sidebar-settings' title='Settings' onclick='toggleSettings()'>
+                <svg viewBox='0 0 24 24'><path d='M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.04.17 0 .36.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.58 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.04-.22 0-.45-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z'/></svg>
+            </div>
+        </div>
+
+        <!-- Left Panel Wrapper -->
+        <div class='left-panel' id='left-panel'>
+            
+            <!-- Persistent Navigation Tabs -->
+            <div class="nav-tabs">
+                <div class="nav-btn active" id="btn-7days" onclick="switchTab('7days')" data-i18n="nav.7days">◊ÓΩ¸7ÃÏ</div>
+                <div class="nav-btn" id="btn-30days" onclick="switchTab('30days')" data-i18n="nav.30days">◊ÓΩ¸30ÃÏ</div>
+                <div class="nav-btn" id="btn-search" onclick="switchTab('search')" data-i18n="nav.search">AI À—À˜</div>
+            </div>
+
+            <!-- View 1: History List -->
+            <div id="panel-history" class="panel-view active">
+                <div class="history-container">
+                    <div class="history-header">
+                        <span id="history-title" data-i18n="history.title.7">◊ÓΩ¸7ÃÏ‰Ø¿¿º«¬º</span>
+                        <span style="font-size: 12px; font-weight: normal; color: #789035;" data-i18n="history.source"> ˝æ›¿¥‘¥: ±æµÿº‡øÿ</span>
+                    </div>
+                    <div class="history-list" id="history-list">
+                        <!-- JS Dynamic -->
+                        <div style="text-align: center; color: #789035; margin-top: 50px;">’˝‘⁄º”‘ÿ ˝æ›...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View 2: AI Search Interface -->
+            <div id="panel-search" class="panel-view">
+                <div class='ai-search-container'>
+                    <div class='ai-search-header'>
+                        <div class='ai-search-title' data-i18n="search.title">AI ÷«ƒ‹À—À˜</div>
+                        <div class='ai-search-subtitle' data-i18n="search.subtitle">ÃΩÀ˜ƒ„µƒ ˝◊÷◊„º£”Îº«“‰</div>
+                    </div>
+                    
+                    <div class='ai-input-box'>
+                        <svg viewBox='0 0 24 24' width='24' height='24' fill='#a4bf5a'><path d='M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z'/></svg>
+                        <input type='text' class='ai-input' id='ai-search-input' data-i18n-placeholder="search.placeholder" placeholder='À—À˜πÿº¸¥ °¢”¶”√ªÚ÷˜Ã‚...' onkeypress='handleAiSearch(event)'>
+                    </div>
+
+                    <div class='filter-tags'>
+                        <div class='filter-tag active' data-i18n="search.filter.all">»´≤ø</div>
+                        <div class='filter-tag' data-i18n="search.filter.doc">Œƒµµ</div>
+                        <div class='filter-tag' data-i18n="search.filter.web">Õ¯“≥</div>
+                        <div class='filter-tag' data-i18n="search.filter.chat">¡ƒÃÏ</div>
+                    </div>
+
+                    <div class='search-results-area' id='ai-results-area'>
+                        <!-- Empty State -->
+                        <div style='text-align: center; color: #789035; margin-top: 40px; opacity: 0.7;'>
+                             ‰»Îπÿº¸¥ ø™ ºÀ—À˜<br>
+                            ¿˝»Á£∫"…œ÷‹µƒœÓƒøŒƒµµ" ªÚ "Chrome ‰Ø¿¿¿˙ ∑"
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Resizer -->
+        <div class='resizer' id='resizer'>
+            <div class='resizer-handle'>
+                <svg viewBox='0 0 24 24'><path d='M8 19c0 1.1.9 2 2 2h4c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v14zm6-14h2v14h-2V5zM8 5h2v14H8V5z'/></svg>
+            </div>
+        </div>
+
+        <!-- Right Panel: AI Chat -->
+        <div class='right-panel' id='right-panel'>
+            <div class='chat-container'>
+                <div class='chat-header'>
+                    <div class='chat-title' data-i18n="chat.title">Flow-State Chat</div>
+                    <div style='color: var(--color-green-mid); cursor: pointer;'>
+                        <svg viewBox='0 0 24 24' width='20' height='20' fill='currentColor'><path d='M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z'/></svg>
+                    </div>
+                </div>
+                
+                <div class='chat-messages' id='chat-messages'>
+                    <div class='message ai' data-i18n="chat.welcome">ƒ„∫√£°Œ“ «ƒ„µƒ Flow-State ÷˙ ÷°£’‚¿Ôø…“‘≤Èø¥ƒ„µƒ¿˙ ∑––Œ™ ˝æ›£¨“≤ø…“‘∫ÕŒ“¡ƒÃÏ°£</div>
+                </div>
+                
+                <div class='input-area'>
+                    <div class='input-wrapper'>
+                        <input type='text' class='input-box' id='chat-input' data-i18n-placeholder="chat.placeholder" placeholder='—ØŒ  Flow-State ÷˙ ÷...'>
+                    </div>
+                    <div class='send-btn' id='send-btn'>
+                        <svg viewBox='0 0 24 24'><path d='M2.01 21L23 12 2.01 3 2 10l15 2-15 2z'/></svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
+
+    <!-- Settings Modal -->
+    <div class='modal-overlay' id='settings-modal'>
+        <div class='settings-modal'>
+            <div class='settings-header'>
+                <span data-i18n="settings.title">…Ë÷√</span>
+                <span class='close-btn' onclick='toggleSettings()'>&times;</span>
+            </div>
+            
+            <!-- General -->
+            <div class='settings-section-title' data-i18n="settings.general">≥£πÊ</div>
+            <div class='setting-item'>
+                <div class='setting-label' data-i18n="settings.language">”Ô—‘</div>
+                <select class="settings-select" id="language-select" onchange="changeLanguage(this.value)">
+                    <option value="zh">÷–Œƒ</option>
+                    <option value="en">English</option>
+                </select>
+            </div>
+
+            <!-- Appearance -->
+            <div class='settings-section-title' data-i18n="settings.appearance">Õ‚π€</div>
+            <div class='setting-item'>
+                <div class='setting-label' data-i18n="settings.theme">÷˜Ã‚…´</div>
+                <div class="color-options">
+                    <div class="color-circle active" style="background: #a4bf5a;" onclick="setTheme('green', this)"></div>
+                    <div class="color-circle" style="background: #6495ED;" onclick="setTheme('blue', this)"></div>
+                    <div class="color-circle" style="background: #FF7F50;" onclick="setTheme('orange', this)"></div>
+                    <div class="color-circle" style="background: #9370DB;" onclick="setTheme('purple', this)"></div>
+                </div>
+            </div>
+            <div class='setting-item'>
+                <div class='setting-label' data-i18n="settings.compact">ΩÙ¥’ƒ£ Ω</div>
+                <label class='switch'>
+                    <input type='checkbox' id="compact-toggle" onchange="toggleCompactMode(this.checked)">
+                    <span class='slider'></span>
+                </label>
+            </div>
+
+            <!-- Data -->
+            <div class='settings-section-title' data-i18n="settings.data"> ˝æ›</div>
+            <div class='setting-item'>
+                <div class='setting-label' data-i18n="settings.auto_record">◊‘∂Øº«¬º‰Ø¿¿ ˝æ›</div>
+                <label class='switch'>
+                    <input type='checkbox' checked>
+                    <span class='slider'></span>
+                </label>
+            </div>
+            
+            <div class='setting-item'>
+                <div class='setting-label' data-i18n="settings.notifications">Õ®÷™Ã·–—</div>
+                <label class='switch'>
+                    <input type='checkbox' checked>
+                    <span class='slider'></span>
+                </label>
+            </div>
+
+            <div style='margin-top: 20px; text-align: right;'>
+                <button onclick='toggleSettings()' style='padding: 8px 20px; background: var(--color-green-dark); color: white; border: none; border-radius: 6px; cursor: pointer;' data-i18n="settings.save">±£¥Ê</button>
+            </div>
+        </div>
+    </div>
+
     <script>
-        document.getElementById('time').innerText = new Date().toLocaleString();
+        // --- Settings Logic (Hoisted) ---
+        const i18n = {
+            zh: {
+                "settings.title": "…Ë÷√",
+                "settings.general": "≥£πÊ",
+                "settings.language": "”Ô—‘",
+                "settings.appearance": "Õ‚π€",
+                "settings.theme": "÷˜Ã‚…´",
+                "settings.compact": "ΩÙ¥’ƒ£ Ω",
+                "settings.data": " ˝æ›",
+                "settings.auto_record": "◊‘∂Øº«¬º‰Ø¿¿ ˝æ›",
+                "settings.notifications": "Õ®÷™Ã·–—",
+                "settings.save": "±£¥Ê",
+                "nav.7days": "◊ÓΩ¸7ÃÏ",
+                "nav.30days": "◊ÓΩ¸30ÃÏ",
+                "nav.search": "AI À—À˜",
+                "history.title.7": "◊ÓΩ¸7ÃÏ‰Ø¿¿º«¬º",
+                "history.title.30": "◊ÓΩ¸30ÃÏ‰Ø¿¿º«¬º",
+                "history.source": " ˝æ›¿¥‘¥: ±æµÿº‡øÿ",
+                "search.title": "AI ÷«ƒ‹À—À˜",
+                "search.subtitle": "ÃΩÀ˜ƒ„µƒ ˝◊÷◊„º£”Îº«“‰",
+                "search.placeholder": "À—À˜πÿº¸¥ °¢”¶”√ªÚ÷˜Ã‚...",
+                "search.filter.all": "»´≤ø",
+                "search.filter.doc": "Œƒµµ",
+                "search.filter.web": "Õ¯“≥",
+                "search.filter.chat": "¡ƒÃÏ",
+                "search.recent": "◊ÓΩ¸À—À˜",
+                "chat.title": "Flow-State Chat",
+                "chat.placeholder": "—ØŒ  Flow-State ÷˙ ÷...",
+                "chat.welcome": "ƒ„∫√£°Œ“ «ƒ„µƒ Flow-State ÷˙ ÷°£’‚¿Ôø…“‘≤Èø¥ƒ„µƒ¿˙ ∑––Œ™ ˝æ›£¨“≤ø…“‘∫ÕŒ“¡ƒÃÏ°£",
+                // Dynamic
+                "msg.loading": "’˝‘⁄º”‘ÿ ˝æ›...",
+                "msg.no_records": "‘›Œﬁº«¬º",
+                "msg.failed": "º”‘ÿ ß∞‹",
+                "msg.ai_thinking": "AI ’˝‘⁄Àºøº",
+                "msg.ai_analyzing": "’˝‘⁄∑÷Œˆ¿˙ ∑º«¬º...",
+                "msg.no_results": "Œ¥’“µΩ”Î \"{query}\" œ‡πÿµƒº«¬º°£",
+                "msg.ai_answer": "AI ÷«ƒ‹ªÿ¥",
+                "msg.sources": "¿¥‘¥º«¬º",
+                "msg.relevant": "œ‡πÿº«¬º"
+            },
+            en: {
+                "settings.title": "Settings",
+                "settings.general": "General",
+                "settings.language": "Language",
+                "settings.appearance": "Appearance",
+                "settings.theme": "Theme Color",
+                "settings.compact": "Compact Mode",
+                "settings.data": "Data",
+                "settings.auto_record": "Auto Record",
+                "settings.notifications": "Notifications",
+                "settings.save": "Save",
+                "nav.7days": "Recent 7 Days",
+                "nav.30days": "Recent 30 Days",
+                "nav.search": "AI Search",
+                "history.title.7": "Browsing History (7 Days)",
+                "history.title.30": "Browsing History (30 Days)",
+                "history.source": "Source: Local Monitor",
+                "search.title": "AI Smart Search",
+                "search.subtitle": "Explore your digital footprint & memories",
+                "search.placeholder": "Search keywords, apps, or topics...",
+                "search.filter.all": "All",
+                "search.filter.doc": "Docs",
+                "search.filter.web": "Web",
+                "search.filter.chat": "Chat",
+                "search.recent": "Recent Searches",
+                "chat.title": "Flow-State Chat",
+                "chat.placeholder": "Ask Flow-State Assistant...",
+                "chat.welcome": "Hello! I am your Flow-State assistant. You can check your history data here or chat with me.",
+                // Dynamic
+                "msg.loading": "Loading data...",
+                "msg.no_records": "No records",
+                "msg.failed": "Failed to load",
+                "msg.ai_thinking": "AI is thinking",
+                "msg.ai_analyzing": "Analyzing history...",
+                "msg.no_results": "No records found for \"{query}\".",
+                "msg.ai_answer": "AI Answer",
+                "msg.sources": "Sources",
+                "msg.relevant": "Relevant Records"
+            }
+        };
+
+        function t(key, params = {}) {
+            const lang = localStorage.getItem('flow-language') || 'zh';
+            let text = (i18n[lang] && i18n[lang][key]) || key;
+            for (const [k, v] of Object.entries(params)) {
+                text = text.replace(`{${k}}`, v);
+            }
+            return text;
+        }
+
+        const themes = {
+            green: {
+                '--color-bg-light': '#fff5cf',
+                '--color-green-light': '#a4bf5a',
+                '--color-green-dark': '#4f6610',
+                '--color-green-mid': '#789035',
+                '--color-text-main': '#4f6610',
+                '--color-text-sub': '#789035',
+                '--color-hover': '#f0f7e6'
+            },
+            blue: {
+                '--color-bg-light': '#e6f7ff',
+                '--color-green-light': '#69c0ff',
+                '--color-green-dark': '#0050b3',
+                '--color-green-mid': '#1890ff',
+                '--color-text-main': '#003a8c',
+                '--color-text-sub': '#1890ff',
+                '--color-hover': '#bae7ff'
+            },
+            orange: {
+                '--color-bg-light': '#fff7e6',
+                '--color-green-light': '#ffc069',
+                '--color-green-dark': '#873800',
+                '--color-green-mid': '#fa8c16',
+                '--color-text-main': '#612500',
+                '--color-text-sub': '#fa8c16',
+                '--color-hover': '#ffd591'
+            },
+            purple: {
+                '--color-bg-light': '#f9f0ff',
+                '--color-green-light': '#b37feb',
+                '--color-green-dark': '#391085',
+                '--color-green-mid': '#722ed1',
+                '--color-text-main': '#22075e',
+                '--color-text-sub': '#722ed1',
+                '--color-hover': '#efdbff'
+            }
+        };
+
+        function changeLanguage(lang) {
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (i18n[lang] && i18n[lang][key]) {
+                    el.textContent = i18n[lang][key];
+                }
+            });
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                const key = el.getAttribute('data-i18n-placeholder');
+                if (i18n[lang] && i18n[lang][key]) {
+                    el.placeholder = i18n[lang][key];
+                }
+            });
+            localStorage.setItem('flow-language', lang);
+        }
+
+        function setTheme(themeName, el) {
+            const theme = themes[themeName];
+            if (!theme) return;
+            const root = document.documentElement;
+            for (const [key, value] of Object.entries(theme)) {
+                root.style.setProperty(key, value);
+            }
+            document.querySelectorAll('.color-circle').forEach(c => c.classList.remove('active'));
+            if(el) el.classList.add('active');
+            else {
+                 const map = {green:0, blue:1, orange:2, purple:3};
+                 const circles = document.querySelectorAll('.color-circle');
+                 if(circles[map[themeName]]) circles[map[themeName]].classList.add('active');
+            }
+            localStorage.setItem('flow-theme', themeName);
+        }
+
+        function toggleCompactMode(isCompact) {
+            if (isCompact) document.body.classList.add('compact');
+            else document.body.classList.remove('compact');
+            localStorage.setItem('flow-compact', isCompact);
+        }
+
+        function initSettings() {
+            const lang = localStorage.getItem('flow-language') || 'zh';
+            const select = document.getElementById('language-select');
+            if(select) select.value = lang;
+            changeLanguage(lang);
+
+            const theme = localStorage.getItem('flow-theme') || 'green';
+            setTheme(theme);
+
+            const isCompact = localStorage.getItem('flow-compact') === 'true';
+            const toggle = document.getElementById('compact-toggle');
+            if(toggle) toggle.checked = isCompact;
+            toggleCompactMode(isCompact);
+        }
+
+        // --- Drag Logic ---
+        const resizer = document.getElementById('resizer');
+        const leftPanel = document.getElementById('left-panel');
+        const app = document.getElementById('app');
+        let isResizing = false;
+
+        resizer.addEventListener('mousedown', function(e) {
+            isResizing = true;
+            document.body.classList.add('resizing');
+        });
+
+        document.addEventListener('mousemove', function(e) {
+            if (!isResizing) return;
+            const containerWidth = app.offsetWidth;
+            const sidebarWidth = 60;
+            let newLeftWidth = ((e.clientX - sidebarWidth) / (containerWidth - sidebarWidth)) * 100;
+            if (newLeftWidth < 20) newLeftWidth = 20;
+            if (newLeftWidth > 80) newLeftWidth = 80;
+            leftPanel.style.width = newLeftWidth + '%';
+        });
+
+        document.addEventListener('mouseup', function(e) {
+            if (isResizing) {
+                isResizing = false;
+                document.body.classList.remove('resizing');
+            }
+        });
+
+        // --- Unified Navigation Logic ---
+        function switchTab(tabId) {
+            // Update Tab UI
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+            
+            // Map tabId to button ID
+            let btnId = '';
+            if (tabId === '7days') btnId = 'btn-7days';
+            else if (tabId === '30days') btnId = 'btn-30days';
+            else if (tabId === 'search') btnId = 'btn-search';
+            
+            if(btnId) document.getElementById(btnId).classList.add('active');
+
+            // Handle View Switching
+            if (tabId === 'search') {
+                showPanel('search');
+            } else {
+                showPanel('history');
+                const days = (tabId === '7days') ? 7 : 30;
+                document.getElementById('history-title').textContent = (days === 7) ? '◊ÓΩ¸7ÃÏ‰Ø¿¿º«¬º' : '◊ÓΩ¸30ÃÏ‰Ø¿¿º«¬º';
+                loadHistory(days);
+            }
+        }
+
+        // --- Sidebar Navigation Logic (Legacy Support) ---
+        function showPanel(panelName) {
+            // Update Sidebar Active State
+            document.querySelectorAll('.sidebar-icon').forEach(el => el.classList.remove('active'));
+            const sidebarIcon = document.getElementById('sidebar-' + panelName);
+            if(sidebarIcon) sidebarIcon.classList.add('active');
+
+            // Toggle Panels
+            document.querySelectorAll('.panel-view').forEach(el => el.classList.remove('active'));
+            document.getElementById('panel-' + panelName).classList.add('active');
+
+            // Sync Top Tabs if switching via sidebar
+            if (panelName === 'search') {
+                document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+                document.getElementById('btn-search').classList.add('active');
+                renderRecentSearches();
+                document.getElementById('ai-search-input').focus();
+            } else if (panelName === 'history') {
+                 // Default to 7 days if returning to history via sidebar
+                 // But ideally we should remember last state. For now reset to 7.
+                 document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+                 document.getElementById('btn-7days').classList.add('active');
+                 loadHistory(7);
+            }
+        }
+
+        function toggleSettings() {
+            const modal = document.getElementById('settings-modal');
+            modal.classList.toggle('active');
+        }
+
+        document.getElementById('settings-modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                toggleSettings();
+            }
+        });
+
+        // --- History Logic (Panel 1) ---
+        let allHistoryData = [];
+
+        async function loadHistory(days) {
+            const listEl = document.getElementById('history-list');
+            listEl.innerHTML = "<div style='text-align: center; color: #789035; margin-top: 50px;'>" + t('msg.loading') + "</div>";
+            
+            try {
+                const response = await fetch('/api/history/recent?days=' + days);
+                const data = await response.json();
+                allHistoryData = data;
+                renderHistoryList(data, 'history-list');
+            } catch (error) {
+                console.error('Failed to load history:', error);
+                listEl.innerHTML = "<div style='text-align: center; color: red;'>" + t('msg.failed') + "</div>";
+            }
+        }
+
+        function renderHistoryList(data, targetId) {
+            const listEl = document.getElementById(targetId);
+            if (!data || data.length === 0) {
+                listEl.innerHTML = "<div style='text-align: center; color: #789035;'>" + t('msg.no_records') + "</div>";
+                return;
+            }
+            
+            listEl.innerHTML = data.map((item, index) => {
+                const initial = item.app_name ? item.app_name.charAt(0).toUpperCase() : '?';
+                const time = item.timestamp ? item.timestamp.split(' ')[1].substring(0, 5) : '--:--';
+                // Add ID for citation reference
+                const itemId = `ref-${index + 1}`;
+                
+                return `
+                <div class='history-item' id='${itemId}'>
+                    <div class='item-icon'>${initial}</div>
+                    <div class='item-content'>
+                        <div class='item-title' title='${item.window_title || item.app_name}'>${item.window_title || item.app_name}</div>
+                        <div class='item-subtitle'>
+                            <span class='item-time'>${time}</span>
+                            <span style='margin-left: 8px;'>${item.app_name}</span>
+                        </div>
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
+
+        // Removed old switchHistoryTab function as it is replaced by switchTab
+
+        // --- AI Search Logic (Panel 2) ---
+        let recentSearches = ['…œ÷‹µƒœÓƒøŒƒµµ', 'Chrome ¿˙ ∑', 'Python ΩÃ≥Ã'];
+
+        function handleAiSearch(e) {
+            if (e.key === 'Enter') {
+                const query = document.getElementById('ai-search-input').value;
+                if(query.trim()) {
+                    performAiSearch(query);
+                }
+            }
+        }
+
+        function renderRecentSearches() {
+            const resultsArea = document.getElementById('ai-results-area');
+            if (document.getElementById('ai-search-input').value.trim() !== '') return;
+
+            const list = recentSearches.map(s => `
+                <div class='recent-item' onclick='setSearch("${s}")'>
+                    <div class='recent-icon'>
+                        <svg viewBox='0 0 24 24' width='16' height='16' fill='currentColor'><path d='M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z'/></svg>
+                    </div>
+                    <span>${s}</span>
+                </div>
+            `).join('');
+
+            resultsArea.innerHTML = `
+                <div class='result-group-title' style='margin-top: 20px;'>${t('search.recent')}</div>
+                <div class='recent-searches'>${list}</div>
+            `;
+        }
+
+        function setSearch(val) {
+            const input = document.getElementById('ai-search-input');
+            input.value = val;
+            performAiSearch(val);
+        }
+
+        function performAiSearch(query) {
+            // Save to recent
+            if (!recentSearches.includes(query)) {
+                recentSearches.unshift(query);
+                if (recentSearches.length > 5) recentSearches.pop();
+            }
+
+            const resultsArea = document.getElementById('ai-results-area');
+            
+            // Show Loading State
+            resultsArea.innerHTML = `
+                <div style='text-align: center; margin-top: 40px;'>
+                    <div style='color: #4f6610; font-weight: bold; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; gap: 10px;'>
+                        <div class="typing-cursor"></div> ${t('msg.ai_thinking')}
+                    </div>
+                    <div style='color: #789035; font-size: 14px;'>${t('msg.ai_analyzing')}</div>
+                </div>
+            `;
+
+            // Simulate AI Delay
+            setTimeout(() => {
+                const results = allHistoryData.filter(item => {
+                    const title = (item.window_title || '').toLowerCase();
+                    const app = (item.app_name || '').toLowerCase();
+                    return title.includes(query.toLowerCase()) || app.includes(query.toLowerCase());
+                });
+                renderAiResults(query, results);
+            }, 1500);
+        }
+
+        function renderAiResults(query, results) {
+            const resultsArea = document.getElementById('ai-results-area');
+            
+            if (results.length === 0) {
+                resultsArea.innerHTML = `
+                    <div style='text-align: center; margin-top: 40px; color: #789035;'>
+                        ${t('msg.no_results', {query})}
+                    </div>
+                `;
+                return;
+            }
+
+            // Prepare layout
+            resultsArea.innerHTML = `
+                <div class='ai-summary-card' style='display: block;'>
+                    <div class='ai-summary-title'>
+                        <svg viewBox='0 0 24 24' width='18' height='18' fill='#4f6610'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z'/></svg>
+                        ${t('msg.ai_answer')}
+                    </div>
+                    <div class='ai-summary-content' id='ai-stream-content'></div>
+                    <div class='follow-up-chips' id='follow-ups' style='display:none;'>
+                        <div class='follow-up-chip' onclick='setSearch("»Á∫ŒÃ·∏ﬂπ§◊˜–ß¬ £ø")'>
+                            <svg viewBox='0 0 24 24' width='14' height='14' fill='currentColor'><path d='M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm2.85 11.1l-.85.6V16h-4v-2.3l-.85-.6A4.997 4.997 0 0 1 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1z'/></svg>
+                            »Á∫ŒÃ·∏ﬂπ§◊˜–ß¬ £ø
+                        </div>
+                        <div class='follow-up-chip' onclick='setSearch("∑÷ŒˆŒ“µƒ ±º‰∑÷≈‰")'>
+                            <svg viewBox='0 0 24 24' width='14' height='14' fill='currentColor'><path d='M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z'/></svg>
+                            ∑÷ŒˆŒ“µƒ ±º‰∑÷≈‰
+                        </div>
+                        <div class='follow-up-chip' onclick='setSearch("µº≥ˆÀ—À˜±®∏Ê")'>
+                            <svg viewBox='0 0 24 24' width='14' height='14' fill='currentColor'><path d='M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z'/></svg>
+                            µº≥ˆ±®∏Ê
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const listHTML = results.map((item, idx) => {
+                const initial = item.app_name ? item.app_name.charAt(0).toUpperCase() : '?';
+                const time = item.timestamp ? item.timestamp.split(' ')[1].substring(0, 5) : '--:--';
+                return `
+                <div class='history-item' id='res-${idx}'>
+                    <div class='item-icon'>${initial}</div>
+                    <div class='item-content'>
+                        <div class='item-title'>${item.window_title || item.app_name}</div>
+                        <div class='item-subtitle'>
+                            <span class='item-time'>${time}</span>
+                            <span style='margin-left: 8px;'>${item.app_name}</span>
+                        </div>
+                    </div>
+                    <div style='font-size: 12px; color: #ccc;'>#${idx+1}</div>
+                </div>
+                `;
+            }).join('');
+
+            resultsArea.innerHTML += `<div class='result-group-title'>${t('msg.sources')}</div><div class='history-list'>${listHTML}</div>`;
+
+            // Start Streaming
+            const appName = results[0]?.app_name || '”¶”√';
+            const count = results.length;
+            const text = `∏˘æ›ƒ˙µƒ¿˙ ∑º«¬º£¨Œ“’“µΩ¡À ${count} Ãıœ‡πÿƒ⁄»›[1]°£’‚–©ªÓ∂Ø÷˜“™∑¢…˙‘⁄ ${appName} ÷–[2]°£\n\nø¥¿¥ƒ˙‘⁄ "${query}" ∑Ω√Êª®∑—¡À≤ª…Ÿ ±º‰°£Ω®“Èƒ˙ªÿπÀ“ªœ¬’‚–©Œƒµµ£¨ªÚ’ﬂ≤Èø¥œ‡πÿµƒπµÕ®º«¬º“‘ªÒ»°∏¸∂‡…œœ¬Œƒ°£`;
+            
+            streamText(text, 'ai-stream-content', () => {
+                document.getElementById('follow-ups').style.display = 'flex';
+            });
+        }
+
+        function streamText(text, elementId, callback) {
+            const el = document.getElementById(elementId);
+            el.innerHTML = ''; // Clear
+            el.classList.add('typing-cursor');
+            
+            let i = 0;
+            // Parse for [n] and replace with styled HTML as we go? 
+            // Simpler: Stream raw text, then format? 
+            // Better: Split by tokens.
+            
+            // Simple char streaming for demo
+            const interval = setInterval(() => {
+                el.textContent += text.charAt(i);
+                i++;
+                if (i >= text.length) {
+                    clearInterval(interval);
+                    el.classList.remove('typing-cursor');
+                    // Post-process for citations
+                    el.innerHTML = el.innerHTML.replace(/\[(\d+)\]/g, `<span class='citation-ref'>$1</span>`);
+                    if(callback) callback();
+                }
+            }, 30);
+        }
+
+        // Init
+        // loadHistory(7); // Default
+        switchTab('7days'); // Use new init
+
+
+        // --- Chat Logic ---
+        const chatMessages = document.getElementById('chat-messages');
+        const chatInput = document.getElementById('chat-input');
+        const sendBtn = document.getElementById('send-btn');
+
+        function addMessage(role, text) {
+            const div = document.createElement('div');
+            div.className = 'message ' + role;
+            div.textContent = text;
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function handleSend() {
+            const text = chatInput.value.trim();
+            if (!text) return;
+            addMessage('user', text);
+            chatInput.value = '';
+            
+            setTimeout(() => {
+                addMessage('ai', 'Œ““— ’µΩƒ˙µƒœ˚œ¢£∫' + text);
+            }, 800);
+        }
+
+        sendBtn.addEventListener('click', handleSend);
+        chatInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') handleSend();
+        });
+
+        // Run Init
+        initSettings();
+
     </script>
 </body>
 </html>

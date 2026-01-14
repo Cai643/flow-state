@@ -1,7 +1,7 @@
 from app.data import get_db_connection
 
 class ActivityDAO:
-    """æ´»åŠ¨æ—¥å¿—æ•°æ®è®¿é—®å¯¹è±¡"""
+    """»î¶¯ÈÕÖ¾Êı¾İ·ÃÎÊ¶ÔÏó"""
     
     @staticmethod
     def insert_log(status: str, duration: int):
@@ -13,13 +13,13 @@ class ActivityDAO:
             conn.commit()
 
 class StatsDAO:
-    """ç»Ÿè®¡æ•°æ®è®¿é—®å¯¹è±¡"""
+    """Í³¼ÆÊı¾İ·ÃÎÊ¶ÔÏó"""
     
     @staticmethod
     def update_daily_stats(date_obj, status: str, duration: int):
-        """å¢é‡æ›´æ–°æ¯æ—¥ç»Ÿè®¡"""
+        """ÔöÁ¿¸üĞÂÃ¿ÈÕÍ³¼Æ"""
         col_name = f"total_{status}_time"
-        # ä»…å¤„ç†æœ‰æ•ˆçŠ¶æ€å­—æ®µ
+        # ½ö´¦ÀíÓĞĞ§×´Ì¬×Ö¶Î
         if status not in ['focus', 'work', 'entertainment']:
             return
 
@@ -35,7 +35,7 @@ class StatsDAO:
 
     @staticmethod
     def get_daily_summary(date_obj):
-        """è·å–æŸæ—¥çš„ç»Ÿè®¡æ•°æ®"""
+        """»ñÈ¡Ä³ÈÕµÄÍ³¼ÆÊı¾İ"""
         with get_db_connection() as conn:
             row = conn.execute(
                 'SELECT * FROM daily_stats WHERE date = ?', (date_obj,)
@@ -45,7 +45,7 @@ class StatsDAO:
         return None
 
 class OcrDAO:
-    """OCR è®°å½•æ•°æ®è®¿é—®å¯¹è±¡"""
+    """OCR ¼ÇÂ¼Êı¾İ·ÃÎÊ¶ÔÏó"""
     
     @staticmethod
     def insert_record(content: str, app_name: str, screenshot_path: str = None):
@@ -55,3 +55,13 @@ class OcrDAO:
                 (content, app_name, screenshot_path)
             )
             conn.commit()
+
+    @staticmethod
+    def get_recent_records(limit=50):
+        """»ñÈ¡×î½üµÄ OCR/ä¯ÀÀ¼ÇÂ¼"""
+        with get_db_connection() as conn:
+            rows = conn.execute(
+                'SELECT id, timestamp, app_name, window_title, content FROM ocr_records ORDER BY timestamp DESC LIMIT ?',
+                (limit,)
+            ).fetchall()
+            return [dict(row) for row in rows]
