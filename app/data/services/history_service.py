@@ -8,7 +8,7 @@
 
 import time
 from datetime import date
-from app.data import ActivityDAO, StatsDAO, OcrDAO
+# from app.data import ActivityDAO, StatsDAO, OcrDAO
 
 class ActivityHistoryManager:
     """活动历史管理器"""

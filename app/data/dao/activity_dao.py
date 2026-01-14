@@ -1,57 +1,78 @@
-from app.data import get_db_connection
+import sqlite3
+import os
+from typing import Optional
 
-class ActivityDAO:
-    """活动日志数据访问对象"""
-    
-    @staticmethod
-    def insert_log(status: str, duration: int):
-        with get_db_connection() as conn:
-            conn.execute(
-                'INSERT INTO activity_logs (status, duration) VALUES (?, ?)',
-                (status, duration)
-            )
-            conn.commit()
+DB_PATH = os.path.join(os.getcwd(), 'data', 'xiaoliu.db')
 
-class StatsDAO:
-    """统计数据访问对象"""
-    
-    @staticmethod
-    def update_daily_stats(date_obj, status: str, duration: int):
-        """增量更新每日统计"""
-        col_name = f"total_{status}_time"
-        # 仅处理有效状态字段
-        if status not in ['focus', 'work', 'entertainment']:
-            return
+def _get_conn():
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    return conn
 
-        with get_db_connection() as conn:
-            # Upsert (Insert or Update)
-            conn.execute(f'''
-                INSERT INTO daily_stats (date, {col_name}) 
-                VALUES (?, ?)
-                ON CONFLICT(date) DO UPDATE SET 
-                {col_name} = {col_name} + ?
-            ''', (date_obj, duration, duration))
-            conn.commit()
+def init_activity_logs_db():
+    """创建 activity_logs 及索引，自动对齐协议表结构"""
+    conn = _get_conn()
+    cur = conn.cursor()
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS activity_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp REAL NOT NULL,   -- float型Unix时间戳
+            status TEXT NOT NULL,      -- "focus"|"entertainment"|"idle"|"distracted"
+            duration INTEGER NOT NULL  -- 单位为秒
+        )
+    ''')
+    cur.execute('CREATE INDEX IF NOT EXISTS idx_activity_time ON activity_logs(timestamp)')
+    conn.commit()
+    conn.close()
 
-    @staticmethod
-    def get_daily_summary(date_obj):
-        """获取某日的统计数据"""
-        with get_db_connection() as conn:
-            row = conn.execute(
-                'SELECT * FROM daily_stats WHERE date = ?', (date_obj,)
-            ).fetchone()
-            if row:
-                return dict(row)
+def insert_activity_log(status: str, timestamp: float, duration: int):
+    """插入一条 activity_logs 记录"""
+    assert status in {"focus", "entertainment", "idle", "distracted"}
+    conn = _get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO activity_logs (status, timestamp, duration) VALUES (?, ?, ?)",
+        (status, timestamp, duration)
+    )
+    conn.commit()
+    conn.close()
+
+def fetch_latest_activity() -> Optional[dict]:
+    """查最新一条，用于 /api/status/current。返回符合协议格式"""
+    conn = _get_conn()
+    cur = conn.cursor()
+    row = cur.execute(
+        "SELECT id, status, timestamp, duration FROM activity_logs ORDER BY timestamp DESC LIMIT 1"
+    ).fetchone()
+    conn.close()
+    if not row:
         return None
+    return {
+        "id": row[0],
+        "status": row[1],
+        "timestamp": row[2],
+        "duration": row[3]
+    }
 
-class OcrDAO:
-    """OCR 记录数据访问对象"""
-    
-    @staticmethod
-    def insert_record(content: str, app_name: str, screenshot_path: str = None):
-        with get_db_connection() as conn:
-            conn.execute(
-                'INSERT INTO ocr_records (content, app_name, screenshot_path) VALUES (?, ?, ?)',
-                (content, app_name, screenshot_path)
-            )
-            conn.commit()
+def fetch_logs_by_date(date_str: str) -> list:
+    """查一天的所有段，用于日报聚合。date_str如'2026-01-14'"""
+    start_ts = _date_str_to_ts(date_str)
+    end_ts = start_ts + 86400
+    conn = _get_conn()
+    cur = conn.cursor()
+    rows = cur.execute(
+        "SELECT status, timestamp, duration FROM activity_logs WHERE timestamp >= ? AND timestamp < ? ORDER BY timestamp",
+        (start_ts, end_ts)
+    ).fetchall()
+    conn.close()
+    # 返回协议格式
+    return [
+        {"status": r[0], "timestamp": r[1], "duration": r[2]}
+        for r in rows
+    ]
+
+def _date_str_to_ts(date_str: str) -> int:
+    # "2026-01-14" -> 1705171200 (零点)
+    import time, datetime
+    y, m, d = map(int, date_str.split('-'))
+    return int(time.mktime(datetime.datetime(y, m, d, 0, 0, 0).timetuple()))
