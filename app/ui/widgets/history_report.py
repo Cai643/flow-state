@@ -287,16 +287,9 @@ class HistoryEntryWidget(QtWidgets.QWidget):
         self.setFixedHeight(64) # 匹配卡片高度
 
     def show_daily_report(self):
-        """点击时光回溯后，直接显示日报信息"""
-        print("[DEBUG] show_daily_report called")
-        # 实例化并显示 SimpleDailyReport
-        try:
-            from app.ui.widgets.report.daily import SimpleDailyReport
-            self.daily_report_window = SimpleDailyReport()
-            self.daily_report_window.show()
-            self.daily_clicked.emit() # 发出信号通知外部（可选）
-        except ImportError as e:
-            print(f"[ERROR] Failed to import SimpleDailyReport: {e}")
+        """点击时光回溯后，发送信号由上层处理"""
+        print("[DEBUG] HistoryEntryWidget emitting daily_clicked")
+        self.daily_clicked.emit()
         
     def reset(self):
         """重置回长条状态 (可供外部调用)"""

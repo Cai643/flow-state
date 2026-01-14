@@ -10,15 +10,15 @@ def _get_conn():
     return conn
 
 def init_activity_logs_db():
-    """åˆ›å»º activity_logs åŠç´¢å¼•ï¼Œè‡ªåŠ¨å¯¹é½åè®®è¡¨ç»“æ„"""
+    """´´½¨ activity_logs ¼°Ë÷Òı£¬×Ô¶¯¶ÔÆëĞ­Òé±í½á¹¹"""
     conn = _get_conn()
     cur = conn.cursor()
     cur.execute('''
         CREATE TABLE IF NOT EXISTS activity_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp REAL NOT NULL,   -- floatå‹Unixæ—¶é—´æˆ³
+            timestamp REAL NOT NULL,   -- floatĞÍUnixÊ±¼ä´Á
             status TEXT NOT NULL,      -- "focus"|"entertainment"|"idle"|"distracted"
-            duration INTEGER NOT NULL  -- å•ä½ä¸ºç§’
+            duration INTEGER NOT NULL  -- µ¥Î»ÎªÃë
         )
     ''')
     cur.execute('CREATE INDEX IF NOT EXISTS idx_activity_time ON activity_logs(timestamp)')
@@ -26,7 +26,7 @@ def init_activity_logs_db():
     conn.close()
 
 def insert_activity_log(status: str, timestamp: float, duration: int):
-    """æ’å…¥ä¸€æ¡ activity_logs è®°å½•"""
+    """²åÈëÒ»Ìõ activity_logs ¼ÇÂ¼"""
     assert status in {"focus", "entertainment", "idle", "distracted"}
     conn = _get_conn()
     cur = conn.cursor()
@@ -38,7 +38,7 @@ def insert_activity_log(status: str, timestamp: float, duration: int):
     conn.close()
 
 def fetch_latest_activity() -> Optional[dict]:
-    """æŸ¥æœ€æ–°ä¸€æ¡ï¼Œç”¨äº /api/status/currentã€‚è¿”å›ç¬¦åˆåè®®æ ¼å¼"""
+    """²é×îĞÂÒ»Ìõ£¬ÓÃÓÚ /api/status/current¡£·µ»Ø·ûºÏĞ­Òé¸ñÊ½"""
     conn = _get_conn()
     cur = conn.cursor()
     row = cur.execute(
@@ -55,7 +55,7 @@ def fetch_latest_activity() -> Optional[dict]:
     }
 
 def fetch_logs_by_date(date_str: str) -> list:
-    """æŸ¥ä¸€å¤©çš„æ‰€æœ‰æ®µï¼Œç”¨äºæ—¥æŠ¥èšåˆã€‚date_strå¦‚'2026-01-14'"""
+    """²éÒ»ÌìµÄËùÓĞ¶Î£¬ÓÃÓÚÈÕ±¨¾ÛºÏ¡£date_strÈç'2026-01-14'"""
     start_ts = _date_str_to_ts(date_str)
     end_ts = start_ts + 86400
     conn = _get_conn()
@@ -65,14 +65,14 @@ def fetch_logs_by_date(date_str: str) -> list:
         (start_ts, end_ts)
     ).fetchall()
     conn.close()
-    # è¿”å›åè®®æ ¼å¼
+    # ·µ»ØĞ­Òé¸ñÊ½
     return [
         {"status": r[0], "timestamp": r[1], "duration": r[2]}
         for r in rows
     ]
 
 def _date_str_to_ts(date_str: str) -> int:
-    # "2026-01-14" -> 1705171200 (é›¶ç‚¹)
+    # "2026-01-14" -> 1705171200 (Áãµã)
     import time, datetime
     y, m, d = map(int, date_str.split('-'))
     return int(time.mktime(datetime.datetime(y, m, d, 0, 0, 0).timetuple()))

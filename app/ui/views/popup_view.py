@@ -320,9 +320,6 @@ class CardPopup(QtWidgets.QWidget):
         
         # 强制让内部卡片更新一次可见性，确保尺寸正确
         if hasattr(self, "card") and self.card:
-            # 重置为第1层
-            self.card.hover_level = 1
-            self.card._update_visibility_by_level()
             # 重新获取更新后的尺寸
             end_rect = self.topLeftTarget(ball_widget)
 
