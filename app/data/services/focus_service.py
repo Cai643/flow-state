@@ -52,8 +52,8 @@ def get_daily_summary(date_str: str):
     汇总统计：当天专注/娱乐总时长(分钟)，以及重组后的时间段（提纯大块，绘图可用）
     """
     segments = consolidate_logs(date_str)
-    total_focus = sum(s["duration_min"] for s in segments if s["status"] == 1)
-    total_play = sum(s["duration_min"] for s in segments if s["status"] == 2)
+    total_focus = sum(s["duration_min"] for s in segments if s["status"] == "focus")
+    total_play = sum(s["duration_min"] for s in segments if s["status"] == "entertainment")
     # 输出提纯后的timeline（segments）
     return {
         "date": date_str,

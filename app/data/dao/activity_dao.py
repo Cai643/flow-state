@@ -91,15 +91,12 @@ class OcrDAO:
     def get_recent_records(limit=50):
         # Get recent OCR/screenshot records
         with _get_conn() as conn:
-            rows = conn.execute(
+            cursor = conn.execute(
                 'SELECT id, timestamp, app_name, window_title, content FROM ocr_records ORDER BY timestamp DESC LIMIT ?',
                 (limit,)
-            ).fetchall()
+            )
+            rows = cursor.fetchall()
             if rows:
-                # Try to build key->value dicts even if records exist
-                cursor = conn.execute(
-                    'SELECT id, timestamp, app_name, window_title, content FROM ocr_records LIMIT 1'
-                )
                 columns = [desc[0] for desc in cursor.description]
                 return [dict(zip(columns, row)) for row in rows]
             else:

@@ -69,7 +69,7 @@ def create_app():
     return app
 
 def run_server(port=5000):
-    print(f"【Web服务进程】启动 (PID: {multiprocessing.current_process().pid}) http://127.0.0.1:{port}")
+    print(f"[Web Server Process] Started (PID: {multiprocessing.current_process().pid}) http://127.0.0.1:{port}")
     app = create_app()
     app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
 
