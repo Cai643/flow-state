@@ -39,22 +39,38 @@ def init_db():
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                 status TEXT NOT NULL,
                 duration INTEGER DEFAULT 0,
-                confidence REAL DEFAULT 1.0
+                confidence REAL DEFAULT 1.0,
+                summary TEXT,
+                raw_data TEXT
+            )
+        ''')
+
+        # 3. 窗口会话表 (Window Sessions) - 用于记录聚合后的窗口使用时长
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS window_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                start_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                end_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                window_title TEXT,
+                process_name TEXT,
+                status TEXT,
+                duration INTEGER DEFAULT 0,
+                summary TEXT
             )
         ''')
         
-        # 3. OCR 识别记录表
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS ocr_records (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                content TEXT,
-                app_name TEXT,
-                window_title TEXT,
-                screenshot_path TEXT,
-                tags TEXT
-            )
-        ''')
+        # 尝试添加新字段 (如果表已存在)
+        try:
+            cursor.execute('ALTER TABLE activity_logs ADD COLUMN summary TEXT')
+        except sqlite3.OperationalError:
+            pass # 字段已存在
+            
+        try:
+            cursor.execute('ALTER TABLE activity_logs ADD COLUMN raw_data TEXT')
+        except sqlite3.OperationalError:
+            pass # 字段已存在
+        
+    
         
         # 4. 每日统计表
         cursor.execute('''

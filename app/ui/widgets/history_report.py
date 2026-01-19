@@ -109,6 +109,9 @@ class TimeAxisCard(QtWidgets.QWidget):
         elif self.title_text == "月报":
             grad_start = QtGui.QColor("#94B267")
             grad_end = QtGui.QColor("#7AA97D")
+        elif self.title_text == "AI 搜索":
+            grad_start = QtGui.QColor("#FFF9C4")
+            grad_end = QtGui.QColor("#FFF176")
         else:
             grad_start = QtGui.QColor("#FEFAE0")
             grad_end = QtGui.QColor("#FEFAE0")

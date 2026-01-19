@@ -418,3 +418,60 @@ class ReminderOverlay(QtWidgets.QDialog):
         self.show()
         self.raise_()
         self.activateWindow()
+
+class EntertainmentReminder(QtCore.QObject):
+    """
+    娱乐提醒逻辑控制器
+    替代原 app.services.reminder_logic.manager.EntertainmentReminder
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.dialog = ReminderOverlay(parent)
+        
+    def check_and_remind(self):
+        """
+        检查最新的 Window Session 是否为娱乐，且时长超过 60s
+        如果是，则触发弹窗
+        """
+        try:
+            from app.data.dao.activity_dao import WindowSessionDAO
+            
+            # 1. 获取最新的会话
+            session = WindowSessionDAO.get_last_session()
+            
+            if not session:
+                return
+                
+            status = session.get('status')
+            duration = session.get('duration', 0)
+            
+            # 2. 判断是否触发提醒
+            # 条件：状态是 entertainment 且 持续时间 >= 60秒
+            if status == 'entertainment' and duration >= 60:
+                # 触发提醒
+                # 简单根据时长判断严重程度
+                if duration > 1800: # 30分钟
+                    severity = 'high'
+                elif duration > 600: # 10分钟
+                    severity = 'medium'
+                else:
+                    severity = 'low'
+                    
+                self._handle_entertainment_warning(status, duration, severity)
+                
+        except Exception as e:
+            print(f"[EntertainmentReminder] Error checking sessions: {e}")
+
+    def _handle_entertainment_warning(self, status, duration, severity):
+        """
+        处理娱乐警告
+        :param status: 当前状态
+        :param duration: 持续时间(秒)
+        :param severity: 严重程度 (low/medium/high)
+        """
+        if status == 'entertainment':
+            self.dialog.show_reminder({
+                'severity': severity,
+                'duration': duration,
+                'status': status
+            })

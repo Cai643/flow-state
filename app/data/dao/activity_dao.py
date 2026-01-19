@@ -7,7 +7,7 @@ class ActivityDAO:
     """活动日志数据访问对象"""
     
     @staticmethod
-    def insert_log(status: str, duration: int, timestamp=None):
+    def insert_log(status: str, duration: int, timestamp=None, summary: str = None, raw_data: str = None):
         with get_db_connection() as conn:
             if timestamp:
                 # 如果是 float/int 时间戳，转换为字符串
@@ -17,13 +17,13 @@ class ActivityDAO:
                     ts_str = timestamp
                     
                 conn.execute(
-                    'INSERT INTO activity_logs (status, duration, timestamp) VALUES (?, ?, ?)',
-                    (status, duration, ts_str)
+                    'INSERT INTO activity_logs (status, duration, timestamp, summary, raw_data) VALUES (?, ?, ?, ?, ?)',
+                    (status, duration, ts_str, summary, raw_data)
                 )
             else:
                 conn.execute(
-                    'INSERT INTO activity_logs (status, duration) VALUES (?, ?)',
-                    (status, duration)
+                    'INSERT INTO activity_logs (status, duration, summary, raw_data) VALUES (?, ?, ?, ?)',
+                    (status, duration, summary, raw_data)
                 )
             conn.commit()
 
@@ -50,6 +50,87 @@ class ActivityDAO:
             ).fetchall()
             return [dict(row) for row in rows]
 
+    @staticmethod
+    def get_recent_activities(limit=50):
+        """获取最近的活动记录"""
+        with get_db_connection() as conn:
+            rows = conn.execute(
+                'SELECT * FROM activity_logs ORDER BY timestamp DESC LIMIT ?',
+                (limit,)
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+
+class WindowSessionDAO:
+    """窗口会话数据访问对象"""
+    
+    @staticmethod
+    def get_last_session():
+        """获取最后一条会话记录"""
+        with get_db_connection() as conn:
+            row = conn.execute(
+                'SELECT * FROM window_sessions ORDER BY id DESC LIMIT 1'
+            ).fetchone()
+            if row:
+                return dict(row)
+        return None
+
+    @staticmethod
+    def create_session(window_title, process_name, start_time, duration, status, summary):
+        """创建新的会话记录"""
+        with get_db_connection() as conn:
+            # 确保时间格式统一
+            if isinstance(start_time, (float, int)):
+                start_ts = datetime.fromtimestamp(start_time).strftime("%Y-%m-%d %H:%M:%S")
+            else:
+                start_ts = start_time
+                
+            # end_time 初始设为 start_time + duration (如果是实时流，可能duration很短)
+            # 或者直接设为 start_time，后续 update 时更新 end_time
+            # 这里我们计算出 end_time
+            # 注意：start_time 是 float/int 还是 string? 上面已处理
+            # 为了计算 end_time，我们需要 start_time 的数值
+            
+            # 简单起见，我们存储 start_time, end_time, duration
+            # end_time = datetime.now()
+            
+            conn.execute(
+                '''INSERT INTO window_sessions 
+                   (window_title, process_name, start_time, end_time, duration, status, summary) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                (window_title, process_name, start_ts, start_ts, duration, status, summary)
+            )
+            conn.commit()
+
+    @staticmethod
+    def update_session_duration(session_id, additional_duration):
+        """更新会话时长和结束时间"""
+        with get_db_connection() as conn:
+            # 更新 duration 和 end_time
+            # SQLite 的 datetime('now') 可以获取当前时间作为 end_time
+            conn.execute(
+                '''UPDATE window_sessions 
+                   SET duration = duration + ?, 
+                       end_time = datetime('now', 'localtime')
+                   WHERE id = ?''',
+                (additional_duration, session_id)
+            )
+            conn.commit()
+
+    @staticmethod
+    def get_today_sessions():
+        """获取今天的会话记录 (用于日报时间轴)"""
+        from datetime import date
+        today_str = date.today().strftime('%Y-%m-%d')
+        start_time = f"{today_str} 00:00:00"
+        
+        with get_db_connection() as conn:
+            # 按开始时间正序排列
+            rows = conn.execute(
+                'SELECT * FROM window_sessions WHERE start_time >= ? ORDER BY start_time ASC',
+                (start_time,)
+            ).fetchall()
+            return [dict(row) for row in rows]
 
 class StatsDAO:
     """统计数据访问对象"""
@@ -82,6 +163,16 @@ class StatsDAO:
             if row:
                 return dict(row)
         return None
+
+    @staticmethod
+    def get_recent_stats(days=7):
+        """获取最近N天的统计数据"""
+        with get_db_connection() as conn:
+            rows = conn.execute(
+                f'SELECT * FROM daily_stats ORDER BY date DESC LIMIT ?',
+                (days,)
+            ).fetchall()
+            return [dict(row) for row in rows]
 
 class OcrDAO:
     """OCR 记录数据访问对象"""

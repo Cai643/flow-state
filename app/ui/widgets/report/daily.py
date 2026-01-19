@@ -46,8 +46,19 @@ class SimpleDailyReport(QtWidgets.QWidget):
     def _load_data(self):
         """加载数据并生成时间轴块"""
         # 1. 获取统计摘要 (Header)
-        summary = self.history_manager.get_daily_summary() or {}
-        total_focus_seconds = summary.get('total_focus_time', 0)
+        # 修改：优先从 StatsDAO 获取实时数据 (daily_stats 表)
+        try:
+            from app.data.dao.activity_dao import StatsDAO
+            summary = StatsDAO.get_daily_summary(date.today()) or {}
+            # 兼容字段名
+            f_time = summary.get('total_focus_time') or summary.get('focus_time') or 0
+            w_time = summary.get('total_work_time') or summary.get('work_time') or 0
+            total_focus_seconds = f_time + w_time
+        except:
+            # Fallback
+            summary = self.history_manager.get_daily_summary() or {}
+            total_focus_seconds = summary.get('total_focus_time', 0)
+            
         self.total_focus_minutes = int(total_focus_seconds / 60)
         
         # 生成超越百分比 (Mock logic based on focus time)
@@ -66,8 +77,102 @@ class SimpleDailyReport(QtWidgets.QWidget):
 
     def _process_logs_to_blocks(self, logs):
         """将原始日志合并为时间块 (Chunking)"""
-        # 强制使用Mock数据
-        return self._get_mock_blocks()
+        # 从 WindowSessionDAO 获取真实数据
+        try:
+            from app.data.dao.activity_dao import WindowSessionDAO
+            from datetime import datetime
+            
+            sessions = WindowSessionDAO.get_today_sessions()
+            
+            blocks = []
+            if not sessions:
+                return blocks
+                
+            current_block = None
+            
+            for s in sessions:
+                # 状态归类
+                if s['status'] in ['work', 'focus']:
+                    s_type = 'A'
+                    s_title = "工作学习"
+                elif s['status'] == 'entertainment':
+                    s_type = 'B'
+                    s_title = "充电"
+                else:
+                    s_type = 'C'
+                    s_title = "碎片"
+                
+                # 检查是否可以合并到上一块
+                if current_block and current_block['type'] == s_type:
+                    # 合并
+                    current_block['duration_sec'] += s['duration']
+                    current_block['end_time_raw'] = s['end_time']
+                    current_block['sub_items'].append(s)
+                else:
+                    # 结算上一块
+                    if current_block:
+                        self._finalize_block(current_block)
+                        blocks.append(current_block)
+                    
+                    # 开启新块
+                    current_block = {
+                        'type': s_type,
+                        'title': s_title,
+                        'start_time_raw': s['start_time'],
+                        'end_time_raw': s['end_time'],
+                        'duration_sec': s['duration'],
+                        'sub_items': [s],
+                        'badge': None # 后续计算
+                    }
+            
+            # 结算最后一块
+            if current_block:
+                self._finalize_block(current_block)
+                blocks.append(current_block)
+                
+            return blocks
+            
+        except Exception as e:
+            print(f"Error loading real sessions: {e}")
+            return self._get_mock_blocks() # Fallback
+
+    def _finalize_block(self, block):
+        """计算 Block 的最终显示属性"""
+        from datetime import datetime
+        
+        # 1. 时长文本
+        duration_mins = max(1, int(block['duration_sec'] / 60))
+        if duration_mins < 60:
+            block['duration_text'] = f"{duration_mins}m"
+        else:
+            h = duration_mins // 60
+            m = duration_mins % 60
+            block['duration_text'] = f"{h}h {m}m"
+        block['duration_mins'] = duration_mins
+        
+        # 2. 时间范围
+        try:
+            t1 = datetime.strptime(block['start_time_raw'], "%Y-%m-%d %H:%M:%S").strftime("%H:%M")
+            t2 = datetime.strptime(block['end_time_raw'], "%Y-%m-%d %H:%M:%S").strftime("%H:%M")
+            block['time'] = f"{t1} - {t2}"
+        except:
+            block['time'] = "??"
+            
+        # 3. 描述 (取最长的一个子项摘要，或者显示子项数量)
+        count = len(block['sub_items'])
+        if count > 1:
+            block['desc'] = f"包含 {count} 个活动片段"
+        else:
+            # 只有一个子项，显示其摘要
+            item = block['sub_items'][0]
+            block['desc'] = item.get('summary') or item.get('window_title') or ""
+            
+        # 4. Badge
+        if block['type'] == 'A':
+            block['badge'] = '专注'
+            if duration_mins > 60: block['badge'] = 'S级'
+        elif block['type'] == 'B':
+            block['badge'] = '☕'
 
     def _get_mock_blocks(self):
         return [
@@ -153,29 +258,36 @@ class SimpleDailyReport(QtWidgets.QWidget):
         content = QtWidgets.QWidget()
         content.setStyleSheet("background: transparent;")
         
-        # 横向布局
-        layout = QtWidgets.QHBoxLayout(content)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(5) # 积木间距
-        layout.setAlignment(QtCore.Qt.AlignLeft)
+        # 横向布局 (使用 self.timeline_layout 以便动态插入)
+        self.timeline_layout = QtWidgets.QHBoxLayout(content)
+        self.timeline_layout.setContentsMargins(20, 20, 20, 20)
+        self.timeline_layout.setSpacing(5) # 积木间距
+        self.timeline_layout.setAlignment(QtCore.Qt.AlignLeft)
         
         # Add Blocks
+        self.block_widgets = [] # 存储引用，用于查找
         for block in self.time_blocks:
             w = self._create_block_widget(block)
-            layout.addWidget(w)
+            self.timeline_layout.addWidget(w)
+            self.block_widgets.append(w)
             
-        layout.addStretch()
+        self.timeline_layout.addStretch()
         scroll.setWidget(content)
         parent_layout.addWidget(scroll)
 
     def _create_block_widget(self, data):
         """根据类型和时长创建横向拉伸的积木"""
         w = QtWidgets.QWidget()
+        w.setCursor(QtCore.Qt.PointingHandCursor) # 添加手型光标
         
-        # 计算宽度: 1分钟 = 3px (基础比例)
-        # 最小宽度 30px
-        width = max(30, data.get('duration_mins', 10) * 3)
-        w.setFixedWidth(width)
+        # 存储数据，以便点击时使用
+        w.block_data = data
+        
+        # 使用 toggle_block_details 替代 show_block_details
+        w.mousePressEvent = lambda e: self.toggle_block_details(w, data) if e.button() == QtCore.Qt.LeftButton else None
+        
+        # 改为固定宽度，每个事件栏目等大
+        w.setFixedWidth(200) 
         
         # 设置固定高度，形成横向长条
         w.setFixedHeight(300) 
@@ -205,20 +317,26 @@ class SimpleDailyReport(QtWidgets.QWidget):
             v_layout.addWidget(icon)
             
             # Title (如果够宽)
-            if width > 60:
-                title = QtWidgets.QLabel(f"{data['title']}\n({data['duration_text']})")
-                title.setAlignment(QtCore.Qt.AlignCenter)
-                title.setWordWrap(True)
-                title.setStyleSheet("color: #1B5E20; font-weight: bold; font-size: 12px; border: none; background: transparent;")
-                v_layout.addWidget(title)
+            # if width > 60: # 移除宽度检查
+            title = QtWidgets.QLabel(f"{data['title']}")
+            title.setAlignment(QtCore.Qt.AlignCenter)
+            title.setWordWrap(True)
+            title.setStyleSheet("color: #1B5E20; font-weight: bold; font-size: 12px; border: none; background: transparent;")
+            v_layout.addWidget(title)
+            
+            # 显示时长 (新增)
+            duration_lbl = QtWidgets.QLabel(f"({data['duration_text']})")
+            duration_lbl.setAlignment(QtCore.Qt.AlignCenter)
+            duration_lbl.setStyleSheet("color: #2E7D32; font-size: 11px; font-weight: bold; border: none; background: transparent;")
+            v_layout.addWidget(duration_lbl)
             
             # AI Comment Bubble (Tooltip style inside)
-            if width > 100:
-                comment = QtWidgets.QLabel(data['desc'])
-                comment.setWordWrap(True)
-                comment.setAlignment(QtCore.Qt.AlignCenter)
-                comment.setStyleSheet("color: #558B2F; font-size: 10px; font-style: italic; border: none; background: transparent; margin-top: 5px;")
-                v_layout.addWidget(comment)
+            # if width > 100: # 移除宽度检查
+            comment = QtWidgets.QLabel(data['desc'])
+            comment.setWordWrap(True)
+            comment.setAlignment(QtCore.Qt.AlignCenter)
+            comment.setStyleSheet("color: #558B2F; font-size: 10px; font-style: italic; border: none; background: transparent; margin-top: 5px;")
+            v_layout.addWidget(comment)
                 
             v_layout.addStretch()
             
@@ -246,10 +364,16 @@ class SimpleDailyReport(QtWidgets.QWidget):
             icon.setStyleSheet("font-size: 16px; border: none; background: transparent;")
             v_layout.addWidget(icon)
             
-            if width > 40:
-                lbl = QtWidgets.QLabel("充电")
-                lbl.setStyleSheet("color: #795548; font-size: 10px; border: none; background: transparent;")
-                v_layout.addWidget(lbl)
+            # if width > 40: # 移除宽度检查
+            lbl = QtWidgets.QLabel("充电")
+            lbl.setStyleSheet("color: #795548; font-size: 10px; border: none; background: transparent;")
+            v_layout.addWidget(lbl)
+            
+            # 显示时长 (新增)
+            duration_lbl = QtWidgets.QLabel(f"({data['duration_text']})")
+            duration_lbl.setAlignment(QtCore.Qt.AlignCenter)
+            duration_lbl.setStyleSheet("color: #8D6E63; font-size: 10px; border: none; background: transparent;")
+            v_layout.addWidget(duration_lbl)
                 
             w.setToolTip(f"休息充电 ({data['duration_text']})")
 
@@ -264,6 +388,129 @@ class SimpleDailyReport(QtWidgets.QWidget):
             """)
             w.setToolTip(f"碎片时间 ({data['duration_text']})")
             
+        return w
+
+    def toggle_block_details(self, block_widget, data):
+        """点击 Block 时，在右侧展开详情"""
+        # 如果没有子项或只有一个子项，就不展开了
+        if len(data.get('sub_items', [])) <= 1:
+            return
+
+        # 1. 检查是否已经展开
+        if hasattr(self, 'active_detail_widget') and self.active_detail_widget:
+            # 如果点击的是同一个，则关闭
+            is_same = (self.active_detail_widget.parent_block == block_widget)
+            
+            # 关闭当前的详情
+            self.active_detail_widget.deleteLater()
+            self.active_detail_widget = None
+            
+            if is_same:
+                return
+
+        # 2. 创建详情容器
+        detail_container = QtWidgets.QWidget()
+        detail_container.parent_block = block_widget
+        detail_container.setFixedHeight(300) # 与 Block 等高
+        detail_container.setStyleSheet("background: transparent;")
+        
+        # 内部布局：横向排列子项
+        h_layout = QtWidgets.QHBoxLayout(detail_container)
+        h_layout.setContentsMargins(10, 0, 10, 0)
+        h_layout.setSpacing(5)
+        h_layout.setAlignment(QtCore.Qt.AlignLeft)
+        
+        # 3. 创建子项积木
+        total_width = 0
+        for item in data['sub_items']:
+            sub_w = self._create_sub_item_widget(item, data['type'])
+            h_layout.addWidget(sub_w)
+            total_width += (sub_w.width() + 5)
+            
+        # 设置容器初始宽度为 0 (用于动画)
+        detail_container.setFixedWidth(0)
+        
+        # 4. 插入到父布局中
+        # 找到 block_widget 的索引
+        idx = self.timeline_layout.indexOf(block_widget)
+        if idx >= 0:
+            self.timeline_layout.insertWidget(idx + 1, detail_container)
+            self.active_detail_widget = detail_container
+            
+            # 5. 动画展开
+            anim = QtCore.QPropertyAnimation(detail_container, b"minimumWidth")
+            anim.setDuration(300)
+            anim.setStartValue(0)
+            anim.setEndValue(total_width + 20) # 加上边距
+            anim.setEasingCurve(QtCore.QEasingCurve.OutCubic)
+            
+            # 同时动画 maximumWidth 以确保平滑
+            anim2 = QtCore.QPropertyAnimation(detail_container, b"maximumWidth")
+            anim2.setDuration(300)
+            anim2.setStartValue(0)
+            anim2.setEndValue(total_width + 20)
+            anim2.setEasingCurve(QtCore.QEasingCurve.OutCubic)
+            
+            self.detail_anim_group = QtCore.QParallelAnimationGroup(self)
+            self.detail_anim_group.addAnimation(anim)
+            self.detail_anim_group.addAnimation(anim2)
+            self.detail_anim_group.start()
+
+    def _create_sub_item_widget(self, item, parent_type):
+        """创建子项的小方块"""
+        w = QtWidgets.QWidget()
+        w.setFixedSize(140, 260) # 比父块稍微矮一点，窄一点
+        
+        # 样式
+        if parent_type == 'A': # 工作学习
+            bg_color = "#E8F5E9"
+            border_color = "#81C784"
+            text_color = "#2E7D32"
+        else: # 充电
+            bg_color = "#FFFDE7"
+            border_color = "#FFF59D"
+            text_color = "#F57F17"
+            
+        w.setStyleSheet(f"""
+            QWidget {{
+                background-color: {bg_color};
+                border: 1px dashed {border_color};
+                border-radius: 6px;
+            }}
+            QWidget:hover {{
+                background-color: #FFFFFF;
+                border: 1px solid {border_color};
+            }}
+        """)
+        
+        v_layout = QtWidgets.QVBoxLayout(w)
+        v_layout.setContentsMargins(8, 8, 8, 8)
+        
+        # 计算时长
+        d_min = max(1, int(item['duration'] / 60))
+        if d_min < 60:
+            d_text = f"{d_min}m"
+        else:
+            d_text = f"{d_min // 60}h {d_min % 60}m"
+            
+        # 标题 (进程名或窗口名)
+        title_text = item.get('window_title') or item.get('process_name') or "未知"
+        # 如果太长截断
+        if len(title_text) > 30: title_text = title_text[:28] + "..."
+            
+        lbl_title = QtWidgets.QLabel(title_text)
+        lbl_title.setWordWrap(True)
+        lbl_title.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignLeft)
+        lbl_title.setStyleSheet(f"color: {text_color}; font-weight: bold; font-size: 11px; border: none; background: transparent;")
+        v_layout.addWidget(lbl_title)
+        
+        # 时长
+        lbl_time = QtWidgets.QLabel(d_text)
+        lbl_time.setStyleSheet(f"color: {text_color}; font-size: 10px; border: none; background: transparent;")
+        v_layout.addWidget(lbl_time)
+        
+        v_layout.addStretch()
+        
         return w
 
     def _build_ui(self):

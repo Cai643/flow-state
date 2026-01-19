@@ -6,8 +6,8 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 from app.main import main
-from app.services.web_server import run_server
-from app.services.ai_worker import ai_monitor_worker
+from app.service.API.web_API import run_server
+from app.service.API.thread import ai_monitor_worker
 import multiprocessing
 
 if __name__ == "__main__":
@@ -18,6 +18,10 @@ if __name__ == "__main__":
     # 1. 创建进程间通信队列 (用于 AI 进程向 UI 进程发送状态)
     msg_queue = multiprocessing.Queue()
     
+    # 新增: AI 占用标志 (True=忙碌, False=空闲)
+    # 使用 'b' (boolean) 或 'i' (int) 类型
+    ai_busy_flag = multiprocessing.Value('b', False)
+    
     # 2. 创建运行标志事件 (控制进程退出)
     running_event = multiprocessing.Event()
     running_event.set()
@@ -25,7 +29,7 @@ if __name__ == "__main__":
     # 3. 启动 AI 监控进程
     ai_process = multiprocessing.Process(
         target=ai_monitor_worker, 
-        args=(msg_queue, running_event),
+        args=(msg_queue, running_event, ai_busy_flag),
         name="AI_Monitor_Process"
     )
     ai_process.start()
@@ -33,7 +37,7 @@ if __name__ == "__main__":
     # 4. 启动 Web 服务进程 (完全独立，不需要 Queue)
     web_process = multiprocessing.Process(
         target=run_server, 
-        kwargs={'port': 8080},
+        kwargs={'port': 8080, 'ai_busy_flag': ai_busy_flag},
         name="Web_Server_Process"
     )
     web_process.start()

@@ -8,7 +8,8 @@
 
 import time
 from datetime import date
-# from app.data import ActivityDAO, StatsDAO, OcrDAO
+from app.data.dao.activity_dao import ActivityDAO, StatsDAO, OcrDAO, WindowSessionDAO
+import json
 
 class ActivityHistoryManager:
     """活动历史管理器"""
@@ -16,10 +17,20 @@ class ActivityHistoryManager:
     def __init__(self):
         self.current_status = None
         self.status_start_time = None
+        self._last_summary = None
+        self._last_raw_data = None
+        
+        # 新增：记录上一个窗口会话的信息，用于合并
+        self._last_window_session = {
+            'id': None,
+            'title': None,
+            'process': None
+        }
+        
         # 内存缓存，用于快速 UI 展示
         self._history_cache = [] 
     
-    def update(self, status: str):
+    def update(self, status: str, summary: str = None, raw_data: str = None):
         """更新当前状态"""
         current_time = time.time()
         
@@ -34,21 +45,111 @@ class ActivityHistoryManager:
             duration_seconds = int(current_time - self.status_start_time)
             # 过滤短时抖动
             if duration_seconds > 2:
-                self._save_record(self.current_status, duration_seconds)
+                self._save_record(self.current_status, duration_seconds, self._last_summary, self._last_raw_data)
                 self._update_cache(self.current_status, int(duration_seconds / 60), self.status_start_time)
             
             self.current_status = status
             self.status_start_time = current_time
+            # 重置缓存的摘要
+            self._last_summary = summary 
+            self._last_raw_data = raw_data
+            
+            # 如果新状态直接带有详细信息（AI分析结果），立即保存一条快照，避免数据积压在内存
+            if raw_data:
+                 # 这里时长设为 0 或者当前已持续时间，视需求而定。
+                 # 为了简单，我们让它作为一条"即时记录"被看到，但要注意不要和上面的 _save_record 重复统计时长
+                 # 策略：更新 status_start_time，相当于开启了一段新记录
+                 pass
+
+        else:
+            # 状态没变
+            # 关键修改：如果收到了 raw_data (说明是 AI 分析结果)，强制保存当前这一段，并开启新的一段
+            # 这样可以确保 AI 分析结果立即写入数据库，而不是等状态改变
+            if raw_data:
+                duration_seconds = int(current_time - self.status_start_time)
+                # 即使时间很短，只要有 AI 分析结果，也值得保存
+                if duration_seconds > 0:
+                     self._save_record(self.current_status, duration_seconds, summary, raw_data)
+                     self._update_cache(self.current_status, int(duration_seconds / 60), self.status_start_time)
+                
+                # 重置开始时间，相当于无缝开启下一段同状态的记录
+                self.status_start_time = current_time
+                self._last_summary = summary
+                self._last_raw_data = raw_data
+            
+            else:
+                # 只是普通的心跳更新，更新缓存即可
+                if summary:
+                    self._last_summary = summary
+                if raw_data:
+                    self._last_raw_data = raw_data
     
-    def _save_record(self, status: str, duration: int):
+    def _save_record(self, status: str, duration: int, summary: str = None, raw_data: str = None):
         """调用 DAO 保存数据"""
         try:
             # 1. 写入流水日志
-            ActivityDAO.insert_log(status, duration)
+            # 使用本地时间作为时间戳，解决时区问题
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            ActivityDAO.insert_log(status, duration, timestamp=timestamp, summary=summary, raw_data=raw_data)
             
             # 2. 更新每日统计
             today = date.today()
             StatsDAO.update_daily_stats(today, status, duration)
+            
+            # 3. 更新或创建窗口会话聚合记录 (Window Sessions)
+            if raw_data:
+                try:
+                    rd = json.loads(raw_data)
+                    window_title = rd.get('window', '')
+                    process_name = rd.get('process', '')
+                    
+                    # 检查是否是同一个窗口会话的延续
+                    # 注意：这里我们简单比对窗口标题。如果需要更严谨，可以比对进程名。
+                    # 还需要考虑 Session 的时间间隔，但这里 duration 已经是连续的片段。
+                    
+                    # 获取数据库中最后一条记录（用于恢复上下文，比如程序重启后）
+                    # 优化：优先使用内存缓存，如果没有（首次运行），再查库
+                    if self._last_window_session['id'] is None:
+                        last_sess = WindowSessionDAO.get_last_session()
+                        if last_sess:
+                            self._last_window_session = {
+                                'id': last_sess['id'],
+                                'title': last_sess['window_title'],
+                                'process': last_sess['process_name']
+                            }
+                    
+                    is_same_session = (
+                        self._last_window_session['id'] is not None and
+                        window_title == self._last_window_session['title']
+                        # process_name == self._last_window_session['process'] # 可选：严格匹配进程
+                    )
+                    
+                    if is_same_session:
+                        # 是同一个会话，更新时长
+                        WindowSessionDAO.update_session_duration(self._last_window_session['id'], duration)
+                    else:
+                        # 是新会话，创建新记录
+                        # start_time 应该是当前时间减去 duration (因为 duration 是刚刚过去的时间)
+                        start_ts = time.time() - duration
+                        
+                        WindowSessionDAO.create_session(
+                            window_title, process_name, start_ts, duration, status, summary
+                        )
+                        
+                        # 更新缓存，指向新创建的 Session
+                        # 注意：create_session 没有返回 ID，我们需要再次查询或者修改 DAO 返回 ID
+                        # 这里简单处理：再查一次 ID (并发低时问题不大)
+                        new_sess = WindowSessionDAO.get_last_session()
+                        if new_sess:
+                            self._last_window_session = {
+                                'id': new_sess['id'],
+                                'title': new_sess['window_title'],
+                                'process': new_sess['process_name']
+                            }
+                            
+                except Exception as e:
+                    print(f"[HistoryManager] Session Merge Error: {e}")
                     
         except Exception as e:
             print(f"[HistoryManager] DB Error: {e}")
