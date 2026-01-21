@@ -84,6 +84,18 @@ def init_db():
             )
         ''')
         
+        # 5. OCR 记录表
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS ocr_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                content TEXT,
+                app_name TEXT,
+                screenshot_path TEXT,
+                window_title TEXT
+            )
+        ''')
+        
         # 索引优化
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_activity_timestamp ON activity_logs(timestamp)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_ocr_timestamp ON ocr_records(timestamp)')
