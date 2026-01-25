@@ -52,12 +52,19 @@ class SimpleDailyReport(QtWidgets.QWidget):
             summary = StatsDAO.get_daily_summary(date.today()) or {}
             # 兼容字段名
             f_time = summary.get('total_focus_time') or summary.get('focus_time') or 0
-            w_time = summary.get('total_work_time') or summary.get('work_time') or 0
-            total_focus_seconds = f_time + w_time
+            # w_time = summary.get('total_work_time') or summary.get('work_time') or 0
+            # total_focus_seconds = f_time + w_time
+            total_focus_seconds = f_time # 只看 focus
+            
+            # New fields usage
+            self.efficiency = summary.get('efficiency_score', 0)
+            self.max_streak = summary.get('max_focus_streak', 0)
+            
         except:
             # Fallback
             summary = self.history_manager.get_daily_summary() or {}
             total_focus_seconds = summary.get('total_focus_time', 0)
+            self.efficiency = 0
             
         self.total_focus_minutes = int(total_focus_seconds / 60)
         
@@ -592,7 +599,7 @@ class SimpleDailyReport(QtWidgets.QWidget):
         s1_layout.addWidget(s1_icon)
         s1_layout.addWidget(s1_text)
         
-        s2 = QtWidgets.QLabel(f"⚡ 击败 {self.beat_percentage}% 用户")
+        s2 = QtWidgets.QLabel(f"⚡ 效能指数: {self.efficiency}")
         s2.setStyleSheet("color: #FFFFFF; font-size: 14px;")
         
         stats_row.addWidget(s1_frame)

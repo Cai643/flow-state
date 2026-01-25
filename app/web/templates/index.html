@@ -1276,53 +1276,133 @@
 
         // --- History Logic (Panel 1) ---
         let allHistoryData = [];
+        let currentPage = 1;
+        let isLoadingMore = false;
+        let hasMoreData = true;
 
+        // 初始化加载（第一页）
         async function loadHistory(days) {
+            // 注意：这里 days 参数暂时只用于 UI 标题显示逻辑，
+            // 实际滚动加载使用的是 /api/history/scroll 接口，默认按时间倒序
+            
+            currentPage = 1;
+            hasMoreData = true;
+            allHistoryData = [];
+            
             const listEl = document.getElementById('history-list');
             listEl.innerHTML = "<div style='text-align: center; color: #789035; margin-top: 50px;'>" + t('msg.loading') + "</div>";
             
-            try {
-                const response = await fetch('/api/history/recent?days=' + days);
-                const json = await response.json();
-                // 兼容直接返回数组或 {code:200, data:[]} 格式
-                const data = Array.isArray(json) ? json : (json.data || []);
-                allHistoryData = data;
-                renderHistoryList(data, 'history-list');
-            } catch (error) {
-                console.error('Failed to load history:', error);
-                listEl.innerHTML = "<div style='text-align: center; color: red;'>" + t('msg.failed') + "</div>";
+            // 解绑之前的滚动事件（防止重复绑定）
+            const container = document.querySelector('.history-container');
+            container.removeEventListener('scroll', handleScroll);
+            
+            await fetchMoreHistory();
+            
+            // 绑定滚动事件
+            container.addEventListener('scroll', handleScroll);
+        }
+
+        // 滚动事件处理
+        function handleScroll() {
+            const container = document.querySelector('.history-container');
+            if (isLoadingMore || !hasMoreData) return;
+            
+            // 检查是否滚动到底部 (预留 50px 缓冲)
+            if (container.scrollTop + container.clientHeight >= container.scrollHeight - 50) {
+                fetchMoreHistory();
             }
         }
 
-        function renderHistoryList(data, targetId) {
-            const listEl = document.getElementById(targetId);
-            if (!data || data.length === 0) {
-                listEl.innerHTML = "<div style='text-align: center; color: #789035;'>" + t('msg.no_records') + "</div>";
-                return;
+        // 加载更多数据
+        async function fetchMoreHistory() {
+            if (isLoadingMore || !hasMoreData) return;
+            isLoadingMore = true;
+            
+            // 显示底部 Loading（如果是第一页，上面已经显示了全屏 Loading，这里主要针对后续页）
+            const listEl = document.getElementById('history-list');
+            if (currentPage > 1) {
+                // 检查是否已经有 loading 指示器
+                if (!document.getElementById('scroll-loader')) {
+                    const loader = document.createElement('div');
+                    loader.id = 'scroll-loader';
+                    loader.style.textAlign = 'center';
+                    loader.style.padding = '10px';
+                    loader.style.color = '#789035';
+                    loader.style.fontSize = '12px';
+                    loader.textContent = '正在加载更多...';
+                    listEl.appendChild(loader);
+                }
             }
             
-            listEl.innerHTML = data.map((item, index) => {
+            try {
+                const response = await fetch(`/api/history/scroll?page=${currentPage}&per_page=20`);
+                const json = await response.json();
+                const newData = json.data || [];
+                
+                // 移除 loading 指示器
+                const loader = document.getElementById('scroll-loader');
+                if (loader) loader.remove();
+                
+                if (currentPage === 1) {
+                    listEl.innerHTML = ''; // 清空初始 loading
+                }
+                
+                if (newData.length > 0) {
+                    allHistoryData = allHistoryData.concat(newData);
+                    appendHistoryItems(newData, 'history-list');
+                    currentPage++;
+                    hasMoreData = json.has_more;
+                } else {
+                    hasMoreData = false;
+                    if (currentPage === 1) {
+                        listEl.innerHTML = "<div style='text-align: center; color: #789035;'>" + t('msg.no_records') + "</div>";
+                    } else {
+                        // 到底了
+                        const endMsg = document.createElement('div');
+                        endMsg.style.textAlign = 'center';
+                        endMsg.style.padding = '20px';
+                        endMsg.style.color = 'var(--color-text-sub)';
+                        endMsg.style.fontSize = '12px';
+                        endMsg.style.opacity = '0.5';
+                        endMsg.textContent = '到底了 没有更多记录';
+                        listEl.appendChild(endMsg);
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load history:', error);
+                const loader = document.getElementById('scroll-loader');
+                if (loader) loader.remove();
+            } finally {
+                isLoadingMore = false;
+            }
+        }
+
+        function appendHistoryItems(data, targetId) {
+            const listEl = document.getElementById(targetId);
+            
+            const html = data.map((item, index) => {
                 const initial = item.app_name ? item.app_name.charAt(0).toUpperCase() : '?';
                 const displayTitle = item.window_title || item.app_name || '未命名';
                 const displayApp = item.app_name || '未知应用';
                 
-                // Parse timestamp (YYYY-MM-DD HH:MM:SS) to YYYY-MM-DD HH:MM
                 let time = '--:--';
                 if (item.timestamp) {
-                    // Split by space to get date and time
                     const parts = item.timestamp.split(' ');
                     if (parts.length >= 2) {
-                        const datePart = parts[0];
-                        const timePart = parts[1];
-                        // Take HH:MM from time part (first 5 chars)
-                        time = `${datePart} ${timePart.substring(0, 5)}`;
+                        // 显示日期+时间，因为是无限滚动，跨天很常见
+                        // 格式: MM-DD HH:MM
+                        const dateParts = parts[0].split('-'); // YYYY-MM-DD
+                        const timePart = parts[1].substring(0, 5);
+                        time = `${dateParts[1]}-${dateParts[2]} ${timePart}`;
                     } else {
                         time = item.timestamp;
                     }
                 }
                 
                 // Add ID for citation reference
-                const itemId = `ref-${index + 1}`;
+                // Use global index based on allHistoryData length
+                const globalIndex = allHistoryData.indexOf(item) + 1;
+                const itemId = `ref-${globalIndex}`;
                 
                 return `
                 <div class='history-item' id='${itemId}'>
@@ -1337,16 +1417,16 @@
                 </div>
                 `;
             }).join('');
-
-            // Add Baffle (Footer)
-            listEl.innerHTML += `
-                <div style='height: 40px; display: flex; align-items: center; justify-content: center; color: var(--color-text-sub); opacity: 0.5; font-size: 12px; margin-top: 10px; margin-bottom: 20px;'>
-                    <span>到底了 没有更多记录</span>
-                </div>
-            `;
+            
+            // 使用 insertAdjacentHTML 追加，而不是 innerHTML 覆盖，提高性能
+            listEl.insertAdjacentHTML('beforeend', html);
         }
 
-        // Removed old switchHistoryTab function as it is replaced by switchTab
+        function renderHistoryList(data, targetId) {
+            const listEl = document.getElementById(targetId);
+            listEl.innerHTML = ''; // Clear existing
+            appendHistoryItems(data, targetId);
+        }
 
         // --- AI Search Logic (Panel 2) ---
         let recentSearches = ['我的工作效率', 'Chrome 历史', 'Python 学习'];
@@ -1512,26 +1592,52 @@
 
         // Auto Refresh Logic
         let autoRefreshInterval = null;
+        let lastKnownLatestId = null;
         
         function startAutoRefresh() {
             if (autoRefreshInterval) clearInterval(autoRefreshInterval);
             
             // Initial load
             loadTodayStats();
+            // Initial check to set ID
+            checkAndRefresh();
 
-            // Poll every 5 seconds
+            // Poll every 30 seconds
             autoRefreshInterval = setInterval(() => {
                 // Always refresh stats
                 loadTodayStats();
+                // Check for updates
+                checkAndRefresh();
+            }, 30000);
+        }
 
-                // Only refresh history if we are on a history tab
-                const activeTab = document.querySelector('.nav-btn.active');
-                if (activeTab && (activeTab.id === 'btn-7days' || activeTab.id === 'btn-30days')) {
-                    const days = activeTab.id === 'btn-7days' ? 7 : 30;
-                    // Silent refresh (don't show loading spinner)
-                    silentLoadHistory(days);
+        async function checkAndRefresh() {
+            try {
+                // Check server for latest record
+                const response = await fetch('/api/history/check_update');
+                const data = await response.json();
+                
+                if (data.error) return;
+                
+                const serverLatestId = data.latest_id;
+                
+                // If we don't have a known ID yet, set it (first run)
+                // Or if server has newer ID, refresh
+                if (lastKnownLatestId === null || (serverLatestId && serverLatestId > lastKnownLatestId)) {
+                    // Update known ID
+                    lastKnownLatestId = serverLatestId;
+                    
+                    // Trigger refresh if we are on history tab
+                    const activeTab = document.querySelector('.nav-btn.active');
+                    if (activeTab && (activeTab.id === 'btn-7days' || activeTab.id === 'btn-30days')) {
+                        const days = activeTab.id === 'btn-7days' ? 7 : 30;
+                        console.log("New data detected, refreshing...");
+                        silentLoadHistory(days);
+                    }
                 }
-            }, 5000);
+            } catch (e) {
+                console.error("Auto refresh check failed", e);
+            }
         }
 
         async function loadTodayStats() {

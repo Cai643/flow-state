@@ -8,7 +8,7 @@
 
 import time
 from datetime import date
-from app.data.dao.activity_dao import ActivityDAO, StatsDAO, OcrDAO, WindowSessionDAO
+from app.data.dao.activity_dao import ActivityDAO, StatsDAO, WindowSessionDAO
 import json
 
 class ActivityHistoryManager:
@@ -19,6 +19,9 @@ class ActivityHistoryManager:
         self.status_start_time = None
         self._last_summary = None
         self._last_raw_data = None
+        
+        # 记录当前连续专注时长 (秒)
+        self._current_focus_streak_seconds = 0
         
         # 新增：记录上一个窗口会话的信息，用于合并
         self._last_window_session = {
@@ -93,11 +96,18 @@ class ActivityHistoryManager:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             ActivityDAO.insert_log(status, duration, timestamp=timestamp, summary=summary, raw_data=raw_data)
             
-            # 2. 更新每日统计
-            today = date.today()
-            StatsDAO.update_daily_stats(today, status, duration)
+            # 2. 计算连续专注时长
+            if status in ['focus', 'work']:
+                self._current_focus_streak_seconds += duration
+            else:
+                # 状态中断，重置 (可以加一个宽容度逻辑，比如 <2分钟的娱乐不打断，但这里先严格处理)
+                self._current_focus_streak_seconds = 0
             
-            # 3. 更新或创建窗口会话聚合记录 (Window Sessions)
+            # 3. 更新每日统计 (传入当前连续时长)
+            today = date.today()
+            StatsDAO.update_daily_stats(today, status, duration, self._current_focus_streak_seconds)
+            
+            # 4. 更新或创建窗口会话聚合记录 (Window Sessions)
             if raw_data:
                 try:
                     rd = json.loads(raw_data)
@@ -172,10 +182,11 @@ class ActivityHistoryManager:
 
     def add_ocr_record(self, content: str, app_name: str, screenshot_path: str = None):
         """添加 OCR 记录"""
-        try:
-            OcrDAO.insert_record(content, app_name, screenshot_path)
-        except Exception as e:
-            print(f"[HistoryManager] OCR DB Error: {e}")
+        pass
+        # try:
+        #     OcrDAO.insert_record(content, app_name, screenshot_path)
+        # except Exception as e:
+        #     print(f"[HistoryManager] OCR DB Error: {e}")
 
     def get_current_duration(self) -> int:
         if self.status_start_time is None:

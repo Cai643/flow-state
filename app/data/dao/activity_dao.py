@@ -148,21 +148,60 @@ class StatsDAO:
     """统计数据访问对象"""
     
     @staticmethod
-    def update_daily_stats(date_obj, status: str, duration: int):
+    def update_daily_stats(date_obj, status: str, duration: int, current_streak: int = 0):
         """更新每日统计"""
-        col_name = f"total_{status}_time"
-        # 检查有效状态字段
-        if status not in ['focus', 'work', 'entertainment']:
-            return
-
+        # 1. 累加时长
+        col_name = None
+        if status in ['focus', 'work']:
+            col_name = "total_focus_time"
+        elif status == 'entertainment':
+            col_name = "total_entertainment_time"
+            
         with get_db_connection() as conn:
-            # Upsert (Insert or Update)
-            conn.execute(f'''
-                INSERT INTO daily_stats (date, {col_name}) 
-                VALUES (?, ?)
-                ON CONFLICT(date) DO UPDATE SET 
-                {col_name} = {col_name} + ?
-            ''', (date_obj, duration, duration))
+            # 先尝试插入初始记录
+            conn.execute('''
+                INSERT OR IGNORE INTO daily_stats (date) VALUES (?)
+            ''', (date_obj,))
+            
+            # 2. 更新累加字段
+            if col_name:
+                conn.execute(f'''
+                    UPDATE daily_stats 
+                    SET {col_name} = {col_name} + ?
+                    WHERE date = ?
+                ''', (duration, date_obj))
+            
+            # 3. 更新当前连续时长 (只在 focus/work 时更新，entertainment 时可能需要重置或保持)
+            # 如果 status 是 focus/work，current_streak 应该是外部传入的当前累积值
+            # 如果 status 是 entertainment，外部可能会传入 0
+            conn.execute('''
+                UPDATE daily_stats 
+                SET current_focus_streak = ?
+                WHERE date = ?
+            ''', (current_streak, date_obj))
+            
+            # 4. 更新最大连续时长 (如果当前连续时长超过了历史最大值)
+            # 只有在 focus/work 时才有可能打破记录
+            if status in ['focus', 'work']:
+                conn.execute('''
+                    UPDATE daily_stats 
+                    SET max_focus_streak = MAX(max_focus_streak, ?)
+                    WHERE date = ?
+                ''', (current_streak, date_obj))
+                
+            # 5. 更新效能指数 (简单计算: focus / (focus + entertainment) * 100)
+            # 这是一个简单的实时计算，也可以放在应用层算
+            # 这里用 SQL 计算
+            conn.execute('''
+                UPDATE daily_stats 
+                SET efficiency_score = CASE 
+                    WHEN (total_focus_time + total_entertainment_time) > 0 
+                    THEN (total_focus_time * 100 / (total_focus_time + total_entertainment_time))
+                    ELSE 0 
+                END
+                WHERE date = ?
+            ''', (date_obj,))
+            
             conn.commit()
 
     @staticmethod
@@ -183,27 +222,5 @@ class StatsDAO:
             rows = conn.execute(
                 f'SELECT * FROM daily_stats ORDER BY date DESC LIMIT ?',
                 (days,)
-            ).fetchall()
-            return [dict(row) for row in rows]
-
-class OcrDAO:
-    """OCR 记录数据访问对象"""
-    
-    @staticmethod
-    def insert_record(content: str, app_name: str, screenshot_path: str = None):
-        with get_db_connection() as conn:
-            conn.execute(
-                'INSERT INTO ocr_records (content, app_name, screenshot_path) VALUES (?, ?, ?)',
-                (content, app_name, screenshot_path)
-            )
-            conn.commit()
-
-    @staticmethod
-    def get_recent_records(limit=50):
-        """获取最近的 OCR/屏幕记录"""
-        with get_db_connection() as conn:
-            rows = conn.execute(
-                'SELECT id, timestamp, app_name, window_title, content FROM ocr_records ORDER BY timestamp DESC LIMIT ?',
-                (limit,)
             ).fetchall()
             return [dict(row) for row in rows]

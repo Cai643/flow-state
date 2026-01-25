@@ -155,23 +155,15 @@ class FocusStatusCard(QtWidgets.QWidget):
         
         # 2. 查询今日累计数据 (调用 StatsDAO)
         try:
-            # 修正导入：StatsDAO 位于 app.data.dao.activity_dao
             from app.data.dao.activity_dao import StatsDAO
             from datetime import date
-            
-            # 调试：打印一下，看看是否真的查到了数据
-            # print(f"FocusCard: Querying StatsDAO for {date.today()}...")
             
             summary = StatsDAO.get_daily_summary(date.today())
             total_focus_sec = 0
             if summary:
-                # 兼容可能的字典键名差异 (focus_time vs total_focus_time)
-                # 检查 activity_dao.py 实际返回的键名
-                f_time = summary.get('total_focus_time') or summary.get('focus_time') or 0
-                w_time = summary.get('total_work_time') or summary.get('work_time') or 0
-                
-                total_focus_sec = f_time + w_time
-                # print(f"FocusCard: DB Stats -> Focus: {f_time}, Work: {w_time}, Total: {total_focus_sec}")
+                # 只读取 total_focus_time
+                f_time = summary.get('total_focus_time') or 0
+                total_focus_sec = f_time
             
             # 加上当前这一段还没入库的时长 (如果当前状态也是工作/专注)
             if current_status in ['work', 'focus']:
@@ -179,12 +171,8 @@ class FocusStatusCard(QtWidgets.QWidget):
                 
             display_focus_hours = total_focus_sec / 3600.0
             
-        except ImportError:
-            # 如果是在独立测试运行，可能无法导入
-            # print("FocusCard: ImportError - app.data.dao.activity_dao")
-            display_focus_hours = 0.0
         except Exception as e:
-            print(f"Stats error: {e}")
+            # print(f"Stats error: {e}")
             display_focus_hours = 0.0
 
         # 3. 计算“拉回注意力”次数 (从娱乐 -> 工作/专注 的切换)

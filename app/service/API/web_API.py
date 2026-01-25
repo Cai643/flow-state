@@ -41,18 +41,96 @@ def create_app(ai_busy_flag=None):
     def health_check():
         return jsonify({'status': 'ok', 'message': 'Flow State Web Server is running'})
     
-    # 示例：获取历史数据接口
-    @app.route('/api/history')
-    def get_history():
-        # TODO: 实际应从 app.data.dao 读取 SQLite
-        # from app.data.dao.activity_dao import ActivityDAO
-        return jsonify({"date": "2026-01-13", "focus_time": 120})
+    # 分页获取历史会话数据接口 (Window Sessions)
+    @app.route('/api/history/scroll')
+    def get_history_scroll():
+        try:
+            from app.data.dao.activity_dao import WindowSessionDAO
+            
+            # 获取分页参数
+            page = request.args.get('page', 1, type=int)
+            per_page = request.args.get('per_page', 20, type=int)
+            
+            # 计算偏移量
+            offset = (page - 1) * per_page
+            
+            # 临时直接调用底层逻辑 (为了快速实现)
+            import sqlite3
+            from app.data.core.database import get_db_path
+            
+            db_path = get_db_path()
+            print(f"[WebAPI] Connecting to DB at: {db_path}") # Debug log
+            
+            conn = sqlite3.connect(db_path)
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            # 使用 window_sessions 表，按开始时间倒序排列
+            query = """
+                SELECT * FROM window_sessions 
+                ORDER BY start_time DESC 
+                LIMIT ? OFFSET ?
+            """
+            cursor.execute(query, (per_page, offset))
+            rows = cursor.fetchall()
+            
+            records = []
+            for s in rows:
+                s = dict(s)
+                
+                # 优先使用 summary (AI 摘要)，如果没有则使用窗口标题
+                title = s.get('summary')
+                if not title or title == s.get('window_title'):
+                    title = s.get('window_title', 'Unknown')
+                    
+                content_str = f"Status: {s.get('status')} | Duration: {s.get('duration')}s"
+                if s.get('process_name'):
+                    content_str += f" | App: {s.get('process_name')}"
+
+                records.append({
+                    'id': s.get('id'),
+                    'timestamp': s.get('start_time'),
+                    'app_name': s.get('process_name', 'Unknown'),
+                    'window_title': title, 
+                    'content': content_str,
+                    'duration': s.get('duration'),
+                    'status': s.get('status')
+                })
+            
+            conn.close()
+            
+            return jsonify({
+                "data": records,
+                "page": page,
+                "has_more": len(records) == per_page
+            })
+            
+        except Exception as e:
+            print(f"Error fetching scroll history: {e}")
+            return jsonify({"error": str(e), "data": []}), 500
+
+    @app.route('/api/history/check_update')
+    def check_update():
+        """检查是否有新数据"""
+        try:
+            from app.data.dao.activity_dao import WindowSessionDAO
+            last_session = WindowSessionDAO.get_last_session()
+            
+            if last_session:
+                return jsonify({
+                    "latest_id": last_session.get('id'),
+                    "latest_timestamp": last_session.get('start_time')
+                })
+            return jsonify({"latest_id": 0, "latest_timestamp": ""})
+        except Exception as e:
+            print(f"Error checking update: {e}")
+            return jsonify({"error": str(e)}), 500
 
     @app.route('/api/history/recent')
     def get_recent_history():
         try:
             # 延迟导入以避免循环依赖或上下文问题
-            from app.data.dao.activity_dao import OcrDAO, WindowSessionDAO
+            from app.data.dao.activity_dao import WindowSessionDAO
             import json
             
             records = []
@@ -91,24 +169,24 @@ def create_app(ai_busy_flag=None):
                     })
             
             # 2. 如果 Window Sessions 没数据 (比如刚启动)，尝试获取 OCR 记录
-            if not records:
-                ocr_records = OcrDAO.get_recent_records(limit=50)
-                if ocr_records:
-                    # OCR records might need similar timestamp handling if they are datetime objects
-                    for ocr in ocr_records:
-                        ts = ocr.get('timestamp')
-                        if hasattr(ts, 'strftime'):
-                            ts_str = ts.strftime('%Y-%m-%d %H:%M:%S')
-                        else:
-                            ts_str = str(ts) if ts else ''
-                            
-                        records.append({
-                            'id': ocr.get('id'),
-                            'timestamp': ts_str,
-                            'app_name': ocr.get('app_name'),
-                            'window_title': ocr.get('window_title'),
-                            'content': ocr.get('content')
-                        })
+            # if not records:
+            #     ocr_records = OcrDAO.get_recent_records(limit=50)
+            #     if ocr_records:
+            #         # OCR records might need similar timestamp handling if they are datetime objects
+            #         for ocr in ocr_records:
+            #             ts = ocr.get('timestamp')
+            #             if hasattr(ts, 'strftime'):
+            #                 ts_str = ts.strftime('%Y-%m-%d %H:%M:%S')
+            #             else:
+            #                 ts_str = str(ts) if ts else ''
+            #                 
+            #             records.append({
+            #                 'id': ocr.get('id'),
+            #                 'timestamp': ts_str,
+            #                 'app_name': ocr.get('app_name'),
+            #                 'window_title': ocr.get('window_title'),
+            #                 'content': ocr.get('content')
+            #             })
 
             # 3. 如果都没有数据，生成一些模拟数据供演示
             if not records:
@@ -141,16 +219,24 @@ def create_app(ai_busy_flag=None):
                 
             # 计算总有效时长 (focus + work)
             focus = summary.get('total_focus_time', 0) or 0
-            work = summary.get('total_work_time', 0) or 0
+            # work = summary.get('total_work_time', 0) or 0 # Removed in new schema
             ent = summary.get('total_entertainment_time', 0) or 0
             
-            total_prod = focus + work
+            # total_prod = focus + work
+            
+            # New fields
+            max_streak = summary.get('max_focus_streak', 0) or 0
+            current_streak = summary.get('current_focus_streak', 0) or 0
+            efficiency = summary.get('efficiency_score', 0) or 0
             
             return jsonify({
                 "total_focus": focus,
-                "total_work": work,
+                # "total_work": work, # Deprecated
                 "total_entertainment": ent,
-                "total_productive_seconds": total_prod
+                "total_productive_seconds": focus, # Just focus now
+                "max_focus_streak": max_streak,
+                "current_focus_streak": current_streak,
+                "efficiency_score": efficiency
             })
         except Exception as e:
             print(f"Error fetching stats: {e}")
