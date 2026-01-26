@@ -1,20 +1,22 @@
-
+# -*- coding: utf-8 -*-
 try:
     from PySide6 import QtWidgets, QtCore, QtGui
+    Signal = QtCore.Signal
 except ImportError:
     from PyQt5 import QtWidgets, QtCore, QtGui
+    Signal = QtCore.pyqtSignal
 
-import random
+import math
 from datetime import datetime, date
-from app.ui.widgets.report.theme import theme
-from app.data import ActivityHistoryManager
+import re
+from urllib.parse import quote_plus
+# from app.data import ActivityHistoryManager
 
 class SimpleDailyReport(QtWidgets.QWidget):
     """
-    全景式+强反馈 长方形时间轴日报
-    核心理念：Time Blocks (积木堆叠)
+    New Daily Report with Dashboard and Timeline views.
     """
-    clicked = QtCore.Signal()  # 点击信号，用于关闭
+    clicked = Signal()  # Signal to close
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -23,53 +25,49 @@ class SimpleDailyReport(QtWidgets.QWidget):
         )
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         
-        # 数据管理器
-        self.history_manager = ActivityHistoryManager()
+        # Size
+        self.setFixedSize(900, 600)
         
-        # 尺寸设置 (横向正方形)
-        self.setFixedSize(800, 750)
-        
-        # 加载数据
+        # Load Data
         self._load_data()
         
+        # Build UI
         self._build_ui()
         self._center_on_screen()
         
-        # 入场动画
-        self.setWindowOpacity(0.0)
-        self.anim = QtCore.QPropertyAnimation(self, b"windowOpacity")
-        self.anim.setDuration(400)
-        self.anim.setStartValue(0.0)
-        self.anim.setEndValue(1.0)
-        self.anim.start()
+        # Entry Animation
+        self.setWindowOpacity(1.0)
 
     def _load_data(self):
-        """加载数据并生成时间轴块"""
-        # 1. 获取统计摘要 (Header)
-        # 修改：优先从 StatsDAO 获取实时数据 (daily_stats 表)
+        """Load data for both dashboard and timeline"""
+        self.today = date.today()
+        
+        # 1. Stats Summary
+        summary = {}
         try:
             from app.data.dao.activity_dao import StatsDAO
-            summary = StatsDAO.get_daily_summary(date.today()) or {}
-            # 兼容字段名
+            summary = StatsDAO.get_daily_summary(self.today) or {}
             f_time = summary.get('total_focus_time') or summary.get('focus_time') or 0
-            # w_time = summary.get('total_work_time') or summary.get('work_time') or 0
-            # total_focus_seconds = f_time + w_time
-            total_focus_seconds = f_time # 只看 focus
+            total_focus_seconds = f_time 
             
-            # New fields usage
             self.efficiency = summary.get('efficiency_score', 0)
             self.max_streak = summary.get('max_focus_streak', 0)
             
         except:
-            # Fallback
-            summary = self.history_manager.get_daily_summary() or {}
-            total_focus_seconds = summary.get('total_focus_time', 0)
+            summary = {}
+            total_focus_seconds = 0
             self.efficiency = 0
+            self.max_streak = 0
             
         self.total_focus_minutes = int(total_focus_seconds / 60)
         
-        # 生成超越百分比 (Mock logic based on focus time)
-        self.beat_percentage = min(99, int(self.total_focus_minutes / 4.8)) # 假设8小时是100%
+        self.daily_goal_minutes = 480 
+        if self.daily_goal_minutes > 0:
+            self.goal_completion_rate = min(1.0, self.total_focus_minutes / self.daily_goal_minutes)
+        else:
+            self.goal_completion_rate = 0.0
+            
+        self.beat_percentage = min(99, int(self.total_focus_minutes / 4.8)) 
         
         hours = self.total_focus_minutes // 60
         minutes = self.total_focus_minutes % 60
@@ -78,564 +76,297 @@ class SimpleDailyReport(QtWidgets.QWidget):
         else:
             self.duration_text = f"{minutes}m"
             
-        # 2. 获取详细日志并合并 (Timeline)
-        raw_logs = self.history_manager.get_daily_logs()
-        self.time_blocks = self._process_logs_to_blocks(raw_logs)
+        self.hours = hours
+        self.minutes = minutes
+        self.total_focus_mins = self.total_focus_minutes
+        
+        e_time = summary.get("total_entertainment_time") or 0
+        self.recharged_mins = int(int(e_time) / 60)
+        
+        self.willpower_count = summary.get("willpower_wins", 0) 
+        self.efficiency_score = self.efficiency
 
-    def _process_logs_to_blocks(self, logs):
-        """将原始日志合并为时间块 (Chunking)"""
-        # 从 WindowSessionDAO 获取真实数据
+        # 2. Timeline Logs
+        self.time_blocks = self._load_timeline_blocks()
+        self.peak_flow_mins = 0
+        try:
+            if self.max_streak:
+                 self.peak_flow_mins = int(self.max_streak / 60)
+            else:
+                peak = 0
+                for b in self.time_blocks:
+                    if b.get("type") == "A":
+                        peak = max(peak, int(b.get("duration_sec") or 0))
+                self.peak_flow_mins = int(peak / 60) if peak > 0 else self.peak_flow_mins
+        except Exception:
+            pass
+
+    def _load_timeline_blocks(self):
         try:
             from app.data.dao.activity_dao import WindowSessionDAO
-            from datetime import datetime
-            
             sessions = WindowSessionDAO.get_today_sessions()
-            
-            blocks = []
             if not sessions:
-                return blocks
-                
+                return []
+
+            blocks = []
             current_block = None
-            
+
             for s in sessions:
-                # 状态归类
-                if s['status'] in ['work', 'focus']:
-                    s_type = 'A'
-                    s_title = "工作学习"
-                elif s['status'] == 'entertainment':
-                    s_type = 'B'
-                    s_title = "充电"
+                status = (s.get("status") or "").lower()
+                if status in ["work", "focus"]:
+                    s_type = "A"
+                    s_title = "\u5de5\u4f5c\u5b66\u4e60"
+                elif status == "entertainment":
+                    s_type = "B"
+                    s_title = "\u5145\u7535"
                 else:
-                    s_type = 'C'
-                    s_title = "碎片"
-                
-                # 检查是否可以合并到上一块
-                if current_block and current_block['type'] == s_type:
-                    # 合并
-                    current_block['duration_sec'] += s['duration']
-                    current_block['end_time_raw'] = s['end_time']
-                    current_block['sub_items'].append(s)
+                    s_type = "C"
+                    s_title = "\u788e\u7247"
+
+                if current_block and current_block["type"] == s_type:
+                    current_block["duration_sec"] += int(s.get("duration") or 0)
+                    current_block["end_time_raw"] = s.get("end_time") or current_block.get("end_time_raw")
+                    current_block["sub_items"].append(s)
                 else:
-                    # 结算上一块
                     if current_block:
                         self._finalize_block(current_block)
                         blocks.append(current_block)
-                    
-                    # 开启新块
+
                     current_block = {
-                        'type': s_type,
-                        'title': s_title,
-                        'start_time_raw': s['start_time'],
-                        'end_time_raw': s['end_time'],
-                        'duration_sec': s['duration'],
-                        'sub_items': [s],
-                        'badge': None # 后续计算
+                        "type": s_type,
+                        "title": s_title,
+                        "start_time_raw": s.get("start_time"),
+                        "end_time_raw": s.get("end_time"),
+                        "duration_sec": int(s.get("duration") or 0),
+                        "sub_items": [s],
                     }
-            
-            # 结算最后一块
+
             if current_block:
                 self._finalize_block(current_block)
                 blocks.append(current_block)
-                
-            return blocks
-            
-        except Exception as e:
-            print(f"Error loading real sessions: {e}")
-            return self._get_mock_blocks() # Fallback
 
-    def _finalize_block(self, block):
-        """计算 Block 的最终显示属性"""
-        from datetime import datetime
-        
-        # 1. 时长文本
-        duration_mins = max(1, int(block['duration_sec'] / 60))
-        if duration_mins < 60:
-            block['duration_text'] = f"{duration_mins}m"
-        else:
-            h = duration_mins // 60
-            m = duration_mins % 60
-            block['duration_text'] = f"{h}h {m}m"
-        block['duration_mins'] = duration_mins
-        
-        # 2. 时间范围
-        try:
-            t1 = datetime.strptime(block['start_time_raw'], "%Y-%m-%d %H:%M:%S").strftime("%H:%M")
-            t2 = datetime.strptime(block['end_time_raw'], "%Y-%m-%d %H:%M:%S").strftime("%H:%M")
-            block['time'] = f"{t1} - {t2}"
-        except:
-            block['time'] = "??"
-            
-        # 3. 描述 (取最长的一个子项摘要，或者显示子项数量)
-        count = len(block['sub_items'])
-        if count > 1:
-            block['desc'] = f"包含 {count} 个活动片段"
-        else:
-            # 只有一个子项，显示其摘要
-            item = block['sub_items'][0]
-            block['desc'] = item.get('summary') or item.get('window_title') or ""
-            
-        # 4. Badge
-        if block['type'] == 'A':
-            block['badge'] = '专注'
-            if duration_mins > 60: block['badge'] = 'S级'
-        elif block['type'] == 'B':
-            block['badge'] = '☕'
+            return blocks
+        except Exception as e:
+            print(f"Error processing blocks: {e}")
+            return []
 
     def _get_mock_blocks(self):
+        """Generate mock blocks for visualization when no data exists"""
         return [
             {
-                "time": "06:37 - 07:26",
-                "duration_text": "50m",
-                "type": "A",
-                "status_raw": "focus",
-                "title": "深度攻坚",
-                "desc": "AI: 这段代码写得太丝滑了！",
-                "badge": "S级",
-                "duration_mins": 50
-            },
-            {
-                "time": "07:26 - 07:40",
-                "duration_text": "14m",
-                "type": "B",
-                "status_raw": "entertainment",
-                "title": "充电",
-                "desc": "",
-                "badge": "☕",
-                "duration_mins": 14
-            },
-            {
-                "time": "07:40 - 07:45",
-                "duration_text": "5m",
-                "type": "C",
-                "status_raw": "other",
-                "title": "",
-                "desc": "",
-                "badge": None,
-                "duration_mins": 5
-            },
-            {
-                "time": "07:45 - 08:30",
+                "time_label": "09:00",
                 "duration_text": "45m",
                 "type": "A",
-                "status_raw": "focus",
-                "title": "知识吸收",
-                "desc": "能量积累中...",
-                "badge": "专注",
-                "duration_mins": 45
+                "title": "\u5de5\u4f5c\u5b66\u4e60", 
+                "desc": "09:00",
+                "category": "study",
+                "duration_sec": 2700,
+                "sub_items": [
+                    {"window_title": "daily.py - flow_state - Visual Studio Code", "process_name": "code.exe", "summary": "Coding", "duration": 1800, "start_time": "2023-01-01 09:00:00", "end_time": "2023-01-01 09:30:00"},
+                    {"window_title": "Stack Overflow - Where is the error?", "process_name": "chrome.exe", "summary": "Research", "duration": 900, "start_time": "2023-01-01 09:30:00", "end_time": "2023-01-01 09:45:00"},
+                ]
             },
             {
-                "time": "08:30 - 10:30",
-                "duration_text": "120m",
+                "time_label": "09:45",
+                "duration_text": "15m",
+                "type": "B",
+                "title": "\u5145\u7535", 
+                "desc": "09:45",
+                "category": "break",
+                "duration_sec": 900,
+                "sub_items": [
+                    {"window_title": "Genshin Impact", "process_name": "YuanShen.exe", "summary": "Gaming", "duration": 900, "start_time": "2023-01-01 09:45:00", "end_time": "2023-01-01 10:00:00"}
+                ]
+            },
+            {
+                "time_label": "10:00",
+                "duration_text": "60m",
                 "type": "A",
-                "status_raw": "focus",
-                "title": "深度心流",
-                "desc": "太强了！连续战斗2小时！",
-                "badge": "S级",
-                "duration_mins": 120
+                "title": "\u5de5\u4f5c\u5b66\u4e60",
+                "desc": "10:00",
+                "category": "study",
+                "duration_sec": 3600,
+                "sub_items": [
+                    {"window_title": "report_widget.py - flow_state", "process_name": "code.exe", "summary": "Coding", "duration": 3600, "start_time": "2023-01-01 10:00:00", "end_time": "2023-01-01 11:00:00"}
+                ]
+            },
+            {
+                "time_label": "11:00",
+                "duration_text": "10m",
+                "type": "B",
+                "title": "\u5145\u7535",
+                "desc": "11:00",
+                "category": "short_video",
+                "duration_sec": 600,
+                "sub_items": [
+                    {"window_title": "\u6296\u97f3 - \u8bb0\u5f55\u7f8e\u597d\u751f\u6d3b", "process_name": "chrome.exe", "summary": "Douyin", "duration": 600, "start_time": "2023-01-01 11:00:00", "end_time": "2023-01-01 11:10:00"}
+                ]
+            },
+            {
+                "time_label": "11:10",
+                "duration_text": "30m",
+                "type": "A",
+                "title": "\u5de5\u4f5c\u5b66\u4e60",
+                "desc": "11:10",
+                "category": "web_other",
+                "duration_sec": 1800,
+                "sub_items": [
+                    {"window_title": "GitHub - flow_state/issues", "process_name": "chrome.exe", "summary": "GitHub", "duration": 1800, "start_time": "2023-01-01 11:10:00", "end_time": "2023-01-01 11:40:00"}
+                ]
             }
         ]
-        
-    def _build_scroll_timeline(self, parent_layout):
-        # 创建横向滚动区域
-        scroll = QtWidgets.QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-        scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        
-        # 滚动条样式
-        scroll.setStyleSheet("""
-            QScrollArea { background: transparent; }
-            QScrollBar:horizontal {
-                border: none;
-                background: #F0F4E8;
-                height: 8px;
-                margin: 0px 0px 0px 0px;
-            }
-            QScrollBar::handle:horizontal {
-                background: #C2E3B8;
-                min-width: 20px;
-                border-radius: 4px;
-            }
-            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
-                width: 0px;
-            }
-        """)
-        
-        content = QtWidgets.QWidget()
-        content.setStyleSheet("background: transparent;")
-        
-        # 横向布局 (使用 self.timeline_layout 以便动态插入)
-        self.timeline_layout = QtWidgets.QHBoxLayout(content)
-        self.timeline_layout.setContentsMargins(20, 20, 20, 20)
-        self.timeline_layout.setSpacing(5) # 积木间距
-        self.timeline_layout.setAlignment(QtCore.Qt.AlignLeft)
-        
-        # Add Blocks
-        self.block_widgets = [] # 存储引用，用于查找
-        for block in self.time_blocks:
-            w = self._create_block_widget(block)
-            self.timeline_layout.addWidget(w)
-            self.block_widgets.append(w)
-            
-        self.timeline_layout.addStretch()
-        scroll.setWidget(content)
-        parent_layout.addWidget(scroll)
 
-    def _create_block_widget(self, data):
-        """根据类型和时长创建横向拉伸的积木"""
-        w = QtWidgets.QWidget()
-        w.setCursor(QtCore.Qt.PointingHandCursor) # 添加手型光标
-        
-        # 存储数据，以便点击时使用
-        w.block_data = data
-        
-        # 使用 toggle_block_details 替代 show_block_details
-        w.mousePressEvent = lambda e: self.toggle_block_details(w, data) if e.button() == QtCore.Qt.LeftButton else None
-        
-        # 改为固定宽度，每个事件栏目等大
-        w.setFixedWidth(200) 
-        
-        # 设置固定高度，形成横向长条
-        w.setFixedHeight(300) 
-        
-        if data['type'] == 'A':
-            # A类：专注长块 (绿色渐变)
-            w.setStyleSheet(f"""
-                QWidget {{
-                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #E8F5E9, stop:1 #C8E6C9);
-                    border: 1px solid #4CAF50;
-                    border-radius: 8px;
-                }}
-                QWidget:hover {{
-                    background: #A5D6A7;
-                    border: 2px solid #2E7D32;
-                }}
-            """)
-            
-            # 内部布局
-            v_layout = QtWidgets.QVBoxLayout(w)
-            v_layout.setContentsMargins(5, 10, 5, 10)
-            
-            # Icon
-            icon = QtWidgets.QLabel("🌳")
-            icon.setAlignment(QtCore.Qt.AlignCenter)
-            icon.setStyleSheet("font-size: 24px; border: none; background: transparent;")
-            v_layout.addWidget(icon)
-            
-            # Title (如果够宽)
-            # if width > 60: # 移除宽度检查
-            title = QtWidgets.QLabel(f"{data['title']}")
-            title.setAlignment(QtCore.Qt.AlignCenter)
-            title.setWordWrap(True)
-            title.setStyleSheet("color: #1B5E20; font-weight: bold; font-size: 12px; border: none; background: transparent;")
-            v_layout.addWidget(title)
-            
-            # 显示时长 (新增)
-            duration_lbl = QtWidgets.QLabel(f"({data['duration_text']})")
-            duration_lbl.setAlignment(QtCore.Qt.AlignCenter)
-            duration_lbl.setStyleSheet("color: #2E7D32; font-size: 11px; font-weight: bold; border: none; background: transparent;")
-            v_layout.addWidget(duration_lbl)
-            
-            # AI Comment Bubble (Tooltip style inside)
-            # if width > 100: # 移除宽度检查
-            comment = QtWidgets.QLabel(data['desc'])
-            comment.setWordWrap(True)
-            comment.setAlignment(QtCore.Qt.AlignCenter)
-            comment.setStyleSheet("color: #558B2F; font-size: 10px; font-style: italic; border: none; background: transparent; margin-top: 5px;")
-            v_layout.addWidget(comment)
-                
-            v_layout.addStretch()
-            
-            # Tooltip for hover
-            w.setToolTip(f"{data['title']} ({data['duration_text']})\n{data['desc']}")
+    def _session_category(self, session: dict) -> str:
+        proc = (session.get("process_name") or "").lower()
+        title = (session.get("window_title") or "") + " " + (session.get("summary") or "")
+        t = title.lower()
 
-        elif data['type'] == 'B':
-            # B类：休息短块 (米黄色)
-            w.setStyleSheet("""
-                QWidget {
-                    background-color: #FFF9C4;
-                    border: 1px solid #FFF59D;
-                    border-radius: 8px;
-                }
-                QWidget:hover {
-                    background-color: #FFF59D;
-                }
-            """)
-            
-            v_layout = QtWidgets.QVBoxLayout(w)
-            v_layout.setContentsMargins(2, 5, 2, 5)
-            v_layout.setAlignment(QtCore.Qt.AlignCenter)
-            
-            icon = QtWidgets.QLabel("☕")
-            icon.setStyleSheet("font-size: 16px; border: none; background: transparent;")
-            v_layout.addWidget(icon)
-            
-            # if width > 40: # 移除宽度检查
-            lbl = QtWidgets.QLabel("充电")
-            lbl.setStyleSheet("color: #795548; font-size: 10px; border: none; background: transparent;")
-            v_layout.addWidget(lbl)
-            
-            # 显示时长 (新增)
-            duration_lbl = QtWidgets.QLabel(f"({data['duration_text']})")
-            duration_lbl.setAlignment(QtCore.Qt.AlignCenter)
-            duration_lbl.setStyleSheet("color: #8D6E63; font-size: 10px; border: none; background: transparent;")
-            v_layout.addWidget(duration_lbl)
-                
-            w.setToolTip(f"休息充电 ({data['duration_text']})")
+        short_video_keys = [
+            "douyin", "\u6296\u97f3", "tiktok", "kuaishou", "\u5feb\u624b", "youtube",
+            "bilibili", "\u54d4\u54e9\u54d4\u54e9", "\u817e\u8baf\u89c6\u9891", "\u7231\u5947\u827a", "iqiyi",
+        ]
+        game_keys = [
+            "steam", "epic", "genshin", "\u539f\u795e", "league", "lol", "valorant", "\u6e38\u620f", "taptap",
+        ]
+        study_keys = [
+            "leetcode", "\u529b\u6263", "\u725b\u5ba2", "csdn", "github", "stackoverflow", "wikipedia",
+            "\u6162\u5b66", "\u5b66\u4e60", "docs", "notion", "\u6559\u7a0b", "\u8bfe\u7a0b", "\u6162\u8bfb",
+        ]
 
+        if any(k in t for k in short_video_keys):
+            return "short_video"
+        if any(k in t for k in game_keys) or proc in ["steam.exe", "epicgameslauncher.exe"]:
+            return "game"
+        if any(k in t for k in study_keys):
+            return "study"
+
+        if proc in ["chrome.exe", "msedge.exe", "firefox.exe"]:
+            return "web_other"
+        if proc in ["pycharm64.exe", "idea64.exe", "code.exe"]:
+            return "study"
+        return "other"
+
+    def _block_category(self, block: dict) -> str:
+        if block.get("type") == "B":
+            return "break"
+        scores = {}
+        for s in block.get("sub_items") or []:
+            cat = self._session_category(s or {})
+            dur = int((s or {}).get("duration") or 0)
+            scores[cat] = scores.get(cat, 0) + max(1, dur)
+        if not scores:
+            return "study" if block.get("type") == "A" else "other"
+        return max(scores.items(), key=lambda kv: kv[1])[0]
+
+    def _finalize_block(self, block):
+        # Calculate display properties
+        duration_mins = max(1, int(block['duration_sec'] / 60))
+        block['duration_text'] = f"{duration_mins}m" if duration_mins < 60 else f"{duration_mins // 60}h {duration_mins % 60}m"
+        
+        try:
+            t1 = datetime.strptime(block['start_time_raw'], "%Y-%m-%d %H:%M:%S").strftime("%H:%M")
+            block['time_label'] = t1
+        except:
+            block['time_label'] = ""
+            
+        def _parse_dt(v: str):
+            if not v:
+                return None
+            for fmt in ("%Y-%m-%d %H:%M:%S", "%Y/%m/%d %H:%M:%S"):
+                try:
+                    return datetime.strptime(v, fmt)
+                except Exception:
+                    pass
+            return None
+
+        start_dt = _parse_dt(block.get("start_time_raw"))
+        if start_dt:
+            block["desc"] = start_dt.strftime("%H:%M")
         else:
-            # C类：碎片 (灰色)
-            w.setStyleSheet("""
-                QWidget {
-                    background-color: #F5F5F5;
-                    border: 1px dashed #BDBDBD;
-                    border-radius: 4px;
-                }
-            """)
-            w.setToolTip(f"碎片时间 ({data['duration_text']})")
+            block["desc"] = block.get("time_label") or ""
             
-        return w
-
-    def toggle_block_details(self, block_widget, data):
-        """点击 Block 时，在右侧展开详情"""
-        # 如果没有子项或只有一个子项，就不展开了
-        if len(data.get('sub_items', [])) <= 1:
-            return
-
-        # 1. 检查是否已经展开
-        if hasattr(self, 'active_detail_widget') and self.active_detail_widget:
-            # 如果点击的是同一个，则关闭
-            is_same = (self.active_detail_widget.parent_block == block_widget)
-            
-            # 关闭当前的详情
-            self.active_detail_widget.deleteLater()
-            self.active_detail_widget = None
-            
-            if is_same:
-                return
-
-        # 2. 创建详情容器
-        detail_container = QtWidgets.QWidget()
-        detail_container.parent_block = block_widget
-        detail_container.setFixedHeight(300) # 与 Block 等高
-        detail_container.setStyleSheet("background: transparent;")
-        
-        # 内部布局：横向排列子项
-        h_layout = QtWidgets.QHBoxLayout(detail_container)
-        h_layout.setContentsMargins(10, 0, 10, 0)
-        h_layout.setSpacing(5)
-        h_layout.setAlignment(QtCore.Qt.AlignLeft)
-        
-        # 3. 创建子项积木
-        total_width = 0
-        for item in data['sub_items']:
-            sub_w = self._create_sub_item_widget(item, data['type'])
-            h_layout.addWidget(sub_w)
-            total_width += (sub_w.width() + 5)
-            
-        # 设置容器初始宽度为 0 (用于动画)
-        detail_container.setFixedWidth(0)
-        
-        # 4. 插入到父布局中
-        # 找到 block_widget 的索引
-        idx = self.timeline_layout.indexOf(block_widget)
-        if idx >= 0:
-            self.timeline_layout.insertWidget(idx + 1, detail_container)
-            self.active_detail_widget = detail_container
-            
-            # 5. 动画展开
-            anim = QtCore.QPropertyAnimation(detail_container, b"minimumWidth")
-            anim.setDuration(300)
-            anim.setStartValue(0)
-            anim.setEndValue(total_width + 20) # 加上边距
-            anim.setEasingCurve(QtCore.QEasingCurve.OutCubic)
-            
-            # 同时动画 maximumWidth 以确保平滑
-            anim2 = QtCore.QPropertyAnimation(detail_container, b"maximumWidth")
-            anim2.setDuration(300)
-            anim2.setStartValue(0)
-            anim2.setEndValue(total_width + 20)
-            anim2.setEasingCurve(QtCore.QEasingCurve.OutCubic)
-            
-            self.detail_anim_group = QtCore.QParallelAnimationGroup(self)
-            self.detail_anim_group.addAnimation(anim)
-            self.detail_anim_group.addAnimation(anim2)
-            self.detail_anim_group.start()
-
-    def _create_sub_item_widget(self, item, parent_type):
-        """创建子项的小方块"""
-        w = QtWidgets.QWidget()
-        w.setFixedSize(140, 260) # 比父块稍微矮一点，窄一点
-        
-        # 样式
-        if parent_type == 'A': # 工作学习
-            bg_color = "#E8F5E9"
-            border_color = "#81C784"
-            text_color = "#2E7D32"
-        else: # 充电
-            bg_color = "#FFFDE7"
-            border_color = "#FFF59D"
-            text_color = "#F57F17"
-            
-        w.setStyleSheet(f"""
-            QWidget {{
-                background-color: {bg_color};
-                border: 1px dashed {border_color};
-                border-radius: 6px;
-            }}
-            QWidget:hover {{
-                background-color: #FFFFFF;
-                border: 1px solid {border_color};
-            }}
-        """)
-        
-        v_layout = QtWidgets.QVBoxLayout(w)
-        v_layout.setContentsMargins(8, 8, 8, 8)
-        
-        # 计算时长
-        d_min = max(1, int(item['duration'] / 60))
-        if d_min < 60:
-            d_text = f"{d_min}m"
+        # Add summary text for visualization
+        # "探索霸王龙..." or "大脑呼吸中"
+        if block.get("type") == "B":
+            block["summary_text"] = "\u5927\u8111\u547c\u5438\u4e2d" # "Brain Breathing"
         else:
-            d_text = f"{d_min // 60}h {d_min % 60}m"
+            # Find most common title or summary
+            details = []
+            for s in block.get("sub_items") or []:
+                t = s.get("summary") or s.get("window_title") or ""
+                if t: details.append(t)
             
-        # 标题 (进程名或窗口名)
-        title_text = item.get('window_title') or item.get('process_name') or "未知"
-        # 如果太长截断
-        if len(title_text) > 30: title_text = title_text[:28] + "..."
-            
-        lbl_title = QtWidgets.QLabel(title_text)
-        lbl_title.setWordWrap(True)
-        lbl_title.setAlignment(QtCore.Qt.AlignTop | QtCore.Qt.AlignLeft)
-        lbl_title.setStyleSheet(f"color: {text_color}; font-weight: bold; font-size: 11px; border: none; background: transparent;")
-        v_layout.addWidget(lbl_title)
-        
-        # 时长
-        lbl_time = QtWidgets.QLabel(d_text)
-        lbl_time.setStyleSheet(f"color: {text_color}; font-size: 10px; border: none; background: transparent;")
-        v_layout.addWidget(lbl_time)
-        
-        v_layout.addStretch()
-        
-        return w
+            if details:
+                # Simple pick first or longest? Let's pick first valid
+                txt = details[0]
+                if len(txt) > 6:
+                    txt = txt[:6] + "..."
+                block["summary_text"] = txt
+            else:
+                block["summary_text"] = "\u4e13\u6ce8\u65f6\u523b" # "Focus Time"
+
+        block["category"] = block.get("category") or self._block_category(block)
+        details = []
+        for s in block.get("sub_items") or []:
+            if not isinstance(s, dict):
+                continue
+            details.append({
+                "window_title": s.get("window_title") or "",
+                "process_name": s.get("process_name") or "",
+                "summary": s.get("summary") or "",
+                "status": s.get("status") or "",
+                "duration": int(s.get("duration") or 0),
+                "start_time": s.get("start_time") or "",
+                "end_time": s.get("end_time") or "",
+            })
+        block["details"] = details
 
     def _build_ui(self):
-        # 主布局
         main_layout = QtWidgets.QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
         
-        # 背景容器
-        container = QtWidgets.QWidget()
-        container.setObjectName("MainContainer")
-        # Cream/Honeydew Background
-        container.setStyleSheet("""
+        # Container with border radius
+        self.container = QtWidgets.QWidget()
+        self.container.setObjectName("MainContainer")
+        self.container.setStyleSheet("""
             QWidget#MainContainer {
-                background-color: #F7F9F2; /* Lighter Honeydew */
+                background: qradialgradient(cx:0.5, cy:0.5, radius: 1.0, fx:0.5, fy:0.5, stop:0 #E8F5E9, stop:0.6 #C8E6C9, stop:1 #81C784);
                 border-radius: 20px;
-                border: 2px solid #50795D;
             }
         """)
-        main_layout.addWidget(container)
+        main_layout.addWidget(self.container)
         
-        content_layout = QtWidgets.QVBoxLayout(container)
-        content_layout.setContentsMargins(0, 0, 0, 0)
-        content_layout.setSpacing(0)
-        
-        # --- Header Section ---
-        self._build_header(content_layout)
-        
-        # --- Scrollable Timeline ---
-        self._build_scroll_timeline(content_layout)
-        
-        # --- Footer Section ---
-        self._build_footer(content_layout)
-
-    def _build_header(self, parent_layout):
-        header = QtWidgets.QWidget()
-        header.setFixedHeight(100)
-        header.setStyleSheet("""
-            background-color: #50795D;
-            border-top-left-radius: 18px;
-            border-top-right-radius: 18px;
+        # Overlay Border (to ensure it stays on top of scroll content)
+        self.border_overlay = QtWidgets.QLabel(self)
+        self.border_overlay.setStyleSheet("""
+            background: transparent;
+            border: 2px solid #66BB6A;
+            border-radius: 20px;
         """)
+        self.border_overlay.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents)
+        self.border_overlay.raise_()
         
-        layout = QtWidgets.QVBoxLayout(header)
-        layout.setContentsMargins(20, 15, 20, 15)
+        container_layout = QtWidgets.QVBoxLayout(self.container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Top Row: Back + Date
-        top_row = QtWidgets.QHBoxLayout()
+        # Stacked Widget for Views
+        self.stack = QtWidgets.QStackedWidget()
         
-        back_btn = QtWidgets.QPushButton("< 返回")
-        back_btn.setCursor(QtCore.Qt.PointingHandCursor)
-        back_btn.setStyleSheet("""
-            color: #FFFFFF; font-weight: bold; border: none; font-size: 14px;
-        """)
-        back_btn.clicked.connect(self.close)
+        # View 1: Dashboard
+        self.dashboard_view = DailyDashboard(self)
+        self.stack.addWidget(self.dashboard_view)
         
-        date_label = QtWidgets.QLabel(date.today().strftime("%Y.%m.%d %A"))
-        date_label.setStyleSheet("color: #C2E3B8; font-size: 14px;")
+        # View 2: Timeline
+        self.timeline_view = DailyTimeline(self)
+        self.stack.addWidget(self.timeline_view)
         
-        top_row.addWidget(back_btn)
-        top_row.addStretch()
-        top_row.addWidget(date_label)
+        container_layout.addWidget(self.stack)
         
-        layout.addLayout(top_row)
-        
-        # Stats Row
-        stats_row = QtWidgets.QHBoxLayout()
-        stats_row.setSpacing(20)
-        
-        # 使用 QFrame 来包含图标和文字
-        s1_frame = QtWidgets.QFrame()
-        s1_layout = QtWidgets.QHBoxLayout(s1_frame)
-        s1_layout.setContentsMargins(0, 0, 0, 0)
-        s1_layout.setSpacing(5)
-        s1_icon = QtWidgets.QLabel("🌳")
-        s1_icon.setStyleSheet("font-size: 16px;")
-        s1_text = QtWidgets.QLabel(f"今日专注能量: {self.duration_text}")
-        s1_text.setStyleSheet("color: #FFD700; font-weight: bold; font-size: 18px;") # 金色大字
-        s1_layout.addWidget(s1_icon)
-        s1_layout.addWidget(s1_text)
-        
-        s2 = QtWidgets.QLabel(f"⚡ 效能指数: {self.efficiency}")
-        s2.setStyleSheet("color: #FFFFFF; font-size: 14px;")
-        
-        stats_row.addWidget(s1_frame)
-        stats_row.addStretch()
-        stats_row.addWidget(s2)
-        
-        layout.addLayout(stats_row)
-        
-        parent_layout.addWidget(header)
-
-    def _build_footer(self, parent_layout):
-        footer = QtWidgets.QWidget()
-        footer.setFixedHeight(60)
-        footer.setStyleSheet("background-color: #FFFFFF; border-bottom-left-radius: 18px; border-bottom-right-radius: 18px;")
-        
-        layout = QtWidgets.QHBoxLayout(footer)
-        layout.setContentsMargins(20, 10, 20, 10)
-        
-        btn = QtWidgets.QPushButton("分享今日成就")
-        btn.setCursor(QtCore.Qt.PointingHandCursor)
-        btn.setFixedHeight(36)
-        btn.setStyleSheet("""
-            QPushButton {
-                background-color: #50795D;
-                color: white;
-                font-weight: bold;
-                border-radius: 18px;
-                font-size: 13px;
-            }
-            QPushButton:hover {
-                background-color: #66BB6A;
-            }
-        """)
-        
-        layout.addWidget(btn)
-        parent_layout.addWidget(footer)
+        # Connect signals
+        self.dashboard_view.switch_to_timeline.connect(lambda: self.stack.setCurrentWidget(self.timeline_view))
+        self.timeline_view.back_to_summary.connect(lambda: self.stack.setCurrentWidget(self.dashboard_view))
+        self.dashboard_view.close_req.connect(self.close)
+        self.timeline_view.close_req.connect(self.close)
 
     def _center_on_screen(self):
         screen = QtGui.QGuiApplication.primaryScreen()
@@ -644,6 +375,11 @@ class SimpleDailyReport(QtWidgets.QWidget):
             x = (geo.width() - self.width()) // 2
             y = (geo.height() - self.height()) // 2
             self.move(x, y)
+
+    def resizeEvent(self, event):
+        if hasattr(self, 'border_overlay'):
+            self.border_overlay.resize(self.size())
+        super().resizeEvent(event)
 
     def mousePressEvent(self, event):
         if event.button() == QtCore.Qt.LeftButton:
@@ -655,9 +391,944 @@ class SimpleDailyReport(QtWidgets.QWidget):
             self.move(event.globalPos() - self.drag_pos)
             event.accept()
 
+
+class DailyDashboard(QtWidgets.QWidget):
+    switch_to_timeline = Signal()
+    close_req = Signal()
+
+    def __init__(self, parent_report):
+        super().__init__()
+        self.report = parent_report
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        # Header
+        self._build_header(layout)
+        
+        # Content
+        content_widget = QtWidgets.QWidget()
+        content_layout = QtWidgets.QHBoxLayout(content_widget)
+        content_layout.setContentsMargins(20, 10, 20, 20)
+        content_layout.setSpacing(20)
+        
+        # Left: Energy Compass
+        self._build_left_panel(content_layout)
+        
+        # Right: Data Matrix
+        self._build_right_panel(content_layout)
+        
+        layout.addWidget(content_widget)
+
+    def _build_header(self, parent_layout):
+        header = QtWidgets.QWidget()
+        header.setFixedHeight(70) 
+        h_layout = QtWidgets.QHBoxLayout(header)
+        h_layout.setContentsMargins(20, 10, 20, 0)
+        
+        # Back
+        btn_back = QtWidgets.QPushButton("< \u8fd4\u56de") # "< "
+        btn_back.setCursor(QtCore.Qt.PointingHandCursor)
+        btn_back.setStyleSheet("color: #50795D; font-weight: bold; border: none; font-size: 16px;") 
+        btn_back.clicked.connect(self.close_req.emit)
+        
+        # Date
+        lbl_date = QtWidgets.QLabel(date.today().strftime("%Y.%m.%d %A"))
+        lbl_date.setStyleSheet("color: #2E4E3F; font-size: 20px; font-weight: bold;") 
+        
+        # Switch
+        btn_switch = QtWidgets.QPushButton("\u5207\u6362\u5230\u65f6\u95f4\u8f74 >") 
+        btn_switch.setCursor(QtCore.Qt.PointingHandCursor)
+        btn_switch.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #2E7D32;
+                border: none;
+                padding: 6px 18px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                color: #1B5E20;
+            }
+        """)
+        btn_switch.clicked.connect(self.switch_to_timeline.emit)
+        
+        h_layout.addWidget(btn_back)
+        h_layout.addStretch()
+        h_layout.addWidget(lbl_date)
+        h_layout.addStretch()
+        h_layout.addWidget(btn_switch)
+        
+        parent_layout.addWidget(header)
+
+    def _build_left_panel(self, parent_layout):
+        panel = QtWidgets.QWidget()
+        panel.setStyleSheet("""
+            QWidget {
+                background-color: #E8F5E9;
+                border-radius: 20px;
+            }
+        """)
+        v_layout = QtWidgets.QVBoxLayout(panel)
+        v_layout.setContentsMargins(25, 25, 25, 25)
+        
+        top_row = QtWidgets.QHBoxLayout()
+        t1 = QtWidgets.QLabel("\ud83c\udfaf \u4eca\u65e5\u76ee\u6807\u8fdb\u5ea6") 
+        t1.setStyleSheet("color: #2E7D32; font-weight: bold; font-size: 16px; background: transparent;")
+        
+        goal_percent_text = f"{int(self.report.goal_completion_rate * 100)}%"
+        t2 = QtWidgets.QLabel(goal_percent_text)
+        t2.setStyleSheet("color: #2E7D32; font-weight: bold; font-size: 20px; background: transparent;")
+        top_row.addWidget(t1)
+        top_row.addStretch()
+        top_row.addWidget(t2)
+        v_layout.addLayout(top_row)
+        
+        v_layout.addStretch()
+        
+        ring = ProgressRingWidget(percentage=self.report.goal_completion_rate, center_text=f"{self.report.hours}\u5c0f\u65f6{self.report.minutes}\u5206", sub_text="\u4eca\u65e5\u4e13\u6ce8") 
+        v_layout.addWidget(ring, 0, QtCore.Qt.AlignCenter)
+        
+        v_layout.addStretch()
+        
+        f1 = QtWidgets.QLabel(f"\ud83c\udfc6 \u51fb\u8d25\u5168\u56fd {self.report.beat_percentage}% \u7684\u7528\u6237") 
+        f1.setAlignment(QtCore.Qt.AlignCenter)
+        f1.setStyleSheet("color: #1B5E20; font-size: 15px; font-weight: bold; background: transparent;")
+        
+        f2 = QtWidgets.QLabel("\u72b6\u6001: \ud83d\udfe2 \u6df1\u5ea6\u6c89\u6d78\u4e2d...") 
+        f2.setAlignment(QtCore.Qt.AlignCenter)
+        f2.setStyleSheet("color: #2E7D32; font-size: 14px; font-weight: bold; background: #C8E6C9; border-radius: 12px; padding: 6px 12px; margin-top: 10px;")
+        
+        v_layout.addWidget(f1)
+        v_layout.addWidget(f2)
+        
+        parent_layout.addWidget(panel, 1)
+
+    def _build_right_panel(self, parent_layout):
+        right_container = QtWidgets.QWidget()
+        v_layout = QtWidgets.QVBoxLayout(right_container)
+        v_layout.setContentsMargins(0, 0, 0, 0)
+        v_layout.setSpacing(20)
+        
+        grid = QtWidgets.QGridLayout()
+        grid.setSpacing(20)
+        
+        c1 = StatCard("\u5dc5\u5cf0\u5fc3\u6d41", f"{self.report.peak_flow_mins}", "\u5206\u949f", "\u26a1", "#F0F4C3", "#827717")
+        c2 = StatCard("\u610f\u5fd7\u529b", f"{self.report.willpower_count}", "\u6b21\u6210\u529f", "\ud83d\udee1\ufe0f", "#FFECB3", "#FF6F00")
+        c3 = StatCard("\u5df2\u5145\u80fd", f"{self.report.recharged_mins}", "\u5206\u949f", "\ud83d\udd0b", "#DCEDC8", "#33691E")
+        c4 = StatCard("\u6548\u80fd\u6307\u6570", f"{self.report.efficiency_score}", "\u5206", "\ud83d\udcc8", "#FFCCBC", "#BF360C")
+        
+        for c in [c1, c2, c3, c4]:
+            c.setMinimumHeight(125)
+        
+        grid.addWidget(c1, 0, 0)
+        grid.addWidget(c2, 0, 1)
+        grid.addWidget(c3, 1, 0)
+        grid.addWidget(c4, 1, 1)
+        
+        v_layout.addLayout(grid, 3)
+        
+        comm_box = QtWidgets.QWidget()
+        comm_box.setStyleSheet("""
+            background-color: #FFFFFF;
+            border-radius: 16px;
+            border: 2px solid #C8E6C9;
+        """)
+        comm_box.setMaximumHeight(140) 
+        
+        comm_layout = QtWidgets.QVBoxLayout(comm_box)
+        comm_layout.setContentsMargins(20, 15, 20, 15) 
+        
+        title = QtWidgets.QLabel("\ud83d\udcac \u5854\u53f0\u901a\u8baf (\u5b9e\u65f6\u64ad\u62a5)")
+        title.setStyleSheet("color: #455A64; font-weight: 900; font-size: 14px; border: none;") 
+        
+        msg = QtWidgets.QLabel('"\u68c0\u6d4b\u5230\u5f3a\u5927\u7684\u610f\u5fd7\u529b\u6ce2\u52a8\uff01\n\u4f60\u5df2\u6210\u529f\u62e6\u622a5\u6b21\u5e72\u6270\u3002" (Mock)')
+        msg.setWordWrap(True)
+        msg.setStyleSheet("color: #37474F; font-size: 13px; font-weight: bold; margin-top: 5px; border: none; line-height: 1.4;") 
+        
+        comm_layout.addWidget(title)
+        comm_layout.addWidget(msg)
+        comm_layout.addStretch()
+        
+        v_layout.addWidget(comm_box, 1)
+        
+        parent_layout.addWidget(right_container, 1)
+
+
+class ProgressRingWidget(QtWidgets.QWidget):
+    def __init__(self, percentage=0.45, center_text="", sub_text=""):
+        super().__init__()
+        self.percentage = percentage
+        self.center_text = center_text
+        self.sub_text = sub_text
+        self.setFixedSize(280, 280)
+        
+    def paintEvent(self, event):
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        
+        rect = self.rect().adjusted(20, 20, -20, -20)
+        
+        pen = QtGui.QPen(QtGui.QColor("#C8E6C9"), 24) 
+        pen.setCapStyle(QtCore.Qt.RoundCap)
+        painter.setPen(pen)
+        painter.drawEllipse(rect)
+        
+        pen.setColor(QtGui.QColor("#43A047"))
+        painter.setPen(pen)
+        span_angle = int(-self.percentage * 360 * 16)
+        painter.drawArc(rect, 90 * 16, span_angle)
+        
+        painter.setPen(QtCore.Qt.NoPen)
+        
+        # Draw Tree (Top Center)
+        font = QtGui.QFont()
+        font.setPixelSize(80) 
+        painter.setFont(font)
+        painter.setPen(QtGui.QColor("#2E7D32"))
+        # Position: Center X, Top Y roughly 1/4 down
+        painter.drawText(QtCore.QRectF(0, 50, self.width(), 80), QtCore.Qt.AlignCenter, "\ud83c\udf33") 
+        
+        # Draw Center Text (Time) - Middle
+        font.setPixelSize(40) 
+        font.setBold(True)
+        painter.setFont(font)
+        painter.setPen(QtGui.QColor("#1B5E20"))
+        # Position: Center X, Middle Y
+        painter.drawText(QtCore.QRectF(0, 135, self.width(), 50), QtCore.Qt.AlignCenter, self.center_text)
+        
+        # Draw Sub Text (Label) - Bottom
+        font.setPixelSize(16) 
+        font.setBold(True) 
+        painter.setFont(font)
+        painter.setPen(QtGui.QColor("#388E3C"))
+        # Position: Center X, Below Time
+        painter.drawText(QtCore.QRectF(0, 180, self.width(), 30), QtCore.Qt.AlignCenter, self.sub_text)
+
+
+class StatCard(QtWidgets.QFrame):
+    def __init__(self, title, value, unit, icon, bg_color, text_color):
+        super().__init__()
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {bg_color};
+                border-radius: 20px;
+            }}
+        """)
+        
+        # Main Layout
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(20, 16, 20, 16)
+        layout.setSpacing(0)
+        
+        # 1. Top Left: Small Icon + Title
+        top_row = QtWidgets.QHBoxLayout()
+        top_row.setSpacing(8)
+        top_row.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
+        
+        # Small Icon
+        lbl_small_icon = QtWidgets.QLabel(icon)
+        lbl_small_icon.setStyleSheet(f"background: transparent; font-size: 18px; color: {text_color};")
+        lbl_small_icon.setAlignment(QtCore.Qt.AlignCenter)
+        
+        # Title
+        l_title = QtWidgets.QLabel(title + ":")
+        l_title.setStyleSheet(f"color: {text_color}; font-size: 15px; font-weight: bold; background: transparent; opacity: 0.9;")
+        
+        top_row.addWidget(lbl_small_icon)
+        top_row.addWidget(l_title)
+        top_row.addStretch()
+        
+        layout.addLayout(top_row)
+        
+        # 2. Center: Large Value + Unit
+        # Use a centered layout that takes up the remaining space
+        center_layout = QtWidgets.QHBoxLayout()
+        center_layout.setAlignment(QtCore.Qt.AlignCenter)
+        center_layout.setSpacing(6)
+        
+        l_val = QtWidgets.QLabel(str(value))
+        # Significantly larger font
+        l_val.setStyleSheet(f"color: {text_color}; font-size: 52px; font-weight: 900; background: transparent;")
+        
+        l_unit = QtWidgets.QLabel(unit)
+        l_unit.setStyleSheet(f"color: {text_color}; font-size: 16px; font-weight: bold; padding-top: 24px; background: transparent; opacity: 0.85;")
+        
+        center_layout.addWidget(l_val)
+        center_layout.addWidget(l_unit)
+        
+        layout.addStretch()
+        layout.addLayout(center_layout)
+        layout.addStretch()
+
+
+
+class DailyTimeline(QtWidgets.QWidget):
+    back_to_summary = Signal()
+    close_req = Signal()
+
+    def __init__(self, parent_report):
+        super().__init__()
+        self.report = parent_report
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Header
+        self._build_header(layout)
+        
+        # Scroll Area
+        scroll = QtWidgets.QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        scroll.setStyleSheet("background: transparent; border: none;")
+        scroll.viewport().setStyleSheet("background: transparent;")
+        
+        # Styled scrollbar
+        scroll.setStyleSheet("""
+            QScrollArea { background: transparent; border: none; }
+            QScrollArea > QWidget > QWidget { background: transparent; }
+            QScrollBar:horizontal {
+                border: none;
+                background: rgba(255,255,255,100);
+                height: 18px;
+                margin: 0px 26px 10px 26px;
+                border-radius: 9px;
+            }
+            QScrollBar::handle:horizontal {
+                background: rgba(90, 140, 115, 200);
+                min-width: 40px;
+                border-radius: 9px;
+            }
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0px; }
+        """)
+        
+        # Timeline Container
+        self.timeline_container = TimelineContainer(self.report.time_blocks)
+        scroll.setWidget(self.timeline_container)
+        
+        layout.addWidget(scroll)
+
+    def _build_header(self, parent_layout):
+        header = QtWidgets.QWidget()
+        header.setFixedHeight(70)
+        h_layout = QtWidgets.QHBoxLayout(header)
+        h_layout.setContentsMargins(20, 0, 20, 0)
+        
+        btn_back = QtWidgets.QPushButton("< \u8fd4\u56de") 
+        btn_back.setCursor(QtCore.Qt.PointingHandCursor)
+        btn_back.setStyleSheet("color: #50795D; font-weight: bold; border: none; font-size: 16px;")
+        btn_back.clicked.connect(self.close_req.emit)
+        
+        lbl_date = QtWidgets.QLabel(date.today().strftime("%Y.%m.%d %A"))
+        lbl_date.setStyleSheet("color: #2E4E3F; font-size: 20px; font-weight: bold;")
+        
+        btn_summary = QtWidgets.QPushButton("< \u56de\u5230\u4eca\u65e5\u603b\u7ed3") 
+        btn_summary.setCursor(QtCore.Qt.PointingHandCursor)
+        btn_summary.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #2E7D32;
+                border: none;
+                padding: 6px 18px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                color: #1B5E20;
+            }
+        """)
+        btn_summary.clicked.connect(self.back_to_summary.emit)
+        
+        h_layout.addWidget(btn_back)
+        h_layout.addStretch()
+        h_layout.addWidget(lbl_date)
+        h_layout.addStretch()
+        h_layout.addWidget(btn_summary)
+        
+        parent_layout.addWidget(header)
+
+
+class TimelineContainer(QtWidgets.QWidget):
+    def __init__(self, blocks):
+        super().__init__()
+        self.blocks = blocks
+        self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+        self.setStyleSheet("background: transparent;")
+        self._padding_x = 80
+        self._slot_w = 220
+        self._y_center = 220 
+        self._card_w = 160   
+        self._card_h = 90   
+        self._node_size = 24
+        self._gap_node_to_card = 20
+
+        self._items = []
+        for i, block in enumerate(self.blocks):
+            # Alternating layout: Even -> Top, Odd -> Bottom
+            is_top = (i % 2 == 0)
+            item = TimelineItemWidget(self, block, is_top)
+            self._items.append(item)
+
+        total_w = self._padding_x * 2 + max(1, len(self._items)) * self._slot_w
+        self.setFixedSize(total_w, 440) 
+        self._layout_items()
+
+    def _layout_items(self):
+        for idx, item in enumerate(self._items):
+            slot_x = self._padding_x + idx * self._slot_w
+            node_x = int(slot_x + (self._slot_w / 2) - (self._node_size / 2))
+            node_y = int(self._y_center - (self._node_size / 2))
+            card_x = int(slot_x + (self._slot_w / 2) - (self._card_w / 2))
+            
+            if item.is_top:
+                # Card Above Line
+                card_y = int(node_y - self._gap_node_to_card - self._card_h)
+                desc_y = int(node_y + self._node_size + 10) # Text below line
+            else:
+                # Card Below Line
+                card_y = int(node_y + self._node_size + self._gap_node_to_card)
+                desc_y = int(node_y - 30) # Text above line
+            
+            # Use geometry to contain everything, but place() does the internal layout
+            item.setGeometry(card_x, 0, self._card_w, self.height())
+            item.place(card_x, card_y, node_x, node_y, desc_y, self._card_w, self._card_h, self._node_size)
+
+    def paintEvent(self, event):
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        
+        y_center = self._y_center
+
+        # Glow Effect
+        glow = QtGui.QPen(QtGui.QColor(165, 214, 167, 100), 12) # Light Green Glow
+        glow.setCapStyle(QtCore.Qt.RoundCap)
+        painter.setPen(glow)
+        painter.drawLine(0, y_center, self.width(), y_center)
+
+        # Core Line
+        main = QtGui.QPen(QtGui.QColor(129, 199, 132, 220), 4) # Solid Green
+        main.setCapStyle(QtCore.Qt.RoundCap)
+        painter.setPen(main)
+        painter.drawLine(0, y_center, self.width(), y_center)
+        
+        # Connectors for items
+        for item in self._items:
+            center = item.node_center()
+            if not center: continue
+            
+            # Draw small connector from node to card if needed? 
+            # The node sits on the line. The card floats.
+            # Wireframe shows a small triangle/tip on the card pointing to the node.
+            # So no extra line needed here.
+            pass
+
+
+class BubbleCard(QtWidgets.QWidget):
+    clicked = Signal(object)
+    hoverChanged = Signal(bool)
+
+    def __init__(self, data, is_top):
+        super().__init__()
+        self.data = data
+        self.is_top = is_top
+        self.setMouseTracking(True)
+        self.setAttribute(QtCore.Qt.WA_Hover, True)
+        self.setCursor(QtCore.Qt.PointingHandCursor)
+        
+        # Color Palette based on Type
+        # Type A (Focus) -> Sage Green
+        # Type B (Break) -> Creamy Beige
+        
+        if data.get("type") == "B":
+             # Break: Cream Background, Warm Text
+             self.bg_color = QtGui.QColor("#FFF9C4") # Light Yellow/Cream
+             self.text_color = QtGui.QColor("#5D4037") # Brownish
+             self.icon_color = QtGui.QColor("#FBC02D") # Mustard
+             self.border_color = QtGui.QColor(251, 192, 45, 100)
+             self.icon_char = "\u2615" # Coffee
+        else:
+             # Work: Green Background, Green Text
+             self.bg_color = QtGui.QColor("#DCEDC8") # Light Sage
+             self.text_color = QtGui.QColor("#1B5E20") # Dark Green
+             self.icon_color = QtGui.QColor("#33691E") # Darker Green
+             self.border_color = QtGui.QColor(51, 105, 30, 100)
+             self.icon_char = "\ud83c\udf33" # Tree
+
+        self._shadow = QtWidgets.QGraphicsDropShadowEffect(self)
+        self._shadow.setBlurRadius(15)
+        self._shadow.setOffset(0, 4)
+        self._shadow.setColor(QtGui.QColor(0, 0, 0, 30))
+        self.setGraphicsEffect(self._shadow)
+        self._hovered = False
+
+    def tip_apex_y(self):
+        # Return local Y coordinate of the tip
+        if self.is_top:
+            return self.height() 
+        else:
+            return 0
+
+    def enterEvent(self, event):
+        self._hovered = True
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self._hovered = False
+        self.update()
+        super().leaveEvent(event)
+
+    def mousePressEvent(self, event):
+        if event.button() == QtCore.Qt.LeftButton:
+            self.clicked.emit(self.data)
+        super().mousePressEvent(event)
+
+    def paintEvent(self, event):
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        
+        rect_h = self.height() - 12 # Reserve space for tip
+        tip_h = 12
+        
+        path = QtGui.QPainterPath()
+        
+        if self.is_top:
+            # Card is above, tip points down
+            rect = QtCore.QRectF(0, 0, self.width(), rect_h)
+            tip_y = rect_h
+            tip_x = self.width() / 2
+            
+            path.addRoundedRect(rect, 16, 16)
+            path.moveTo(tip_x - 8, tip_y)
+            path.lineTo(tip_x, tip_y + tip_h)
+            path.lineTo(tip_x + 8, tip_y)
+            path.closeSubpath()
+        else:
+            # Card is below, tip points up
+            rect = QtCore.QRectF(0, tip_h, self.width(), rect_h)
+            tip_y = tip_h
+            tip_x = self.width() / 2
+            
+            path.addRoundedRect(rect, 16, 16)
+            path.moveTo(tip_x - 8, tip_y)
+            path.lineTo(tip_x, tip_y - tip_h)
+            path.lineTo(tip_x + 8, tip_y)
+            path.closeSubpath()
+
+        # Draw
+        if self._hovered:
+            painter.setBrush(self.bg_color.lighter(105))
+        else:
+            painter.setBrush(self.bg_color)
+            
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.drawPath(path)
+        
+        # Content
+        # Icon
+        y_off = 0 if self.is_top else tip_h
+        icon_rect = QtCore.QRectF(15, 15 + y_off, 40, 40)
+        font = QtGui.QFont()
+        font.setPixelSize(32)
+        painter.setFont(font)
+        painter.setPen(self.icon_color)
+        painter.drawText(icon_rect, QtCore.Qt.AlignCenter, self.icon_char)
+        
+        # Title (Work/Rest)
+        title_rect = QtCore.QRectF(65, 15 + y_off, self.width() - 70, 20)
+        font.setPixelSize(13)
+        font.setBold(True)
+        painter.setFont(font)
+        painter.setPen(self.text_color)
+        title_txt = "\u5de5\u4f5c\u5b66\u4e60" if self.data.get("type") == "A" else "\u5145\u7535"
+        painter.drawText(title_rect, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter, title_txt)
+        
+        # Duration
+        dur_rect = QtCore.QRectF(65, 35 + y_off, self.width() - 70, 30)
+        font.setPixelSize(24)
+        font.setBold(True)
+        font.setWeight(QtGui.QFont.Black)
+        painter.setFont(font)
+        painter.drawText(dur_rect, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter, self.data.get("duration_text", ""))
+
+class TimelineItemWidget(QtWidgets.QWidget):
+    def __init__(self, parent, block_data, is_top):
+        super().__init__(parent)
+        self.block_data = block_data
+        self.is_top = is_top
+        
+        self._card = BubbleCard(block_data, is_top)
+        
+        # Start Time (e.g. "09:00")
+        self._desc = QtWidgets.QLabel(block_data.get("desc", ""))
+        self._desc.setAlignment(QtCore.Qt.AlignCenter)
+        self._desc.setWordWrap(True)
+        self._desc.setStyleSheet("color: #1B5E20; font-size: 13px; font-weight: bold; background: transparent;")
+
+        # Node (Solid Green or Hollow Yellow)
+        is_rest = (block_data.get("type") == "B")
+        self._node = TimelineNode(is_rest)
+
+        self._card.setParent(self)
+        self._desc.setParent(self)
+        self._node.setParent(self)
+        
+        # Make visible again!
+        self._node.show()
+        self._card.show()
+        self._desc.show()
+
+        self._node_pos = None
+        self._card.clicked.connect(self._show_details)
+        self._popup = None
+
+    def place(self, card_x, card_y, node_x, node_y, desc_y, card_w, card_h, node_size):
+        # Card
+        self._card.setFixedSize(card_w, card_h + 12) # +tip
+        self._card.move(0, card_y)
+        
+        # Node
+        self._node.setFixedSize(node_size, node_size)
+        self._node.move(node_x - self.x(), node_y)
+        
+        # Text
+        self._desc.setFixedWidth(card_w + 40) # Allow wider text
+        self._desc.move(int((card_w - self._desc.width()) / 2), desc_y)
+
+        self._node_pos = (node_x + int(node_size / 2), node_y + int(node_size / 2))
+        self.update()
+
+    def node_center(self):
+        return self._node_pos
+
+    def _show_details(self, data: dict):
+        try:
+            if self._popup and self._popup.isVisible():
+                self._popup.close()
+        except RuntimeError:
+            self._popup = None
+
+        self._popup = TimelineDetailPopup(None, data)
+        self._popup.adjustSize()
+        
+        # Center popup on screen
+        screen = QtGui.QGuiApplication.primaryScreen()
+        geo = screen.geometry()
+        x = (geo.width() - self._popup.width()) // 2
+        y = (geo.height() - self._popup.height()) // 2
+        self._popup.move(x, y)
+        self._popup.show()
+
+class TimelineNode(QtWidgets.QWidget):
+    def __init__(self, is_rest):
+        super().__init__()
+        self.is_rest = is_rest
+        self.setFixedSize(24, 24)
+        self._hovered = False
+
+    def set_hover(self, hovered: bool):
+        if self._hovered != hovered:
+            self._hovered = hovered
+            self.update()
+        
+    def paintEvent(self, event):
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        
+        rect = self.rect().adjusted(2, 2, -2, -2)
+        
+        if self.is_rest:
+            # Hollow Yellow Node
+            # Fill: White/Cream
+            painter.setBrush(QtGui.QColor("#FFF9C4"))
+            # Border: Yellow/Orange
+            pen = QtGui.QPen(QtGui.QColor("#FBC02D"), 3)
+            painter.setPen(pen)
+            painter.drawEllipse(rect)
+        else:
+            # Solid Green Node
+            # Fill: Green
+            painter.setBrush(QtGui.QColor("#66BB6A"))
+            # Border: White ring? Or just solid
+            pen = QtGui.QPen(QtGui.QColor("#FFFFFF"), 2) # White border to pop from line
+            painter.setPen(pen)
+            painter.drawEllipse(rect)
+
+
+class TimelineDetailPopup(QtWidgets.QDialog):
+    def __init__(self, parent, block_data: dict):
+        super().__init__(None)
+        self.setWindowFlags(QtCore.Qt.Tool | QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint)
+        self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+        self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
+        
+        self._block_data = block_data or {}
+        self._build()
+
+    def _category_color(self) -> QtGui.QColor:
+        cat = (self._block_data.get("category") or "other").lower()
+        colors = {
+            "study": QtGui.QColor(108, 191, 156),
+            "short_video": QtGui.QColor(150, 125, 210),
+            "game": QtGui.QColor(230, 120, 90),
+            "web_other": QtGui.QColor(90, 150, 180),
+            "break": QtGui.QColor(255, 214, 79),
+            "other": QtGui.QColor(108, 191, 156),
+        }
+        return colors.get(cat, colors["other"])
+
+    def _fmt_hm(self, dt_str: str) -> str:
+        if not dt_str:
+            return "--:--"
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y/%m/%d %H:%M:%S"):
+            try:
+                return datetime.strptime(dt_str, fmt).strftime("%H:%M")
+            except Exception:
+                pass
+        try:
+            return dt_str[-8:-3]
+        except Exception:
+            return "--:--"
+
+    def _guess_url(self, d: dict) -> str:
+        text = " ".join([
+            str(d.get("window_title") or ""),
+            str(d.get("summary") or ""),
+            str(d.get("process_name") or ""),
+        ])
+        # Simplified regex to avoid re.error (multiple repeat) and cover most cases
+        m = re.search(r"(https?://\S+)", text)
+        if m:
+            return m.group(1)
+        t = text.lower()
+        mapping = [
+            ("bilibili", "https://www.bilibili.com/"),
+            ("\u54d4\u54e9\u54d4\u54e9", "https://www.bilibili.com/"),
+            ("douyin", "https://www.douyin.com/"),
+            ("\u6296\u97f3", "https://www.douyin.com/"),
+            ("tiktok", "https://www.tiktok.com/"),
+            ("youtube", "https://www.youtube.com/"),
+            ("steam", "https://store.steampowered.com/"),
+            ("github", "https://github.com/"),
+            ("leetcode", "https://leetcode.com/"),
+            ("\u529b\u6263", "https://leetcode.cn/"),
+            ("csdn", "https://www.csdn.net/"),
+            ("stackoverflow", "https://stackoverflow.com/"),
+            ("wikipedia", "https://wikipedia.org/"),
+        ]
+        for k, url in mapping:
+            if k in t:
+                return url
+        query = (d.get("summary") or d.get("window_title") or "").strip()
+        if not query:
+            query = t.strip()
+        if query:
+            return f"https://www.bing.com/search?q={quote_plus(query[:80])}"
+        return ""
+
+    def _build(self):
+        accent = self._category_color()
+        accent_rgb = f"{accent.red()}, {accent.green()}, {accent.blue()}"
+        
+        # 1. Main Window Layout (with margins for shadow)
+        self.setStyleSheet("background: transparent;")
+        main_layout = QtWidgets.QVBoxLayout(self)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        
+        # 2. Content Frame
+        self.content_frame = QtWidgets.QFrame()
+        self.content_frame.setObjectName("PopupContent")
+        self.content_frame.setStyleSheet(f"""
+            QFrame#PopupContent {{
+                background: #FFF9E6; 
+                border: 2px solid rgba({accent_rgb}, 180);
+                border-radius: 20px;
+            }}
+            QLabel {{ background: transparent; }}
+            QPushButton#LinkBtn {{
+                border: 1px solid rgba({accent_rgb}, 150);
+                border-radius: 12px;
+                padding: 6px 12px;
+                color: rgba(40, 60, 20, 240);
+                background: rgba(255, 255, 255, 180);
+                font-weight: 800;
+                font-size: 12px;
+            }}
+            QPushButton#LinkBtn:hover {{
+                background: rgba({accent_rgb}, 40);
+                color: rgba(20, 40, 10, 255);
+            }}
+            QPushButton#CloseBtn {{
+                border: none;
+                background: rgba({accent_rgb}, 30);
+                border-radius: 12px;
+                color: rgba(40, 60, 20, 220);
+                font-size: 16px;
+                font-weight: 900;
+            }}
+            QPushButton#CloseBtn:hover {{
+                background: rgba({accent_rgb}, 60);
+                color: rgba(20, 40, 10, 255);
+            }}
+        """)
+        
+        # Shadow on Content Frame
+        self._shadow = QtWidgets.QGraphicsDropShadowEffect(self.content_frame)
+        self._shadow.setBlurRadius(26)
+        self._shadow.setOffset(0, 10)
+        self._shadow.setColor(QtGui.QColor(0, 0, 0, 60))
+        self.content_frame.setGraphicsEffect(self._shadow)
+        
+        main_layout.addWidget(self.content_frame)
+        
+        # Limit width (including margins)
+        self.setMinimumWidth(400) # 360 + 40
+        self.setMaximumWidth(460) # 420 + 40
+
+        layout = QtWidgets.QVBoxLayout(self.content_frame)
+        layout.setContentsMargins(14, 12, 14, 12)
+        layout.setSpacing(10)
+
+        header = QtWidgets.QHBoxLayout()
+        header.setSpacing(10)
+        dot = QtWidgets.QLabel(" ")
+        dot.setFixedSize(10, 10)
+        dot.setStyleSheet(f"background: rgba({accent.red()}, {accent.green()}, {accent.blue()}, 220); border-radius: 5px;")
+        title = QtWidgets.QLabel("\u64cd\u4f5c\u7ec6\u8282")
+        title.setStyleSheet("color: rgba(20, 50, 40, 235); font-size: 13px; font-weight: 900;")
+        close_btn = QtWidgets.QPushButton("\u00d7")
+        close_btn.setObjectName("CloseBtn")
+        close_btn.setCursor(QtCore.Qt.PointingHandCursor)
+        close_btn.setFixedSize(22, 22)
+        close_btn.clicked.connect(self.close)
+        header.addWidget(dot)
+        header.addWidget(title)
+        header.addStretch()
+        header.addWidget(close_btn)
+        layout.addLayout(header)
+
+        meta = QtWidgets.QLabel(f"{self._block_data.get('title','')}  \u00b7  {self._block_data.get('duration_text','')}")
+        meta.setStyleSheet("color: rgba(30, 60, 50, 190); font-size: 12px; font-weight: 700;")
+        meta.setWordWrap(True)
+        layout.addWidget(meta)
+
+        sep = QtWidgets.QFrame()
+        sep.setFixedHeight(1)
+        sep.setStyleSheet(f"background: rgba({accent.red()}, {accent.green()}, {accent.blue()}, 70); border: none;")
+        layout.addWidget(sep)
+
+        details = self._block_data.get("details") or []
+        if not details:
+            empty = QtWidgets.QLabel("\u6682\u65e0\u66f4\u591a\u6570\u636e")
+            empty.setStyleSheet("color: rgba(40, 70, 60, 170); font-size: 12px;")
+            layout.addWidget(empty)
+            return
+
+        scroll = QtWidgets.QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        
+        # Styled Vertical Scrollbar (Matching Timeline Style)
+        scroll.setStyleSheet("""
+            QScrollArea { background: transparent; border: none; }
+            QScrollBar:vertical {
+                border: none;
+                background: rgba(0, 0, 0, 0);
+                width: 10px;
+                margin: 0px 0px 0px 0px;
+                border-radius: 5px;
+            }
+            QScrollBar::handle:vertical {
+                background: rgba(90, 140, 115, 200);
+                min-height: 40px;
+                border-radius: 5px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: none; }
+        """)
+        scroll.viewport().setStyleSheet("background: transparent;")
+
+        body = QtWidgets.QWidget()
+        v = QtWidgets.QVBoxLayout(body)
+        v.setContentsMargins(0, 0, 10, 0) # Add right margin to separate content from scrollbar
+        v.setSpacing(8)
+
+        for d in details[:12]:
+            v.addWidget(TimelineDetailRow(d, accent, self._fmt_hm, self._guess_url))
+        v.addStretch()
+
+        scroll.setWidget(body)
+        scroll.setFixedHeight(min(260, max(120, 28 + len(details[:12]) * 54)))
+        layout.addWidget(scroll)
+
+
+class TimelineDetailRow(QtWidgets.QFrame):
+    def __init__(self, detail: dict, accent: QtGui.QColor, fmt_hm, guess_url):
+        super().__init__()
+        self._detail = detail or {}
+        self._accent = accent
+        self._fmt_hm = fmt_hm
+        self._guess_url = guess_url
+        self._build()
+
+    def _build(self):
+        self.setObjectName("DetailRow")
+        self.setStyleSheet(f"""
+            QFrame#DetailRow {{
+                background: rgba(255, 255, 255, 255);
+                border: 1px solid rgba({self._accent.red()}, {self._accent.green()}, {self._accent.blue()}, 255);
+                border-radius: 14px;
+            }}
+            QLabel {{
+                border: none;
+                background: transparent;
+            }}
+        """)
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(10, 8, 10, 8)
+        layout.setSpacing(6)
+
+        title_text = (self._detail.get("summary") or self._detail.get("window_title") or "").strip()
+        if not title_text:
+            title_text = "\u672a\u77e5\u7a97\u53e3"
+
+        title = QtWidgets.QLabel()
+        title.setStyleSheet("color: rgba(20, 50, 40, 230); font-size: 12px; font-weight: 800;")
+        title.setWordWrap(False)
+        fm = QtGui.QFontMetrics(title.font())
+        title.setText(fm.elidedText(title_text, QtCore.Qt.ElideRight, 320))
+        layout.addWidget(title)
+
+        start = self._fmt_hm(self._detail.get("start_time") or "")
+        end = self._fmt_hm(self._detail.get("end_time") or "")
+        dur = int(self._detail.get("duration") or 0)
+        mins = max(1, int(dur / 60))
+        process_name = (self._detail.get("process_name") or "").strip()
+        sub = QtWidgets.QLabel(f"{start} - {end}  \u00b7  {mins}m  \u00b7  {process_name}")
+        sub.setStyleSheet("color: rgba(30, 60, 50, 175); font-size: 11px; font-weight: 700;")
+        sub.setWordWrap(False)
+        layout.addWidget(sub)
+
+
+
 if __name__ == "__main__":
+    print("Starting Daily Report...")
     import sys
-    app = QtWidgets.QApplication(sys.argv)
-    w = SimpleDailyReport()
-    w.show()
-    sys.exit(app.exec())
+    try:
+        app = QtWidgets.QApplication(sys.argv)
+        w = SimpleDailyReport()
+        w.show()
+        print("Widget shown")
+        sys.exit(app.exec())
+    except Exception as e:
+        print(f"CRITICAL ERROR: {e}")
+        import traceback
+        traceback.print_exc()
