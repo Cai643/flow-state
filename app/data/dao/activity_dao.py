@@ -148,7 +148,7 @@ class StatsDAO:
     """统计数据访问对象"""
     
     @staticmethod
-    def update_daily_stats(date_obj, status: str, duration: int, current_streak: int = 0):
+    def update_daily_stats(date_obj, status: str, duration: int, current_streak: int = 0, willpower_wins_increment: int = 0):
         """更新每日统计"""
         # 1. 累加时长
         col_name = None
@@ -188,6 +188,14 @@ class StatsDAO:
                     SET max_focus_streak = MAX(max_focus_streak, ?)
                     WHERE date = ?
                 ''', (current_streak, date_obj))
+            
+            # 4.5 更新意志力胜利次数
+            if willpower_wins_increment > 0:
+                 conn.execute('''
+                    UPDATE daily_stats 
+                    SET willpower_wins = willpower_wins + ?
+                    WHERE date = ?
+                ''', (willpower_wins_increment, date_obj))
                 
             # 5. 更新效能指数 (简单计算: focus / (focus + entertainment) * 100)
             # 这是一个简单的实时计算，也可以放在应用层算
@@ -195,9 +203,9 @@ class StatsDAO:
             conn.execute('''
                 UPDATE daily_stats 
                 SET efficiency_score = CASE 
-                    WHEN (total_focus_time + total_entertainment_time) > 0 
-                    THEN (total_focus_time * 100 / (total_focus_time + total_entertainment_time))
-                    ELSE 0 
+                WHEN (total_focus_time + total_entertainment_time) > 0 
+                THEN (total_focus_time * 100 / (total_focus_time + total_entertainment_time))
+                ELSE 0 
                 END
                 WHERE date = ?
             ''', (date_obj,))

@@ -13,7 +13,7 @@ client = ollama.Client(host='http://127.0.0.1:11434')
 
 # print(client.list())
 
-# print(client.show('qwen2:7b'))
+# print(client.show('qwen2:1.5b'))
 
 # print(client.ps())
 
@@ -134,7 +134,7 @@ Output:"
             fmt = 'json' if json_mode else None
             
             response = self.client.chat(
-                model='qwen2:7b',
+                model='qwen2:1.5b',
                 messages=messages,
                 format=fmt 
             )

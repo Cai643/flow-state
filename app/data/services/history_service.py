@@ -23,6 +23,9 @@ class ActivityHistoryManager:
         # 记录当前连续专注时长 (秒)
         self._current_focus_streak_seconds = 0
         
+        # 意志力胜利检测状态: 记录进入当前状态前，是否处于 Focus 状态
+        self._last_status_was_focus = False
+        
         # 新增：记录上一个窗口会话的信息，用于合并
         self._last_window_session = {
             'id': None,
@@ -48,9 +51,21 @@ class ActivityHistoryManager:
             duration_seconds = int(current_time - self.status_start_time)
             # 过滤短时抖动
             if duration_seconds > 2:
-                self._save_record(self.current_status, duration_seconds, self._last_summary, self._last_raw_data)
+                # 检测意志力胜利 (从 Entertainment 切回 Focus)
+                willpower_win_increment = 0
+                if self.current_status == 'entertainment' and status in ['focus', 'work']:
+                    if self._last_status_was_focus and 5 < duration_seconds < 300:
+                        willpower_win_increment = 1
+                
+                self._save_record(self.current_status, duration_seconds, self._last_summary, self._last_raw_data, willpower_wins_increment=willpower_win_increment)
                 self._update_cache(self.current_status, int(duration_seconds / 60), self.status_start_time)
             
+            # 更新状态追踪 (为下一段做准备)
+            if self.current_status in ['focus', 'work']:
+                self._last_status_was_focus = True
+            else:
+                self._last_status_was_focus = False
+                
             self.current_status = status
             self.status_start_time = current_time
             # 重置缓存的摘要
@@ -87,7 +102,7 @@ class ActivityHistoryManager:
                 if raw_data:
                     self._last_raw_data = raw_data
     
-    def _save_record(self, status: str, duration: int, summary: str = None, raw_data: str = None):
+    def _save_record(self, status: str, duration: int, summary: str = None, raw_data: str = None, willpower_wins_increment: int = 0):
         """调用 DAO 保存数据"""
         try:
             # 1. 写入流水日志
@@ -105,7 +120,7 @@ class ActivityHistoryManager:
             
             # 3. 更新每日统计 (传入当前连续时长)
             today = date.today()
-            StatsDAO.update_daily_stats(today, status, duration, self._current_focus_streak_seconds)
+            StatsDAO.update_daily_stats(today, status, duration, self._current_focus_streak_seconds, willpower_wins_increment)
             
             # 4. 更新或创建窗口会话聚合记录 (Window Sessions)
             if raw_data:

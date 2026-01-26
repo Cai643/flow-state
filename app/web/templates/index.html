@@ -551,170 +551,176 @@
         .right-panel {
             flex: 1;
             height: 100%;
-            background-color: var(--color-white);
-            display: flex;
-            /* flex-direction: column;  Changed to row for 3-pane layout */
-            flex-direction: row; 
-            position: relative;
-            min-width: 300px;
-            /* padding-left: 5px; Removed to allow flush resizer */
-        }
-
-        /* --- Chat Area --- */
-        .chat-container {
-            flex: 1;
+            background-color: #FDFBF7; /* 米黄色背景 */
             display: flex;
             flex-direction: column;
-            background-color: var(--color-white);
-            min-width: 300px;
-        }
-        
-        /* ... (Keep existing chat styles) ... */
-
-        /* --- Right Sidebar (New) --- */
-        .right-sidebar {
-            width: 0px; /* Initially hidden/collapsed */
-            height: 100%;
-            background-color: var(--color-bg-light);
-            border-left: 1px solid var(--color-green-light);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            transition: width 0.1s; /* Smooth resize */
-        }
-        
-        .right-sidebar.active {
-            width: 250px; /* Default open width */
-        }
-
-        /* Right Resizer */
-        .resizer-right {
-            width: 10px;
-            cursor: col-resize;
-            background-color: transparent;
-            display: flex;
+            align-items: center;
             justify-content: center;
+            position: relative;
+            min-width: 300px;
+            overflow: hidden; /* 防止内容溢出 */
+        }
+
+        /* --- Report Generation UI --- */
+        .report-ui-container {
+            display: flex;
+            flex-direction: column;
             align-items: center;
-            z-index: 10;
-            margin-left: -5px; /* Overlap slightly */
+            justify-content: center;
+            width: 100%;
+            height: 100%;
             position: relative;
         }
-        .resizer-right::before {
-            content: '';
-            width: 1px;
-            height: 100%;
-            background-color: var(--color-green-light);
+
+        /* 水印背景 */
+        .watermark-icon {
             position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 300px;
+            height: 300px;
+            opacity: 0.05; /* 极淡的水印 */
+            pointer-events: none;
+            z-index: 0;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%232E7D32'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z'/%3E%3C/svg%3E"); /* 暂时用一个通用图标代替大脑图标 */
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: contain;
         }
-        /* Reuse resizer-handle style but ensure it works here */
-        .resizer-right .resizer-handle {
-            /* Inherits shared styles, add specific if needed */
-            cursor: col-resize;
+
+        /* 标题区 */
+        .report-header {
+            text-align: center;
+            z-index: 1;
+            margin-bottom: 40px;
+            font-family: 'SimSun', 'Songti SC', serif; /* 宋体 */
+            color: #424242; /* 深灰色 */
         }
-        .chat-header {
-            padding: 20px;
-            border-bottom: 1px solid rgba(164, 191, 90, 0.2);
+        
+        .report-title-line {
+            font-size: 18px;
+            margin-bottom: 8px;
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            justify-content: center;
+            gap: 8px;
         }
-        .chat-title {
+
+        .report-dropdown-trigger {
+            background-color: #388E3C; /* 深抹茶绿 */
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
             font-weight: bold;
-            font-size: 16px;
-            color: var(--color-green-dark);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-family: sans-serif; /* 胶囊内用无衬线体更易读 */
+        }
+
+        .report-subtitle {
+            font-size: 24px;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+
+        /* 选项卡区 */
+        .period-selector {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 60px; /* 大留白 */
+            z-index: 1;
+        }
+
+        .period-btn {
+            padding: 10px 24px;
+            border: 1px solid #A5D6A7; /* 细浅绿边框 */
+            border-radius: 8px;
+            background: transparent;
+            color: #2E7D32;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .period-btn:hover, .period-btn.active {
+            background-color: #E8F5E9; /* 悬停变实心浅绿 */
+            border-color: #2E7D32;
+            font-weight: bold;
+            transform: translateY(-2px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        /* 生成按钮 */
+        .generate-btn-container {
+            z-index: 1;
+        }
+
+        .generate-btn {
+            background-color: #66BB6A; /* 高饱和草绿 */
+            color: white;
+            padding: 16px 48px;
+            border-radius: 50px; /* Pill Shape */
+            border: none;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(46, 125, 50, 0.2); /* 柔和投影 */
+            transition: all 0.2s ease;
             display: flex;
             align-items: center;
             gap: 10px;
         }
-        .chat-title::before {
-            content: '';
-            display: block;
-            width: 8px;
-            height: 8px;
-            background-color: var(--color-green-light);
-            border-radius: 50%;
+
+        .generate-btn:hover {
+            background-color: #4CAF50;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 15px rgba(46, 125, 50, 0.3);
         }
-        .chat-messages {
-            flex: 1;
+
+        .generate-btn:active {
+            transform: translateY(1px);
+            box-shadow: 0 2px 5px rgba(46, 125, 50, 0.2);
+        }
+        
+        /* 报告显示区 (生成后显示) */
+        .report-content-view {
+            display: none; /* 默认隐藏 */
+            width: 100%;
+            height: 100%;
             overflow-y: auto;
-            padding: 30px 30px 80px 30px;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
+            padding: 20px;
+            box-sizing: border-box;
+            background: #FFF;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 10;
         }
-        .message {
-            max-width: 70%;
-            padding: 15px 20px;
-            border-radius: 12px;
+        
+        .report-markdown {
+            max-width: 800px;
+            margin: 0 auto;
             line-height: 1.6;
-            position: relative;
+            color: #333;
         }
-        .message.ai {
-            align-self: flex-start;
-            background-color: var(--color-bg-light); 
-            color: var(--color-green-dark);
-            border-top-left-radius: 2px;
-            border: 1px solid rgba(164, 191, 90, 0.1);
-        }
-        .message.user {
-            align-self: flex-end;
-            background-color: var(--color-green-dark);
-            color: var(--color-white);
-            border-top-right-radius: 2px;
-        }
-        .input-area {
-            padding: 20px 30px;
-            border-top: 1px solid rgba(164, 191, 90, 0.2);
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-        .input-wrapper {
-            flex: 1;
-            background-color: var(--color-bg-light);
-            border-radius: 25px;
-            padding: 5px 20px;
-            display: flex;
-            align-items: center;
-            border: 1px solid transparent;
-            transition: border 0.2s;
-        }
-        .input-wrapper:focus-within {
-            border-color: var(--color-green-light);
-        }
-        .input-box {
-            flex: 1;
+        
+        .report-back-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: none;
             border: none;
-            background: transparent;
-            padding: 10px 0;
-            outline: none;
-            font-size: 14px;
-            color: var(--color-green-dark);
-        }
-        .input-box::placeholder {
-            color: var(--color-green-mid);
-            opacity: 0.6;
-        }
-        .send-btn {
-            width: 40px;
-            height: 40px;
-            background-color: var(--color-green-dark);
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            color: #2E7D32;
             cursor: pointer;
-            transition: transform 0.2s;
-        }
-        .send-btn:hover {
-            transform: scale(1.1);
-            background-color: var(--color-green-mid);
-        }
-        .send-btn svg {
-            fill: white;
-            width: 18px;
-            height: 18px;
-            margin-left: 2px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
         body.resizing {
             cursor: col-resize;
@@ -851,43 +857,62 @@
             </div>
         </div>
 
-        <!-- Right Panel: AI Chat -->
+        <!-- Right Panel: Report Generation -->
         <div class='right-panel' id='right-panel'>
-            <div class='chat-container'>
-                <div class='chat-header'>
-                    <div class='chat-title' data-i18n="chat.title">Flow-State Chat</div>
-                    <div style='color: var(--color-green-mid); cursor: pointer;' onclick="toggleRightSidebar()">
-                        <svg viewBox='0 0 24 24' width='20' height='20' fill='currentColor'><path d='M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z'/></svg>
+            
+            <!-- Default UI: Report Config -->
+            <div class="report-ui-container" id="report-config-ui">
+                <!-- Watermark -->
+                <div class="watermark-icon"></div>
+
+                <!-- Header -->
+                <div class="report-header">
+                    <div class="report-title-line">
+                        对 <span class="report-dropdown-trigger">最近 <span id="selected-period-text">3</span> 天 ▼</span> 的数据进行
                     </div>
+                    <div class="report-subtitle">深度效能复盘</div>
                 </div>
-                
-                <div class='chat-messages' id='chat-messages'>
-                    <div class='message ai' data-i18n="chat.welcome">你好！我是你的 Flow-State 助手。这里可以查看你的历史行为数据，也可以和我聊天。</div>
+
+                <!-- Period Selectors -->
+                <div class="period-selector">
+                    <button class="period-btn active" onclick="selectPeriod(3)">⚡️ 近3天</button>
+                    <button class="period-btn" onclick="selectPeriod(7)">📅 近7天</button>
+                    <button class="period-btn" onclick="selectPeriod(30)">🌙 近30天</button>
                 </div>
-                
-                <div class='input-area'>
-                    <div class='input-wrapper'>
-                        <input type='text' class='input-box' id='chat-input' data-i18n-placeholder="chat.placeholder" placeholder='询问 Flow-State 助手...'>
-                    </div>
-                    <div class='send-btn' id='send-btn'>
-                        <svg viewBox='0 0 24 24'><path d='M2.01 21L23 12 2.01 3 2 10l15 2-15 2z'/></svg>
+
+                <!-- Generate Button -->
+                <div class="generate-btn-container">
+                    <button class="generate-btn" onclick="generateReport()">
+                        <span>✨ 生成洞察报告</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Report View (Hidden initially) -->
+            <div class="report-content-view" id="report-result-view">
+                <button class="report-back-btn" onclick="showReportConfig()">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+                    返回配置
+                </button>
+                <div class="report-markdown" id="report-markdown-content">
+                    <!-- Markdown content will be injected here -->
+                    <div style="text-align: center; margin-top: 100px; color: #666;">
+                        正在生成报告，请稍候...<br>
+                        <span style="font-size: 12px; opacity: 0.7;">AI 正在分析您的专注数据</span>
                     </div>
                 </div>
             </div>
 
-            <!-- Right Resizer -->
+            <!-- Right Resizer (Preserved) -->
             <div class='resizer-right' id='resizer-right'>
                 <div class='resizer-handle'>
                     <svg viewBox='0 0 24 24'><path d='M8 19c0 1.1.9 2 2 2h4c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v14zm6-14h2v14h-2V5zM8 5h2v14H8V5z'/></svg>
                 </div>
             </div>
             
-            <!-- Right Sidebar -->
+            <!-- Right Sidebar (Preserved) -->
             <div class='right-sidebar' id='right-sidebar'>
-                <div style="padding: 20px; color: var(--color-green-mid); font-size: 14px; text-align: center;">
-                    <div style="margin-bottom: 10px; font-weight: bold;">扩展信息</div>
-                    <div style="font-size: 12px; opacity: 0.8;">这里可以放置更多工具或上下文信息。</div>
-                </div>
+                <!-- ... existing sidebar content ... -->
             </div>
         </div>
 
@@ -1683,6 +1708,76 @@
 
         startAutoRefresh();
 
+
+        // --- Report Generation Logic ---
+        let selectedReportDays = 3;
+
+        function selectPeriod(days) {
+            selectedReportDays = days;
+            document.getElementById('selected-period-text').innerText = days;
+            
+            // Update button styles
+            const buttons = document.querySelectorAll('.period-btn');
+            buttons.forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.innerText.includes(days + '天')) {
+                    btn.classList.add('active');
+                }
+            });
+        }
+
+        async function generateReport() {
+            // Switch UI
+            document.getElementById('report-config-ui').style.display = 'none';
+            document.getElementById('report-result-view').style.display = 'block';
+            
+            const markdownContainer = document.getElementById('report-markdown-content');
+            markdownContainer.innerHTML = `
+                <div style="text-align: center; margin-top: 100px; color: #666;">
+                    <svg style="animation: spin 1s linear infinite; margin-bottom: 20px;" viewBox="0 0 24 24" width="40" height="40" fill="#66BB6A"><path d="M12 4V2A10 10 0 0 0 2 12h2a8 8 0 0 1 8-8z"/></svg><br>
+                    正在生成 ${selectedReportDays} 天的深度复盘...<br>
+                    <span style="font-size: 12px; opacity: 0.7;">AI 正在分析您的专注数据</span>
+                </div>
+                <style>@keyframes spin { 100% { transform: rotate(360deg); } }</style>
+            `;
+
+            try {
+                // Call API (Need to implement backend endpoint later)
+                // For now, simulating a delay and Markdown response
+                // await new Promise(r => setTimeout(r, 2000));
+                
+                const response = await fetch('/api/report/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ days: selectedReportDays })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    markdownContainer.innerHTML = `<div style="color: red; text-align: center; margin-top: 50px;">生成失败: ${data.error}</div>`;
+                } else {
+                    // Render Markdown (Simple replacement for now, marked.js recommended for production)
+                    let html = data.report
+                        .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+                        .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+                        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+                        .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
+                        .replace(/\n/gim, '<br>');
+                    
+                    markdownContainer.innerHTML = html;
+                }
+
+            } catch (e) {
+                console.error(e);
+                markdownContainer.innerHTML = `<div style="color: red; text-align: center; margin-top: 50px;">网络请求错误，请检查后台服务。</div>`;
+            }
+        }
+
+        function showReportConfig() {
+            document.getElementById('report-config-ui').style.display = 'flex';
+            document.getElementById('report-result-view').style.display = 'none';
+        }
 
         // --- Chat Logic ---
         const chatMessages = document.getElementById('chat-messages');

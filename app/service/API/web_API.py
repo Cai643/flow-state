@@ -242,9 +242,78 @@ def create_app(ai_busy_flag=None):
             print(f"Error fetching stats: {e}")
             return jsonify({"error": str(e)}), 500
 
-    # 示例：AI 生成日报接口
-    @app.route('/api/generate_report', methods=['POST'])
-    def generate_report():
+    # 新增：生成深度复盘报告接口 (Report Generation)
+    @app.route('/api/report/generate', methods=['POST'])
+    def generate_report_api():
+        data = request.json
+        days = data.get('days', 3)
+        print(f"【Web服务】收到生成报告请求，周期: {days}天")
+        
+        # 错峰执行：设置忙碌标志
+        flag = app.config.get('AI_BUSY_FLAG')
+        if flag:
+            flag.value = True
+            
+        try:
+            from app.data.web_report.report_generator import ReportGenerator
+            from app.service.detector.detector_logic import analyze
+            
+            # 定义 AI 回调函数
+            def ai_callback(context):
+                print("【Web服务】正在请求 AI 生成洞察...")
+                
+                # 构造 Prompt
+                prompt = f"""
+                你是一个专业的高效能教练。请根据以下用户最近 {days} 天的专注数据，生成一份深度复盘报告的两个核心部分。
+                
+                【用户数据 Context】
+                - 周期: {context['period']}
+                - 专注总时长: {context['total_focus_hours']} 小时
+                - 意志力胜利次数: {context['willpower_wins']} 次
+                - 巅峰日信息: {context['peak_day']}
+                - 每日概览: {context['daily_logs']}
+                
+                【任务要求】
+                请返回一个 JSON 对象（不要 Markdown 代码块，纯 JSON），包含以下两个字段：
+                1. "core_items": 一个字典，Key是日期（格式如 "1月21日"），Value是当天核心事项的一句话精炼总结（基于 top_app 和 title）。
+                   例如: {{ "1月21日": "重构后端核心逻辑", "1月22日": "深入研究数据库架构" }}
+                2. "encouragement": 一段 100 字左右的致追梦者寄语。风格激昂、真诚，引用上面的具体数据（如“你夺回了XX分钟”），对用户的努力给予高度肯定。
+                
+                请确保输出是合法的 JSON 格式。
+                """
+                
+                # 调用 AI (使用 json_mode=True)
+                try:
+                    response_text = analyze("生成复盘报告", system_prompt=prompt, json_mode=True)
+                    import json
+                    return json.loads(response_text)
+                except Exception as e:
+                    print(f"AI 生成失败: {e}")
+                    # Fallback
+                    return {
+                        "core_items": {}, 
+                        "encouragement": f"数据表明，你在过去 {days} 天里投入了 {context['total_focus_hours']} 小时的专注时间。虽然 AI 暂时无法连接，但你的努力已被记录。继续加油！"
+                    }
+
+            # 生成报告
+            generator = ReportGenerator()
+            report_md = generator.generate_report(days=days, ai_callback=ai_callback)
+            
+            return jsonify({"report": report_md})
+            
+        except Exception as e:
+            print(f"【Web服务】生成报告失败: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({"error": str(e)}), 500
+        finally:
+            # 恢复后台 AI
+            if flag:
+                flag.value = False
+
+    # 示例：AI 生成日报接口 (Old, kept for compatibility if needed)
+    @app.route('/api/generate_report_old', methods=['POST'])
+    def generate_report_old():
         print("【Web服务】收到生成日报请求...")
         
         # 错峰执行：暂停后台 AI

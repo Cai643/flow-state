@@ -70,6 +70,7 @@ def init_db():
                 total_entertainment_time INTEGER DEFAULT 0, -- 娱乐总时长
                 current_focus_streak INTEGER DEFAULT 0, -- 目前持续专注时长
                 efficiency_score INTEGER DEFAULT 0,   -- 效能指数
+                willpower_wins INTEGER DEFAULT 0,    -- 意志力胜利次数
                 summary_text TEXT
             )
         ''')
@@ -87,6 +88,11 @@ def init_db():
             
         try:
             cursor.execute('ALTER TABLE daily_stats ADD COLUMN efficiency_score INTEGER DEFAULT 0')
+        except sqlite3.OperationalError:
+            pass
+
+        try:
+            cursor.execute('ALTER TABLE daily_stats ADD COLUMN willpower_wins INTEGER DEFAULT 0')
         except sqlite3.OperationalError:
             pass
         
