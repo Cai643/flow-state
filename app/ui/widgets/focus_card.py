@@ -31,6 +31,8 @@ class FocusStatusCard(QtWidgets.QWidget):
     """
     专注状态卡片
     展示核心状态和摘要
+
+    修改：保留统计，更改为专注/充能模式转换
     """
     enter_deep_mode_requested = Signal()
 
@@ -88,15 +90,42 @@ class FocusStatusCard(QtWidgets.QWidget):
         self.status_label.setStyleSheet(self.item_style)
         self.status_label.setFixedHeight(30)
 
-        self.summary_label = QtWidgets.QLabel("💪 拉回注意力 0次  ↑效率+0%")
-        self.summary_label.setFont(QtGui.QFont("Microsoft YaHei", 9))
-        self.summary_label.setStyleSheet(self.item_style)
-        self.summary_label.setFixedHeight(30)
+        # 模式切换 Switch 按钮容器
+        mode_container = QtWidgets.QWidget()
+        mode_layout = QtWidgets.QHBoxLayout(mode_container)
+        mode_layout.setContentsMargins(0, 0, 0, 0)
+        mode_layout.setSpacing(0)
+        
+        # 专注模式按钮
+        self.focus_btn = QtWidgets.QPushButton("💪 专注模式")
+        self.focus_btn.setFont(QtGui.QFont("Microsoft YaHei", 9))
+        self.focus_btn.setCheckable(True)
+        self.focus_btn.setChecked(True)
+        self.focus_btn.setFixedHeight(30)
+        self.focus_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+        self.focus_btn.clicked.connect(self._on_focus_mode_clicked)
+        
+        # 充电模式按钮
+        self.recharge_btn = QtWidgets.QPushButton("🔋 充电模式")
+        self.recharge_btn.setFont(QtGui.QFont("Microsoft YaHei", 9))
+        self.recharge_btn.setCheckable(True)
+        self.recharge_btn.setChecked(False)
+        self.recharge_btn.setFixedHeight(30)
+        self.recharge_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+        self.recharge_btn.clicked.connect(self._on_recharge_mode_clicked)
+        
+        mode_layout.addWidget(self.focus_btn, 1)
+        mode_layout.addWidget(self.recharge_btn, 1)
+        mode_container.setFixedHeight(30)
+        
+        # 当前模式 (用于跟踪状态)
+        self.current_mode = "focus"
+        self._update_mode_buttons_style()
 
         layout.addWidget(self.title_label)
         layout.addSpacing(2)
         layout.addWidget(self.status_label)
-        layout.addWidget(self.summary_label)
+        layout.addWidget(mode_container)
 
     def enterEvent(self, event):
         self.hovering = True
@@ -147,6 +176,85 @@ class FocusStatusCard(QtWidgets.QWidget):
             self.breath_direction = 1
         # self._apply_style() # 减少频繁调用以优化性能，或者仅在需要时更新
 
+    def _update_mode_buttons_style(self):
+        """更新模式按钮的样式"""
+        if self.current_mode == "focus":
+            # 专注模式：深绿底白字
+            self.focus_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #4CAF50;
+                    color: white;
+                    border: none;
+                    border-radius: 12px;
+                    padding: 4px 12px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #45a049;
+                }
+            """)
+            # 充电模式：浅绿底黑字
+            self.recharge_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #FEFAE0;
+                    color: #5D4037;
+                    border: none;
+                    border-radius: 12px;
+                    padding: 4px 12px;
+                    font-weight: normal;
+                }
+                QPushButton:hover {
+                    background-color: #FFFEF5;
+                }
+            """)
+        else:
+            # 专注模式：浅绿底黑字
+            self.focus_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #FEFAE0;
+                    color: #5D4037;
+                    border: none;
+                    border-radius: 12px;
+                    padding: 4px 12px;
+                    font-weight: normal;
+                }
+                QPushButton:hover {
+                    background-color: #FFFEF5;
+                }
+            """)
+            # 充电模式：深绿底白字
+            self.recharge_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #4CAF50;
+                    color: white;
+                    border: none;
+                    border-radius: 12px;
+                    padding: 4px 12px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #45a049;
+                }
+            """)
+
+    def _on_focus_mode_clicked(self):
+        """处理专注模式按钮点击"""
+        if self.current_mode != "focus":
+            self.current_mode = "focus"
+            self._update_mode_buttons_style()
+            # 更新全局模式
+            from app.data.services.history_service import ActivityHistoryManager
+            ActivityHistoryManager.set_current_mode("focus")
+
+    def _on_recharge_mode_clicked(self):
+        """处理充电模式按钮点击"""
+        if self.current_mode != "recharge":
+            self.current_mode = "recharge"
+            self._update_mode_buttons_style()
+            # 更新全局模式
+            from app.data.services.history_service import ActivityHistoryManager
+            ActivityHistoryManager.set_current_mode("recharge")
+
     # 对外数据更新接口：联动监控结果
     def update_from_result(self, result: dict):
         # 1. 解析实时监控数据
@@ -188,7 +296,8 @@ class FocusStatusCard(QtWidgets.QWidget):
             display_focus_hours = 0.0
 
         # 3. 计算“拉回注意力”次数 (从娱乐 -> 工作/专注 的切换)
-        if self.last_status is not None:
+        # 修改：充电模式下不计算拉回注意力次数
+        if self.last_status is not None and self.current_mode != "recharge":
             # 只有当上一次是娱乐，且这一次变成了工作或专注，才算一次“拉回”
             if self.last_status == 'entertainment' and current_status in ['work', 'focus']:
                 self.pull_back_count += 1
@@ -214,11 +323,10 @@ class FocusStatusCard(QtWidgets.QWidget):
         
         display_pull_back_count = self.pull_back_count
 
-        self.status_label.setText(f"⚡ 专注中  已连续{display_minutes}分钟")
-
-        self.summary_label.setText(
-            f"💪 拉回注意力 {display_pull_back_count}次  ↑效率+{efficiency_gain}%"
-        )
+        if self.current_mode == "recharge":
+            self.status_label.setText(f"🔋 充电中  已连续{display_minutes}分钟")
+        else:
+            self.status_label.setText(f"⚡ 专注中  已连续{display_minutes}分钟")
 
 
 class TimerDialog(QtWidgets.QDialog):

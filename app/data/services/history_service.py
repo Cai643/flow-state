@@ -14,6 +14,19 @@ import json
 class ActivityHistoryManager:
     """活动历史管理器"""
     
+    # 全局当前模式变量
+    _current_mode = "focus"  # 默认专注模式
+    
+    @classmethod
+    def set_current_mode(cls, mode):
+        """设置当前模式"""
+        cls._current_mode = mode
+    
+    @classmethod
+    def get_current_mode(cls):
+        """获取当前模式"""
+        return cls._current_mode
+    
     def __init__(self):
         self.current_status = None
         self.status_start_time = None
@@ -95,7 +108,14 @@ class ActivityHistoryManager:
             
             # 2. 更新每日统计
             today = date.today()
-            StatsDAO.update_daily_stats(today, status, duration)
+            
+            # 修改：如果是充电模式，所有活动都计入充能时间
+            if self.get_current_mode() == "recharge":
+                # 充电模式下，不管实际状态是什么，都统计为娱乐时间（充能）
+                StatsDAO.update_daily_stats(today, "entertainment", duration)
+            else:
+                # 专注模式下，按实际状态统计
+                StatsDAO.update_daily_stats(today, status, duration)
             
             # 3. 更新或创建窗口会话聚合记录 (Window Sessions)
             if raw_data:
@@ -125,6 +145,11 @@ class ActivityHistoryManager:
                         # process_name == self._last_window_session['process'] # 可选：严格匹配进程
                     )
                     
+                    # 修改：如果是充电模式，所有活动都标记为entertainment
+                    session_status = status
+                    if self.get_current_mode() == "recharge":
+                        session_status = "entertainment"
+                    
                     if is_same_session:
                         # 是同一个会话，更新时长
                         WindowSessionDAO.update_session_duration(self._last_window_session['id'], duration)
@@ -141,7 +166,7 @@ class ActivityHistoryManager:
                         start_ts = time.time() - duration
                         
                         WindowSessionDAO.create_session(
-                            window_title, process_name, start_ts, duration, status, summary
+                            window_title, process_name, start_ts, duration, session_status, summary
                         )
                         
                         # 更新缓存，指向新创建的 Session
