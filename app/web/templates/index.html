@@ -605,176 +605,187 @@
         .right-panel {
             flex: 1;
             height: 100%;
-            background-color: #FDFBF7; /* 米黄色背景 */
+            background-color: var(--color-white);
             display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+            flex-direction: row; 
             position: relative;
             min-width: 300px;
-            overflow: hidden; /* 防止内容溢出 */
         }
 
-        /* --- Report Generation UI --- */
-        .report-ui-container {
+        /* --- Chat Area --- */
+        .chat-container {
+            flex: 1;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            height: 100%;
-            position: relative;
+            background-color: var(--color-white);
+            min-width: 300px;
         }
 
-        /* 水印背景 */
-        .watermark-icon {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 300px;
-            height: 300px;
-            opacity: 0.05; /* 极淡的水印 */
-            pointer-events: none;
-            z-index: 0;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%232E7D32'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z'/%3E%3C/svg%3E"); /* 暂时用一个通用图标代替大脑图标 */
-            background-repeat: no-repeat;
-            background-position: center;
-            background-size: contain;
-        }
-
-        /* 标题区 */
-        .report-header {
-            text-align: center;
-            z-index: 1;
-            margin-bottom: 40px;
-            font-family: 'SimSun', 'Songti SC', serif; /* 宋体 */
-            color: #424242; /* 深灰色 */
-        }
-        
-        .report-title-line {
-            font-size: 18px;
-            margin-bottom: 8px;
+        .chat-header {
+            height: 50px;
+            border-bottom: 1px solid rgba(164, 191, 90, 0.3);
             display: flex;
             align-items: center;
-            justify-content: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            background-color: var(--color-bg-light);
+        }
+
+        .chat-title {
+            font-weight: 600;
+            color: var(--color-text-main);
+            display: flex;
+            align-items: center;
             gap: 8px;
         }
 
-        .report-dropdown-trigger {
-            background-color: #388E3C; /* 深抹茶绿 */
-            color: white;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: bold;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            font-family: sans-serif; /* 胶囊内用无衬线体更易读 */
-        }
-
-        .report-subtitle {
-            font-size: 24px;
-            font-weight: bold;
-            letter-spacing: 2px;
-        }
-
-        /* 选项卡区 */
-        .period-selector {
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
             display: flex;
-            gap: 20px;
-            margin-bottom: 60px; /* 大留白 */
-            z-index: 1;
+            flex-direction: column;
+            gap: 16px;
         }
 
-        .period-btn {
-            padding: 10px 24px;
-            border: 1px solid #A5D6A7; /* 细浅绿边框 */
-            border-radius: 8px;
-            background: transparent;
-            color: #2E7D32;
+        .message {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 12px;
             font-size: 14px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-weight: 500;
+            line-height: 1.5;
+            word-wrap: break-word;
         }
 
-        .period-btn:hover, .period-btn.active {
-            background-color: #E8F5E9; /* 悬停变实心浅绿 */
-            border-color: #2E7D32;
-            font-weight: bold;
-            transform: translateY(-2px);
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        .message.user {
+            align-self: flex-end;
+            background-color: var(--color-green-light);
+            color: var(--color-green-dark);
+            border-bottom-right-radius: 2px;
         }
 
-        /* 生成按钮 */
-        .generate-btn-container {
-            z-index: 1;
+        .message.ai {
+            align-self: flex-start;
+            background-color: var(--color-bg-light);
+            color: var(--color-text-main);
+            border-bottom-left-radius: 2px;
+            border: 1px solid rgba(164, 191, 90, 0.3);
         }
 
-        .generate-btn {
-            background-color: #66BB6A; /* 高饱和草绿 */
-            color: white;
-            padding: 16px 48px;
-            border-radius: 50px; /* Pill Shape */
-            border: none;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 4px 10px rgba(46, 125, 50, 0.2); /* 柔和投影 */
-            transition: all 0.2s ease;
+        .input-area {
+            padding: 20px;
+            border-top: 1px solid rgba(164, 191, 90, 0.3);
             display: flex;
-            align-items: center;
             gap: 10px;
+            background-color: var(--color-bg-light); /* 背景改为米黄色 */
         }
 
-        .generate-btn:hover {
-            background-color: #4CAF50;
-            transform: translateY(-1px);
-            box-shadow: 0 6px 15px rgba(46, 125, 50, 0.3);
+        .input-wrapper {
+            flex: 1;
+            position: relative;
         }
 
-        .generate-btn:active {
-            transform: translateY(1px);
-            box-shadow: 0 2px 5px rgba(46, 125, 50, 0.2);
+        .input-box {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #789035;
+            border-radius: 24px;
+            outline: none;
+            font-size: 16px; /* 字体加大 */
+            transition: border-color 0.2s;
+            background-color: var(--color-white);
+            box-sizing: border-box;
+            color: var(--color-text-main);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center; /* 文本居中 */
         }
         
-        /* 报告显示区 (生成后显示) */
-        .report-content-view {
-            display: none; /* 默认隐藏 */
+        .report-input-container {
             width: 100%;
             height: 100%;
-            overflow-y: auto;
-            padding: 20px;
-            box-sizing: border-box;
-            background: #FFF;
-            position: absolute;
-            top: 0;
-            left: 0;
-            z-index: 10;
-        }
-        
-        .report-markdown {
-            max-width: 800px;
-            margin: 0 auto;
-            line-height: 1.6;
-            color: #333;
-        }
-        
-        .report-back-btn {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background: none;
-            border: none;
-            color: #2E7D32;
-            cursor: pointer;
-            font-weight: bold;
             display: flex;
             align-items: center;
-            gap: 5px;
+            justify-content: center;
+            font-size: 16px;
+            color: var(--color-green-dark);
+            font-weight: bold;
+        }
+        
+        .days-input {
+            width: 40px;
+            border: none;
+            /* border-bottom: 2px solid var(--color-green-mid);  Removed underline */
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--color-green-dark);
+            margin: 0 5px;
+            outline: none;
+            background: transparent;
+            padding-top: 2px; /* Slight offset down */
+        }
+        
+        .days-input:focus {
+            /* border-bottom-color: var(--color-green-dark); Removed focus underline */
+        }
+
+        .send-btn {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background-color: var(--color-green-mid);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.1s, background-color 0.2s;
+            flex-shrink: 0;
+        }
+
+        .send-btn:hover {
+            background-color: var(--color-green-dark);
+            transform: scale(1.05);
+        }
+
+        .send-btn:active {
+            transform: scale(0.95);
+        }
+
+        .send-btn svg {
+            width: 20px;
+            height: 20px;
+            fill: white;
+            margin-left: 2px;
+        }
+
+        /* --- Right Sidebar (Collapsed) --- */
+        .right-sidebar {
+            width: 0;
+            background-color: #fafafa;
+            border-left: 1px solid rgba(164, 191, 90, 0.3);
+            overflow: hidden;
+            transition: width 0.3s ease;
+        }
+
+        .right-sidebar.open {
+            width: 250px;
+        }
+
+        .resizer-right {
+            width: 5px;
+            cursor: col-resize;
+            background: transparent;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .resizer-right:hover {
+            background: rgba(0,0,0,0.05);
         }
         body.resizing {
             cursor: col-resize;
@@ -926,62 +937,48 @@
             </div>
         </div>
 
-        <!-- Right Panel: Report Generation -->
+        <!-- Right Panel: AI Chat -->
         <div class='right-panel' id='right-panel'>
-            
-            <!-- Default UI: Report Config -->
-            <div class="report-ui-container" id="report-config-ui">
-                <!-- Watermark -->
-                <div class="watermark-icon"></div>
-
-                <!-- Header -->
-                <div class="report-header">
-                    <div class="report-title-line">
-                        对 <span class="report-dropdown-trigger">最近 <span id="selected-period-text">3</span> 天 ▼</span> 的数据进行
+            <div class='chat-container'>
+                <div class='chat-header'>
+                    <div class='chat-title' data-i18n="chat.title">Flow-State Chat</div>
+                    <div style='color: var(--color-green-mid); cursor: pointer;' onclick="toggleRightSidebar()">
+                        <svg viewBox='0 0 24 24' width='20' height='20' fill='currentColor'><path d='M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z'/></svg>
                     </div>
-                    <div class="report-subtitle">深度效能复盘</div>
                 </div>
-
-                <!-- Period Selectors -->
-                <div class="period-selector">
-                    <button class="period-btn active" onclick="selectPeriod(3)">⚡️ 近3天</button>
-                    <button class="period-btn" onclick="selectPeriod(7)">📅 近7天</button>
-                    <button class="period-btn" onclick="selectPeriod(30)">🌙 近30天</button>
+                
+                <div class='chat-messages' id='chat-messages'>
+                    <div class='message ai' data-i18n="chat.welcome">你好！我是你的 Flow-State 助手。这里可以查看你的历史行为数据，也可以和我聊天。</div>
                 </div>
-
-                <!-- Generate Button -->
-                <div class="generate-btn-container">
-                    <button class="generate-btn" onclick="generateReport()">
-                        <span>✨ 生成洞察报告</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Report View (Hidden initially) -->
-            <div class="report-content-view" id="report-result-view">
-                <button class="report-back-btn" onclick="showReportConfig()">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
-                    返回配置
-                </button>
-                <div class="report-markdown" id="report-markdown-content">
-                    <!-- Markdown content will be injected here -->
-                    <div style="text-align: center; margin-top: 100px; color: #666;">
-                        正在生成报告，请稍候...<br>
-                        <span style="font-size: 12px; opacity: 0.7;">AI 正在分析您的专注数据</span>
+                
+                <div class='input-area'>
+                    <div class='input-wrapper'>
+                        <!-- 自定义报告生成输入框 -->
+                        <div class='input-box' id='report-input-wrapper'>
+                            <div class="report-input-container">
+                                生成近 <input type="number" id="days-input" class="days-input" value="3" min="1" max="365"> 天的报告
+                            </div>
+                        </div>
+                    </div>
+                    <div class='send-btn' id='send-btn' onclick="triggerReportGeneration()">
+                        <svg viewBox='0 0 24 24'><path d='M2.01 21L23 12 2.01 3 2 10l15 2-15 2z'/></svg>
                     </div>
                 </div>
             </div>
 
-            <!-- Right Resizer (Preserved) -->
+            <!-- Right Resizer -->
             <div class='resizer-right' id='resizer-right'>
                 <div class='resizer-handle'>
                     <svg viewBox='0 0 24 24'><path d='M8 19c0 1.1.9 2 2 2h4c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v14zm6-14h2v14h-2V5zM8 5h2v14H8V5z'/></svg>
                 </div>
             </div>
             
-            <!-- Right Sidebar (Preserved) -->
+            <!-- Right Sidebar -->
             <div class='right-sidebar' id='right-sidebar'>
-                <!-- ... existing sidebar content ... -->
+                <div style="padding: 20px; color: var(--color-green-mid); font-size: 14px; text-align: center;">
+                    <div style="margin-bottom: 10px; font-weight: bold;">扩展信息</div>
+                    <div style="font-size: 12px; opacity: 0.8;">这里可以放置更多工具或上下文信息。</div>
+                </div>
             </div>
         </div>
 
@@ -1861,28 +1858,29 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
-        async function handleSend() {
-            const text = chatInput.value.trim();
-            if (!text) return;
-            addMessage('user', text);
-            chatInput.value = '';
+        // --- New Report Trigger Logic ---
+        async function triggerReportGeneration() {
+            const daysInput = document.getElementById('days-input');
+            const days = parseInt(daysInput.value) || 3;
+            
+            // 构造模拟的用户消息，用于显示
+            const userText = `生成近 ${days} 天的报告`;
+            addMessage('user', userText);
             
             // Show thinking state
             const thinkingId = 'thinking-' + Date.now();
             const div = document.createElement('div');
             div.className = 'message ai typing-cursor';
             div.id = thinkingId;
-            div.textContent = t('msg.ai_thinking') + '...';
+            div.innerHTML = `正在为您生成近 ${days} 天的深度复盘报告...<br><span style="font-size:12px; opacity:0.7">这可能需要几秒钟</span>`;
             chatMessages.appendChild(div);
             chatMessages.scrollTop = chatMessages.scrollHeight;
 
             try {
-                const response = await fetch('/api/chat', {
+                const response = await fetch('/api/report/generate', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ message: text })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ days: days })
                 });
                 
                 const data = await response.json();
@@ -1892,25 +1890,44 @@
                 if (thinkingEl) thinkingEl.remove();
 
                 if (data.error) {
-                    addMessage('ai', 'Error: ' + data.error);
+                    addMessage('ai', '生成失败: ' + data.error);
                 } else {
-                    // 支持 Markdown 渲染（简单版）
-                    const content = data.response
-                        .replace(/\n/g, '<br>')
-                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                    // Render Markdown Report in Chat
+                    let html = data.report
+                        .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+                        .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+                        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+                        .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
+                        .replace(/\n/gim, '<br>');
                     
                     const aiDiv = document.createElement('div');
                     aiDiv.className = 'message ai';
-                    aiDiv.innerHTML = content; // 使用 innerHTML 渲染格式化后的文本
+                    aiDiv.innerHTML = html;
                     chatMessages.appendChild(aiDiv);
                     chatMessages.scrollTop = chatMessages.scrollHeight;
                 }
             } catch (e) {
                 const thinkingEl = document.getElementById(thinkingId);
                 if (thinkingEl) thinkingEl.remove();
-                addMessage('ai', 'Network Error: ' + e.message);
+                addMessage('ai', '网络请求错误: ' + e.message);
             }
         }
+
+        // Handle Enter key in number input
+        document.getElementById('days-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') triggerReportGeneration();
+        });
+
+        // Deprecated old handleSend but kept if needed for other logic
+        async function handleSend() {
+             // ... old logic ...
+        }
+        
+        // Remove old event listeners that might conflict
+        // sendBtn.removeEventListener('click', handleSend); 
+        // We replaced onclick in HTML directly for simplicity
+        
+        // --- End New Logic ---
 
         sendBtn.addEventListener('click', handleSend);
         chatInput.addEventListener('keypress', function(e) {
