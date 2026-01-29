@@ -27,7 +27,7 @@ class SuspensionBall(QtWidgets.QWidget):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        
+        self._is_destroying = False
         # 1. 窗口属性设置
         self.setWindowFlags(
             QtCore.Qt.FramelessWindowHint |  # 无边框
@@ -145,6 +145,27 @@ class SuspensionBall(QtWidgets.QWidget):
         self.ring_timer.setSingleShot(True)
         self.ring_timer.setInterval(50)
         self.ring_timer.timeout.connect(self._show_ring_visuals)
+        
+    def closeEvent(self, event):
+        """窗口关闭时设置销毁标志，停止所有动画"""
+        self._is_destroying = True
+        
+        # 停止所有动画
+        if hasattr(self, 'breath_anim'):
+            self.breath_anim.stop()
+        if hasattr(self, 'rotation_anim'):
+            self.rotation_anim.stop()
+        if hasattr(self, 'scale_anim'):
+            self.scale_anim.stop()
+        if hasattr(self, 'opacity_anim'):
+            self.opacity_anim.stop()
+        
+        # 停止定时器
+        if hasattr(self, 'ring_timer'):
+            self.ring_timer.stop()
+        
+        # 调用父类方法
+        super().closeEvent(event)
 
     # ================= 属性定义 (用于动画) =================
     
@@ -154,15 +175,19 @@ class SuspensionBall(QtWidgets.QWidget):
     
     @rotation_angle.setter
     def rotation_angle(self, angle):
+        if self._is_destroying:  # ← 添加这行检查
+            return
         self._rotation_angle = angle
-        self.update() # 重绘
+        self.update()
         
     @Property(float)
     def scale_factor(self):
         return self._scale_factor
     
-    @scale_factor.setter
+    @scale_factor.setter  
     def scale_factor(self, factor):
+        if self._is_destroying:  # ← 添加这行检查
+            return
         self._scale_factor = factor
         self.update()
         
@@ -172,6 +197,8 @@ class SuspensionBall(QtWidgets.QWidget):
     
     @opacity_level.setter
     def opacity_level(self, val):
+        if self._is_destroying:  # ← 添加这行检查
+            return
         self._opacity_level = val
         self.update()
         
@@ -181,6 +208,8 @@ class SuspensionBall(QtWidgets.QWidget):
         
     @breath_offset.setter
     def breath_offset(self, val):
+        if self._is_destroying:  # ← 添加这行检查
+            return
         self._breath_offset = val
         self.update()
 

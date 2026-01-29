@@ -434,6 +434,11 @@ class EntertainmentReminder(QtCore.QObject):
         如果是，则触发弹窗
         """
         try:
+            # 检查当前模式，如果是充电模式，则不触发提醒
+            from app.data.services.history_service import ActivityHistoryManager
+            if ActivityHistoryManager.get_current_mode() == "recharge":
+                return
+
             from app.data.dao.activity_dao import WindowSessionDAO
             
             # 1. 获取最新的会话
