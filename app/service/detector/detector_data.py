@@ -467,7 +467,35 @@ def detect_focus_events(focus_detector: FocusDetector):
         try:
             # print(f"[焦点切换] {info_str}") # 可选：先打印原始信息
             ai_result = AI.analyze(info_str)
-            print(f"\n[AI 分析] {ai_result}")
+            # 尝试解析 JSON
+            import json
+            try:
+                if isinstance(ai_result, str):
+                    # 尝试清理可能存在的 Markdown 标记
+                    clean_result = ai_result.strip()
+                    # 移除 ```json 标记
+                    if clean_result.startswith("```json"):
+                        clean_result = clean_result[7:]
+                    elif clean_result.startswith("```"):
+                        clean_result = clean_result[3:]
+                    
+                    # 移除结尾的 ```
+                    if clean_result.endswith("```"):
+                        clean_result = clean_result[:-3]
+                    
+                    # 再次去除空白字符
+                    clean_result = clean_result.strip()
+                    
+                    # 打印清洗后的结果，方便调试
+                    # print(f"DEBUG: Cleaned Result: {clean_result}")
+                    
+                    data = json.loads(clean_result)
+                    print(f"\n[AI 分析] {json.dumps(data, ensure_ascii=False)}")
+                else:
+                    print(f"\n[AI 分析] {ai_result}")
+            except json.JSONDecodeError:
+                print(f"\n[AI 分析] (原始输出) {ai_result}")
+                
             print(f"源数据: {info_str}\n")
         except Exception as e:
             print(f"[AI 分析失败] {e}")

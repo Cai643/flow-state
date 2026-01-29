@@ -73,16 +73,43 @@ def main(msg_queue=None):
         if not hasattr(on_status_update, 'last_fatigue_remind_time'):
             on_status_update.last_fatigue_remind_time = 0
             
-        # 当连续专注时长 >= 45分钟 (2700秒)
-        if duration >= 2700:
+        # 动态获取疲劳阈值 (默认为 2700秒 / 45分钟)
+        current_fatigue_threshold = 2700
+        if hasattr(popup, 'card') and hasattr(popup.card, 'fatigue_threshold'):
+            current_fatigue_threshold = popup.card.fatigue_threshold
+            
+        # 调试输出
+        # print(f"[DEBUG] Duration: {duration}, Threshold: {current_fatigue_threshold}")
+        
+        # 当连续专注时长 >= 用户设定阈值
+        if duration >= current_fatigue_threshold:
              # 距离上次提醒至少间隔 5 分钟
+             # 增加调试：如果是第一次，或者间隔足够
+            should_remind = False
             if current_time - on_status_update.last_fatigue_remind_time > 300:
+                should_remind = True
+            
+            # 如果是刚启动(last_time=0)且已经超时，也应该提醒
+            if on_status_update.last_fatigue_remind_time == 0:
+                 should_remind = True
+                 
+            if should_remind:
                 print(f"[MAIN] Triggering Fatigue Reminder: Focus Duration {duration}s")
                 
                 # 计算显示的分钟数
                 minutes = int(duration / 60)
+                
+                # 确保在主线程安全调用 UI
+                # 这里的 on_status_update 本身就在主线程 (通过 QTimer)
                 on_status_update.fatigue_dialog = FatigueReminderDialog(severity='medium', duration=minutes)
+                
+                # 关键：确保 dialog 没有被其他窗口遮挡
+                on_status_update.fatigue_dialog.setWindowFlags(
+                    on_status_update.fatigue_dialog.windowFlags() | QtCore.Qt.WindowStaysOnTopHint
+                )
                 on_status_update.fatigue_dialog.show()
+                on_status_update.fatigue_dialog.raise_()
+                on_status_update.fatigue_dialog.activateWindow()
                 
                 on_status_update.last_fatigue_remind_time = current_time
 
@@ -94,18 +121,32 @@ def main(msg_queue=None):
             
         # 只有当状态为娱乐，且当前状态持续时间 >= 60秒
         # 使用 current_activity_duration 而不是 duration (因为 duration 在娱乐时被置0了)
-        if status == 'entertainment' and current_activity_duration >= 60:
-            # 距离上次提醒至少间隔 5 分钟 (300秒)，避免频繁打扰
-            if current_time - on_status_update.last_entertainment_remind_time > 300:
-                print(f"[MAIN] Triggering Entertainment Reminder: Duration {current_activity_duration}s")
-                
-                # 计算严重程度
-                if current_activity_duration > 1800: severity = 'high'
-                elif current_activity_duration > 600: severity = 'medium'
-                else: severity = 'low'
-                
-                entertainment_reminder._handle_entertainment_warning(status, current_activity_duration, severity)
-                on_status_update.last_entertainment_remind_time = current_time
+        # 关键修改：检查当前模式是否为 "focus" (专注模式)
+        from app.data.services.history_service import ActivityHistoryManager
+        current_mode = ActivityHistoryManager.get_current_mode()
+        
+        # 只有在专注模式下，才启用娱乐提醒
+        if current_mode == "focus":
+            # 动态获取当前配置的阈值
+            # 这里的 entertainment_reminder.dialog 其实是 ReminderOverlay，并没有存储 threshold
+            # 但 FocusCard 存了。popup.card_widget 就是 FocusCard 实例
+            
+            # 注意：用户已将 UI 上的阈值控制改为“疲劳阈值”，所以娱乐阈值现在不再可配置，固定为 2分钟 (120s)
+            current_threshold = 120 
+            
+            # 使用动态阈值替代硬编码的 60
+            if status == 'entertainment' and current_activity_duration >= current_threshold:
+                # 距离上次提醒至少间隔 5 分钟 (300秒)，避免频繁打扰
+                if current_time - on_status_update.last_entertainment_remind_time > 300:
+                    print(f"[MAIN] Triggering Entertainment Reminder: Duration {current_activity_duration}s (Threshold: {current_threshold}s)")
+                    
+                    # 计算严重程度
+                    if current_activity_duration > 1800: severity = 'high'
+                    elif current_activity_duration > 600: severity = 'medium'
+                    else: severity = 'low'
+                    
+                    entertainment_reminder._handle_entertainment_warning(status, current_activity_duration, severity)
+                    on_status_update.last_entertainment_remind_time = current_time
 
         # ----------------------------------------------------
 

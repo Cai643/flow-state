@@ -268,7 +268,6 @@ def create_app(ai_busy_flag=None):
                 print(f"【Web服务】正在实时提取今日({today_str})数据...")
                 extract_core_events(today_str)
                 
-                from scripts.calculate_period_stats import calculate_period_stats
                 calculate_period_stats(today_str)
             except Exception as e:
                 print(f"【Web服务】实时提取失败 (不影响后续流程): {e}")

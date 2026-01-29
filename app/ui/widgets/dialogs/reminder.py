@@ -152,21 +152,25 @@ class ReminderOverlay(QtWidgets.QDialog):
                 font-weight: bold; 
                 background: transparent;
                 border: none;
+                margin-bottom: 2px;
             }} 
         """)
         history_layout.addWidget(self.focus_summary_label)
         
         # 专注内容
-        self.focus_task_label = QtWidgets.QLabel("   在做：论文写作")
+        self.focus_task_label = QtWidgets.QLabel("在做：论文写作")
         self.focus_task_label.setObjectName("focus_task")
         self.focus_task_label.setAlignment(qt_const("AlignLeft"))
+        self.focus_task_label.setWordWrap(True) # 允许长文本换行
         
         self.focus_task_label.setStyleSheet(f"""
             QLabel#focus_task {{ 
                 color: #5D4037; 
-                font-size: 16px; 
+                font-size: 15px; 
                 background: transparent;
                 border: none;
+                padding-left: 26px; /* 稍微缩进，与上面的图标对齐 */
+                line-height: 1.2;
             }} 
         """)
         history_layout.addWidget(self.focus_task_label)
@@ -203,7 +207,8 @@ class ReminderOverlay(QtWidgets.QDialog):
         msg_layout.addWidget(self.main_message)
         
         # 建议详情
-        self.suggestion_detail = QtWidgets.QLabel("   休息8分钟后，现在回去效率最高！")
+        # 初始化时使用默认文案，show_reminder 时会根据数据更新
+        self.suggestion_detail = QtWidgets.QLabel("趁着思路还没断，现在回去效率最高！")
         self.suggestion_detail.setAlignment(qt_const("AlignLeft"))
         self.suggestion_detail.setWordWrap(True)
         self.suggestion_detail.setStyleSheet("""
@@ -212,13 +217,14 @@ class ReminderOverlay(QtWidgets.QDialog):
                 font-size: 16px; 
                 background: transparent;
                 border: none;
-                margin-top: 5px;
+                margin-top: 15px;    /* 增加顶部间距 */
+                margin-bottom: 5px;  /* 增加底部间距 */
             } 
         """)
         msg_layout.addWidget(self.suggestion_detail)
         
         # 鼓励语 (原 encouragement)
-        self.encouragement = QtWidgets.QLabel("   论文思路还在热乎中，现在回去刚刚好！")
+        self.encouragement = QtWidgets.QLabel("论文思路还在热乎中，现在回去刚刚好！")
         self.encouragement.setAlignment(qt_const("AlignLeft"))
         self.encouragement.setWordWrap(True)
         self.encouragement.setStyleSheet("""
@@ -300,22 +306,22 @@ class ReminderOverlay(QtWidgets.QDialog):
         layout.addLayout(button_layout)
         
         # 底部：暂时禁用 (更隐蔽的设计)
-        disable_button = QtWidgets.QPushButton("今天不再提醒")
-        disable_button.setCursor(qt_const("PointingHandCursor"))
-        disable_button.setStyleSheet(f"""
-            QPushButton {{
-                background: transparent;
-                color: {MorandiTheme.COLOR_TEXT_SECONDARY.name()};
-                border: none;
-                font-size: 13px;
-                text-decoration: underline;
-            }}
-            QPushButton:hover {{
-                color: #5D4037;
-            }}
-        """)
-        disable_button.clicked.connect(self.on_disable_button)
-        layout.addWidget(disable_button, 0, qt_const("AlignCenter"))
+        # disable_button = QtWidgets.QPushButton("今天不再提醒")
+        # disable_button.setCursor(qt_const("PointingHandCursor"))
+        # disable_button.setStyleSheet(f"""
+        #     QPushButton {{
+        #         background: transparent;
+        #         color: {MorandiTheme.COLOR_TEXT_SECONDARY.name()};
+        #         border: none;
+        #         font-size: 13px;
+        #         text-decoration: underline;
+        #     }}
+        #     QPushButton:hover {{
+        #         color: #5D4037;
+        #     }}
+        # """)
+        # disable_button.clicked.connect(self.on_disable_button)
+        # layout.addWidget(disable_button, 0, qt_const("AlignCenter"))
         
         # 点击关闭
         # self.setCursor(qt_const("PointingHandCursor")) # 移除全局手型，避免干扰
@@ -400,6 +406,17 @@ class ReminderOverlay(QtWidgets.QDialog):
             else:  # high
                 message = f"哇，{minutes} 分钟了！\n你真的很投入呢～\n但现在真的该认真工作了哦！"
         
+        # 优化文案和排版：在主消息和建议详情之间增加空行，或者调整文本
+        # 这里直接通过 HTML 格式化来增强视觉效果
+        
+        # 将换行符转换为 HTML 的换行，并增加段落间距
+        formatted_message = message.replace('\n', '<br>')
+        
+        # 使用 HTML 样式
+        self.main_message.setText(f"""
+            <p style='line-height: 140%; margin-bottom: 10px;'>{formatted_message}</p>
+        """)
+        
         if custom_encouragement:
             encouragement = custom_encouragement
         else:
@@ -410,8 +427,102 @@ class ReminderOverlay(QtWidgets.QDialog):
             else:
                 encouragement = "✨ 冲冲冲，你可以的！"
         
-        self.main_message.setText(message)
         self.encouragement.setText(encouragement)
+        
+        # 建议详情文案微调
+        # 重新根据最新的 duration 更新文案
+        # 注意：这里的 duration 是娱乐时长，还是应该用专注时长？
+        # 通常番茄钟是：专注25分钟 -> 休息5分钟。
+        # 这里场景是：用户正在娱乐（被抓包了）。
+        # 如果用户刚才专注了很久（比如 > 45分钟），那么建议他休息一会是合理的。
+        # 如果用户刚才没怎么专注，或者才专注了几分钟就开始玩，那么建议直接回去。
+        
+        # 我们这里做一个更智能的判断
+        last_focus_duration = 0
+        if 'last_duration_min' in locals():
+            last_focus_duration = last_duration_min * 60 # 转换为秒
+        
+        # 策略：如果上次专注 > 45分钟，建议休息 5-10 分钟。否则建议立即回去。
+        if last_focus_duration > 2700: # 45分钟
+            rec_rest = 10
+        elif last_focus_duration > 1500: # 25分钟
+            rec_rest = 5
+        else:
+            rec_rest = 0
+            
+        if rec_rest > 0:
+            self.suggestion_detail.setText(f"刚才专注了很久，建议休息 {rec_rest} 分钟后再继续！")
+        else:
+            self.suggestion_detail.setText("趁着思路还没断，现在回去效率最高！")
+        
+        # --- 获取真实的历史专注数据 ---
+        try:
+            from app.data.dao.activity_dao import StatsDAO, WindowSessionDAO
+            from datetime import date
+            
+            # 1. 获取今日总专注时长 (Today Focus)
+            # 注意：get_today_stats 返回的是一个字典
+            today_stats = StatsDAO.get_today_stats()
+            # 假设返回结构: {'focus_duration': 1234, 'entertainment_duration': ...}
+            # 如果 StatsDAO 还没实现这个，我们可能需要现写一个简单的查询
+            # 暂时用 get_daily_stats
+            # daily_record = StatsDAO.get_daily_stats(date.today())
+            # total_focus_minutes = int(daily_record.focus_duration / 60) if daily_record else 0
+            
+            # 由于 DAO 层方法不确定，我们尝试用最稳妥的 WindowSessionDAO 获取最近一次专注记录
+            last_focus_session = WindowSessionDAO.get_last_focus_session()
+            
+            if last_focus_session:
+                last_duration_min = int(last_focus_session.get('duration', 0) / 60)
+                last_task_name = last_focus_session.get('process_name', '未知任务')
+                
+                # 尝试优化任务名显示：如果是浏览器，显示标题；如果是 IDE，显示项目名
+                window_title = last_focus_session.get('window_title', '')
+                process_name = last_focus_session.get('process_name', '')
+                
+                # 获取 AI 摘要
+                ai_summary = last_focus_session.get('summary')
+                
+                # 优先级：AI摘要 > 清洗后的窗口标题 > 进程名
+                if ai_summary and len(ai_summary) > 2: # 确保摘要不是空的或无效的
+                    last_task_name = ai_summary
+                elif window_title:
+                     # 简单清洗：取 " - " 前的部分，或者取最后一部分
+                     clean_title = window_title.split(' - ')[0]
+                     if len(clean_title) > 15:
+                         clean_title = clean_title[:12] + "..."
+                     last_task_name = clean_title
+                else:
+                    last_task_name = process_name
+                
+                self.focus_summary_label.setText(f"📚 刚才你专注了{last_duration_min}分钟")
+                self.focus_task_label.setText(f"在做：{last_task_name}")
+                
+                # 更新建议文案（因为有了真实数据）
+                last_focus_duration = last_duration_min * 60
+                if last_focus_duration > 2700: # 45分钟
+                    rec_rest = 10
+                elif last_focus_duration > 1500: # 25分钟
+                    rec_rest = 5
+                else:
+                    rec_rest = 0
+                    
+                if rec_rest > 0:
+                    self.suggestion_detail.setText(f"刚才专注了很久，建议休息 {rec_rest} 分钟后再继续！")
+                else:
+                    self.suggestion_detail.setText("趁着思路还没断，现在回去效率最高！")
+                    
+            else:
+                self.focus_summary_label.setText("📚 今天还没有开始专注哦")
+                self.focus_task_label.setText("准备好开始第一项任务了吗？")
+                # 没专注过，当然是建议直接开始
+                self.suggestion_detail.setText("千里之行始于足下，现在开始效率最高！")
+                
+        except Exception as e:
+            print(f"[Reminder] Error fetching real stats: {e}")
+            # 出错时保持默认显示的假数据，或者显示为空
+            # self.focus_summary_label.setText("📚 刚才你专注了--分钟")
+            pass
         
         # 显示窗口
         self.setWindowOpacity(1.0)

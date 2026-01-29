@@ -76,6 +76,19 @@ class WindowSessionDAO:
         return None
 
     @staticmethod
+    def get_last_focus_session():
+        """获取最后一条专注/工作类型的会话记录"""
+        with get_db_connection() as conn:
+            row = conn.execute(
+                '''SELECT * FROM window_sessions 
+                   WHERE status IN ('focus', 'work') 
+                   ORDER BY id DESC LIMIT 1'''
+            ).fetchone()
+            if row:
+                return dict(row)
+        return None
+
+    @staticmethod
     def create_session(window_title, process_name, start_time, duration, status, summary):
         """创建新的会话记录"""
         with get_db_connection() as conn:
@@ -214,14 +227,29 @@ class StatsDAO:
 
     @staticmethod
     def get_daily_summary(date_obj):
-        """获取某日的统计摘要"""
+        """获取指定日期的统计摘要"""
         with get_db_connection() as conn:
             row = conn.execute(
                 'SELECT * FROM daily_stats WHERE date = ?', (date_obj,)
             ).fetchone()
             if row:
                 return dict(row)
-        return None
+        
+        # 如果没有记录，返回空结构
+        return {
+            'total_focus_time': 0, 
+            'total_entertainment_time': 0,
+            'current_focus_streak': 0,
+            'efficiency_score': 0,
+            'max_focus_streak': 0,
+            'willpower_wins': 0
+        }
+
+    @staticmethod
+    def get_today_stats():
+        """获取今日的统计数据 (便捷方法)"""
+        from datetime import date
+        return StatsDAO.get_daily_summary(date.today())
 
     @staticmethod
     def get_recent_stats(days=7):

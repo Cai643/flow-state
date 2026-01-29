@@ -46,6 +46,9 @@ class FocusStatusCard(QtWidgets.QWidget):
         # 拉回注意力次数（从娱乐 -> 工作 的切换次数）
         self.pull_back_count = 0
         self.last_status = None
+        
+        # 疲劳阈值默认值 (2700s = 45min)
+        self.fatigue_threshold = 2700
 
         # 构建 UI
         self._build_ui()
@@ -71,10 +74,10 @@ class FocusStatusCard(QtWidgets.QWidget):
 
         self.item_style = """
             QLabel {
-                background-color: #FEFAE0;
+                background-color: #fff5cf;
                 border-radius: 12px;
                 padding: 4px 12px;
-                color: #5D4037;
+                color: #4f6610;
             }
         """
 
@@ -96,36 +99,175 @@ class FocusStatusCard(QtWidgets.QWidget):
         mode_layout.setContentsMargins(0, 0, 0, 0)
         mode_layout.setSpacing(0)
         
-        # 专注模式按钮
+        # 高级模式按钮
+        self.advanced_btn = QtWidgets.QPushButton("⚙️ 高级模式")
+        self.advanced_btn.setFont(QtGui.QFont("Microsoft YaHei", 9))
+        self.advanced_btn.setFixedHeight(30)
+        self.advanced_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+        # 初始样式
+        self.advanced_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #789035;
+                color: white;
+                border: none;
+                border-radius: 12px;
+                padding: 4px 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #6a8030;
+            }
+        """)
+        self.advanced_btn.clicked.connect(self._on_advanced_mode_clicked)
+        
+        mode_layout.addWidget(self.advanced_btn)
+        mode_container.setFixedHeight(30)
+        
+        # 高级设置面板 (初始隐藏)
+        self.settings_panel = QtWidgets.QWidget()
+        self.settings_panel.setVisible(False)
+        settings_layout = QtWidgets.QVBoxLayout(self.settings_panel)
+        settings_layout.setContentsMargins(15, 10, 15, 10)
+        settings_layout.setSpacing(12)
+        
+        # 1. 模式选择 (专注模式 / 充能模式) - 仿图1/图2的黄白长框风格
+        mode_select_container = QtWidgets.QWidget()
+        mode_select_layout = QtWidgets.QHBoxLayout(mode_select_container)
+        mode_select_layout.setContentsMargins(0, 0, 0, 0)
+        mode_select_layout.setSpacing(0)
+        
+        # 专注模式按钮 (左侧)
         self.focus_btn = QtWidgets.QPushButton("💪 专注模式")
-        self.focus_btn.setFont(QtGui.QFont("Microsoft YaHei", 9))
         self.focus_btn.setCheckable(True)
         self.focus_btn.setChecked(True)
         self.focus_btn.setFixedHeight(30)
         self.focus_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
         self.focus_btn.clicked.connect(self._on_focus_mode_clicked)
         
-        # 充电模式按钮
-        self.recharge_btn = QtWidgets.QPushButton("🔋 充电模式")
-        self.recharge_btn.setFont(QtGui.QFont("Microsoft YaHei", 9))
+        # 充能模式按钮 (右侧)
+        self.recharge_btn = QtWidgets.QPushButton("🔋 充能模式")
         self.recharge_btn.setCheckable(True)
         self.recharge_btn.setChecked(False)
         self.recharge_btn.setFixedHeight(30)
         self.recharge_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
         self.recharge_btn.clicked.connect(self._on_recharge_mode_clicked)
         
-        mode_layout.addWidget(self.focus_btn, 1)
-        mode_layout.addWidget(self.recharge_btn, 1)
-        mode_container.setFixedHeight(30)
+        mode_select_layout.addWidget(self.focus_btn, 1)
+        mode_select_layout.addWidget(self.recharge_btn, 1)
         
+        settings_layout.addWidget(mode_select_container)
+        
+        # 2. 疲劳阈值设定
+        threshold_layout = QtWidgets.QHBoxLayout()
+        threshold_layout.setSpacing(10)
+        
+        threshold_label = QtWidgets.QLabel("疲劳阈值:")
+        threshold_label.setStyleSheet("color: #5D4037; font-size: 14px;")
+        
+        self.threshold_combo = QtWidgets.QComboBox()
+        self.threshold_combo.addItems(["15分钟", "30分钟", "45分钟 (默认)", "自定义..."])
+        self.threshold_combo.setCurrentIndex(2) # 默认 45分钟
+        self.threshold_combo.setEditable(True) # 允许编辑
+        self.threshold_combo.setInsertPolicy(QtWidgets.QComboBox.NoInsert) # 不自动插入新项
+        
+        # 内部变量，用于存储自定义的值，以便在下拉列表中正确显示 "自定义..."
+        self._custom_minutes = 45 
+        
+        # 连接 activated 信号以处理回车或选中
+        # currentIndexChanged 在编辑文本时可能不会按预期触发，或者触发多次
+        # 使用 lineEdit().editingFinished 处理自定义输入
+        self.threshold_combo.lineEdit().editingFinished.connect(self._on_custom_input_finished)
+        # 新增：实时监听文本变化，确保用户输入数字后立即生效，无需回车
+        self.threshold_combo.editTextChanged.connect(self._on_custom_text_changed)
+        self.threshold_combo.currentIndexChanged.connect(self._on_threshold_changed)
+
+        # 仿图2风格：米黄色背景，圆角，文字颜色深棕色
+        self.threshold_combo.setStyleSheet("""
+            QComboBox {
+                border: none;
+                border-radius: 6px;
+                padding: 4px 10px;
+                color: #5D4037; /* 文字深棕色 */
+                background: #fff5cf; /* 背景米黄色 */
+                font-size: 14px;
+                min-width: 120px;
+            }
+            QComboBox::drop-down {
+                border: none;
+                background: transparent;
+                width: 20px;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 6px solid #5D4037; /* 三角形箭头颜色深棕色 */
+                margin-right: 5px;
+            }
+            QComboBox QAbstractItemView {
+                background: #fff5cf;
+                color: #5D4037;
+                selection-background-color: #f0ebd0;
+                border: none;
+            }
+        """)
+        # self.threshold_combo.currentIndexChanged.connect(self._on_threshold_changed) # 移动到上面连接了
+        
+        threshold_layout.addWidget(threshold_label)
+        threshold_layout.addWidget(self.threshold_combo)
+        threshold_layout.addStretch()
+        settings_layout.addLayout(threshold_layout)
+        
+        settings_layout.addStretch() # 挤到上面
+        
+        # 3. 返回按钮 - 整个框框用高级设置的配色 (#789035)
+        # 风格：实线边框，去掉虚线，文字改为 "回到实时监测面板"
+        # 修改：文字颜色改为白色，背景色填充为橄榄绿
+        
+        self.back_btn = QtWidgets.QPushButton("🔙 回到实时监测面板")
+        self.back_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+        self.back_btn.setFixedHeight(36)
+        self.back_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #789035; /* 橄榄绿背景 */
+                color: white; /* 白色文字 */
+                border: none; /* 无边框 */
+                border-radius: 18px;
+                font-size: 13px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #6a8030; /* 悬停加深 */
+            }
+        """)
+        self.back_btn.clicked.connect(self._on_back_clicked)
+        settings_layout.addWidget(self.back_btn)
+        
+        # 4. 初始化模式按钮样式 (需要在设置 current_mode 之后)
+        # 移动到 _build_ui 的末尾，或者在这里临时设置一个默认值
+        # 但 current_mode 是在 _build_ui 之后定义的，所以我们这里先不调用
+        # self._update_mode_buttons_style() 
+
+        # 121->128: 替换原有布局
         # 当前模式 (用于跟踪状态)
         self.current_mode = "focus"
-        self._update_mode_buttons_style()
+        self._update_mode_buttons_style() # 这里调用是安全的
 
-        layout.addWidget(self.title_label)
-        layout.addSpacing(2)
-        layout.addWidget(self.status_label)
-        layout.addWidget(mode_container)
+        # 主布局添加组件
+        # 使用 QStackedLayout 或者简单的显隐控制
+        # 这里为了简单，直接全部加上，通过 setVisible 控制
+        self.dashboard_container = QtWidgets.QWidget()
+        dashboard_layout = QtWidgets.QVBoxLayout(self.dashboard_container)
+        dashboard_layout.setContentsMargins(0, 0, 0, 0)
+        dashboard_layout.setSpacing(6)
+        
+        dashboard_layout.addWidget(self.title_label)
+        dashboard_layout.addSpacing(2)
+        dashboard_layout.addWidget(self.status_label)
+        dashboard_layout.addWidget(mode_container)
+        
+        layout.addWidget(self.dashboard_container)
+        layout.addWidget(self.settings_panel)
 
     def enterEvent(self, event):
         self.hovering = True
@@ -142,27 +284,32 @@ class FocusStatusCard(QtWidgets.QWidget):
         # 清新森林主题基色: #66BB6A (Green)
 
         # 背景与边框完全不透明
+        # 修改：充电模式下显示橄榄绿，专注模式下显示橄榄绿 (统一背景色)
         bg_color = QtGui.QColor("#7FA10F")
         bg_rgba = f"rgba({bg_color.red()}, {bg_color.green()}, {bg_color.blue()}, 255)"
-        border_color = QtGui.QColor("#7FA10F")
-        border_rgba = f"rgba({border_color.red()}, {border_color.green()}, {border_color.blue()}, 255)"
+        
+        # 修改：去除边框 (将边框颜色设置为透明或与背景一致)
+        # border_color = QtGui.QColor("#7FA10F")
+        # border_rgba = f"rgba({border_color.red()}, {border_color.green()}, {border_color.blue()}, 255)"
+        border_rgba = "transparent" # 去掉外框白线
 
         text_color = "#5D4037"
         
-        # 悬停时稍微变亮或加深边框
+        # 悬停时... (如果需要边框反馈，可以在这里加回，但用户要求去掉白线，我们暂时全部去掉)
         if self.hovering:
-             border_color = border_color.lighter(110)
-             border_rgba = f"rgba({border_color.red()}, {border_color.green()}, {border_color.blue()}, 255)"
+             # border_color = border_color.lighter(110)
+             # border_rgba = f"rgba({border_color.red()}, {border_color.green()}, {border_color.blue()}, 255)"
+             pass
 
         style = """
             QWidget {
                 background-color: %s;
                 border-radius: 16px;
-                border: 1px solid %s;
+                border: 0px solid transparent; 
                 color: %s;
             }
         """
-        self.setStyleSheet(style % (bg_rgba, border_rgba, text_color))
+        self.setStyleSheet(style % (bg_rgba, text_color))
 
     def _update_breath(self):
         # 0.95 -> 1.0 的轻微呼吸效果
@@ -179,10 +326,10 @@ class FocusStatusCard(QtWidgets.QWidget):
     def _update_mode_buttons_style(self):
         """更新模式按钮的样式"""
         if self.current_mode == "focus":
-            # 专注模式：深绿底白字
+            # 专注模式：橄榄绿底白字
             self.focus_btn.setStyleSheet("""
                 QPushButton {
-                    background-color: #4CAF50;
+                    background-color: #789035;
                     color: white;
                     border: none;
                     border-radius: 12px;
@@ -190,42 +337,42 @@ class FocusStatusCard(QtWidgets.QWidget):
                     font-weight: bold;
                 }
                 QPushButton:hover {
-                    background-color: #45a049;
+                    background-color: #6a8030;
                 }
             """)
-            # 充电模式：浅绿底黑字
+            # 充电模式：米黄底深绿字
             self.recharge_btn.setStyleSheet("""
                 QPushButton {
-                    background-color: #FEFAE0;
-                    color: #5D4037;
+                    background-color: #fff5cf;
+                    color: #4f6610;
                     border: none;
                     border-radius: 12px;
                     padding: 4px 12px;
                     font-weight: normal;
                 }
                 QPushButton:hover {
-                    background-color: #FFFEF5;
+                    background-color: #f0ebd0;
                 }
             """)
         else:
-            # 专注模式：浅绿底黑字
+            # 专注模式：米黄底深绿字
             self.focus_btn.setStyleSheet("""
                 QPushButton {
-                    background-color: #FEFAE0;
-                    color: #5D4037;
+                    background-color: #fff5cf;
+                    color: #4f6610;
                     border: none;
                     border-radius: 12px;
                     padding: 4px 12px;
                     font-weight: normal;
                 }
                 QPushButton:hover {
-                    background-color: #FFFEF5;
+                    background-color: #f0ebd0;
                 }
             """)
-            # 充电模式：深绿底白字
+            # 充电模式：橙色底白字 (区分模式)
             self.recharge_btn.setStyleSheet("""
                 QPushButton {
-                    background-color: #4CAF50;
+                    background-color: #FFB74D;
                     color: white;
                     border: none;
                     border-radius: 12px;
@@ -233,10 +380,23 @@ class FocusStatusCard(QtWidgets.QWidget):
                     font-weight: bold;
                 }
                 QPushButton:hover {
-                    background-color: #45a049;
+                    background-color: #FFA726;
                 }
             """)
 
+    def _on_advanced_mode_clicked(self):
+        """点击高级模式：切换到设置面板"""
+        self.dashboard_container.setVisible(False)
+        self.settings_panel.setVisible(True)
+        # 调整大小以适应内容
+        # self.adjustSize() 
+        # 或者保持固定大小，看效果
+        
+    def _on_back_clicked(self):
+        """点击返回：回到仪表盘"""
+        self.settings_panel.setVisible(False)
+        self.dashboard_container.setVisible(True)
+        
     def _on_focus_mode_clicked(self):
         """处理专注模式按钮点击"""
         if self.current_mode != "focus":
@@ -254,6 +414,134 @@ class FocusStatusCard(QtWidgets.QWidget):
             # 更新全局模式
             from app.data.services.history_service import ActivityHistoryManager
             ActivityHistoryManager.set_current_mode("recharge")
+            
+    # 删除不再需要的 _on_mode_changed 方法 (因为它依赖 radio 按钮) 
+            
+    def _on_threshold_changed(self, index):
+        """处理阈值变更 (下拉选择)"""
+        # 映射 index 到 秒数
+        # ["15分钟", "30分钟", "45分钟 (默认)", "自定义..."]
+        # index: 0=900s, 1=1800s, 2=2700s, 3=Custom
+        
+        # 检查是否选择了 "自定义..." (最后一个选项)
+        if index == 3:
+            # 选中 "自定义..." 时，清空文本框并聚焦，让用户输入
+            # 获取当前自定义的分钟数，如果没有则默认为 45
+            current_mins = getattr(self, '_custom_minutes', 45)
+            
+            # 使用 setInputMask 限制输入格式
+            # "999 分钟; " : 9表示可选数字，分号后的空格表示占位符用空格代替下划线
+            self.threshold_combo.lineEdit().setInputMask("999 分钟; ")
+            
+            # 设置显示文本 (注意要匹配 mask 格式，数字靠右或靠左取决于实现，通常简单设置即可)
+            # 为了美观，我们可能希望数字靠左，但 mask 通常是固定宽度的
+            # 尝试直接设置文本，Qt 会自动适配 mask
+            self.threshold_combo.lineEdit().setText(f"{current_mins}")
+            
+            # 选中数字部分
+            self.threshold_combo.lineEdit().setSelection(0, len(str(current_mins)))
+            
+            self.threshold_combo.lineEdit().setFocus()
+            return
+
+        # 非自定义模式，清除掩码
+        self.threshold_combo.lineEdit().setInputMask("")
+        
+        threshold_map = {
+            0: 900,
+            1: 1800,
+            2: 2700
+        }
+        seconds = threshold_map.get(index, 2700)
+        self.fatigue_threshold = seconds
+        
+        # 如果切换回其他选项，需要把最后一项的文本重置为 "自定义..."
+        if self.threshold_combo.itemText(3) != "自定义...":
+            self.threshold_combo.setItemText(3, "自定义...")
+
+    def _on_custom_text_changed(self, text):
+        """实时处理自定义输入文本变化"""
+        # 只有在 index 为 3 (自定义) 时才处理
+        if self.threshold_combo.currentIndex() != 3:
+            return
+
+        # 尝试提取数字并更新阈值
+        import re
+        match = re.search(r'(\d+)', text)
+        if match:
+            try:
+                minutes = int(match.group(1))
+                # 限制范围 1-120 (这里只更新内部值，不修改界面显示，以免打断输入)
+                minutes = max(1, min(minutes, 120))
+                
+                # 实时更新阈值
+                seconds = minutes * 60
+                self.fatigue_threshold = seconds
+                self._custom_minutes = minutes
+                
+                # print(f"[DEBUG] Real-time threshold update: {minutes} mins ({seconds}s)")
+            except ValueError:
+                pass
+
+    def _on_custom_input_finished(self):
+        """处理自定义输入完成 (回车或失焦)"""
+        # 只有在 index 为 3 (自定义) 时才处理
+        if self.threshold_combo.currentIndex() != 3:
+            return
+
+        text = self.threshold_combo.currentText().strip()
+        
+        # 如果文本为空，不做处理
+        if not text:
+            return
+
+        # 尝试提取数字
+        # 支持格式: "20", "20分钟", "20m" 等
+        import re
+        match = re.search(r'(\d+)', text)
+        if match:
+            minutes = int(match.group(1))
+            # 限制范围 1-120
+            minutes = max(1, min(minutes, 120))
+            
+            self._custom_minutes = minutes # 记住这个值
+            
+            seconds = minutes * 60
+            self.fatigue_threshold = seconds
+            
+            # 格式化显示: "X 分钟" (注意中间有空格)
+            display_text = f"{minutes} 分钟"
+            
+            # 下拉列表里始终显示 "自定义..."
+            self.threshold_combo.blockSignals(True)
+            self.threshold_combo.setItemText(3, "自定义...")
+            self.threshold_combo.setCurrentIndex(3)
+            self.threshold_combo.blockSignals(False)
+            
+            # 关键：强制设置 lineEdit 文本为 "X 分钟"
+            if self.threshold_combo.lineEdit():
+                # 保持掩码，确保格式一致 ("999 分钟; ")
+                # 注意：setText 时只需设置数字部分，掩码会自动补充 " 分钟"
+                self.threshold_combo.lineEdit().setInputMask("999 分钟; ")
+                self.threshold_combo.lineEdit().setText(str(minutes))
+                self.threshold_combo.lineEdit().clearFocus()
+        else:
+            # 输入无效的处理...
+            # 如果是 "自定义..." 或者包含 "分钟" 但没数字 (可能是刚切换过来的状态)，保持原状
+            # 注意：有了掩码后，text 可能会包含空格和掩码字符
+            # 比如 "   分钟"
+            if "分钟" in text and not any(c.isdigit() for c in text):
+                 return
+            
+            # 其他情况恢复默认
+            # 清除掩码以便显示普通文本
+            if self.threshold_combo.lineEdit():
+                self.threshold_combo.lineEdit().setInputMask("")
+            self.threshold_combo.setCurrentIndex(2)
+            
+    def _handle_custom_threshold(self):
+        """已废弃，改用直接输入"""
+        pass
 
     # 对外数据更新接口：联动监控结果
     def update_from_result(self, result: dict):
@@ -280,7 +568,7 @@ class FocusStatusCard(QtWidgets.QWidget):
             display_focus_hours = total_focus_sec / 3600.0
             
         except Exception as e:
-            # print(f"Stats error: {e}")
+            print(f"Stats error: {e}")
             display_focus_hours = 0.0
 
         # 3. 计算“拉回注意力”次数 (从娱乐 -> 工作/专注 的切换)
@@ -292,6 +580,33 @@ class FocusStatusCard(QtWidgets.QWidget):
         
         self.last_status = current_status
 
+        # 4. 检查是否需要显示娱乐提醒 (Fatigue Dialog)
+        # 逻辑：
+        # - 只有在“专注模式”下才提醒
+        # - 当前状态是 entertainment
+        # - 持续时间超过阈值 (例如 15分钟 = 900秒，或者 30秒测试用)
+        # - 没有已经显示的弹窗 (由 main.py 或 signals 控制，这里只是发射信号)
+        
+        # 从 result 中获取 current_activity_duration
+        current_activity_duration = result.get("current_activity_duration", 0)
+        
+        # 动态获取阈值 (默认为 900秒 / 15分钟)
+        # 注意：这里是娱乐阈值，现在 UI 控制的是疲劳阈值，所以娱乐阈值固定为 900
+        threshold = 900
+        
+        # 阈值设置 (测试用 30秒，实际建议 15分钟)
+        # REMINDER_THRESHOLD = 30 
+        
+        if self.current_mode == "focus":
+            if current_status == 'entertainment' and current_activity_duration >= threshold:
+                # 只有当上次还没达到阈值，这次刚达到时，才发射信号 (避免重复发射)
+                # 或者依靠外部逻辑去重。这里我们简单处理：只要满足条件就检查是否已发射
+                pass 
+                # 注意：这里的逻辑其实更适合放在 main.py 中统一处理，因为弹窗是全局的。
+                # FocusCard 主要是展示数据。
+                # 但为了响应用户的"点击充电模式关闭提醒"，我们需要确保 main.py 能感知到当前模式。
+                # main.py 可以通过读取 FocusCard.current_mode 或者 ActivityHistoryManager.get_current_mode() 来判断。
+        
         target_hours = 8.0
         self.title_label.setText(
             f"🎯 今日专注  {display_focus_hours:.1f}h / {target_hours:.0f}h")
@@ -304,6 +619,12 @@ class FocusStatusCard(QtWidgets.QWidget):
         # 所以直接用 current_duration 显示 "已连续XX分钟" 是对的
         display_minutes = int(current_duration / 60)
         
+        # 针对娱乐状态的特殊显示：使用 current_activity_duration
+        if current_status == 'entertainment':
+             # 娱乐状态下，我们想看看到底“摸鱼”了多久
+             entertainment_minutes = int(current_activity_duration / 60)
+             display_minutes = entertainment_minutes
+
         # efficiency_gain = 30 # 暂时保留模拟值，后续可改为基于算法计算
         
         # 简单算法：每拉回一次，效率提升 5%，上限 50%
@@ -312,9 +633,16 @@ class FocusStatusCard(QtWidgets.QWidget):
         display_pull_back_count = self.pull_back_count
 
         if self.current_mode == "recharge":
+            # 充电模式下，无论什么状态都显示充电中
+            # 如果实际是娱乐，也可以显示娱乐了多久，这里我们统一显示已连续多久（即 display_minutes）
             self.status_label.setText(f"🔋 充电中  已连续{display_minutes}分钟")
         else:
-            self.status_label.setText(f"⚡ 专注中  已连续{display_minutes}分钟")
+            if current_status == 'entertainment':
+                 self.status_label.setText(f"🍿 娱乐中  已连续{display_minutes}分钟")
+            elif current_status in ['work', 'focus']:
+                 self.status_label.setText(f"⚡ 专注中  已连续{display_minutes}分钟")
+            else:
+                 self.status_label.setText(f"⏸️ 休息中  已连续{display_minutes}分钟")
 
 
 class TimerDialog(QtWidgets.QDialog):

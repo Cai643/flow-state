@@ -1,5 +1,9 @@
 import os
 import datetime
+import requests
+import uuid
+import json
+import re
 
 # 1. 强制不走代理（关键步骤！）
 os.environ["NO_PROXY"] = "localhost,127.0.0.1"
@@ -7,19 +11,13 @@ os.environ["NO_PROXY"] = "localhost,127.0.0.1"
 os.environ["HTTP_PROXY"] = ""
 os.environ["HTTPS_PROXY"] = ""
 
-import ollama
-
-client = ollama.Client(host='http://127.0.0.1:11434')
-
-# print(client.list())
-
-# print(client.show('qwen2:7b'))
-
-# print(client.ps())
-
 class AIProcessor:
     def __init__(self):
-        self.client = ollama.Client(host='http://127.0.0.1:11434')
+        # 配置 API (LangFlow)
+        self.API_KEY = 'sk-2nUYtCKss6_D6-R3TQZ96nFfYW2rfjZuYtVFHj0Jnv0'
+        self.URL = "http://localhost:7860/api/v1/run/f45b7d1f-c583-4327-9093-6bfc75f20344"
+        
+        # 默认 System Prompt (保留作为文档，实际上现在通过 LangFlow 流程控制)
         self.system_prompt = r"""你是一个专业的活动摘要助手（专注学习倾向的助手）,专注于分析用户的工作学习状态（工作学习/娱乐/其它）。
 根据用户提供的当前窗口标题、进程名，推断用户正在进行的任务。
 请输出简短的分析结果，**请以JSON格式返回：**
@@ -117,33 +115,94 @@ Output:"
         # 获取当前实时时间
         now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        messages = []
+        # 构造输入值
+        # 注意：LangFlow 的 Input 组件通常只需要一个 input_value 字符串
+        # 我们把 system_prompt 和 text 拼接起来，或者只传 text
+        # 如果 system_prompt 很重要，最好将其硬编码在 LangFlow 的 Prompt 组件中
+        # 这里我们将它们合并，以便 LangFlow 可以通过单一输入接收所有上下文
         
         # 优先使用传入的 system_prompt，否则使用默认的
         current_sys_prompt = system_prompt if system_prompt else self.system_prompt
         
         if current_sys_prompt:
-            # 将时间注入到 system prompt 中
-            prompt_with_time = f"{current_sys_prompt}\n【当前系统时间】：{now_str}"
-            messages.append({"role": "system", "content": prompt_with_time})
-        
-        messages.append({"role": "user", "content": text})
+            final_input = f"{current_sys_prompt}\n【当前系统时间】：{now_str}\n\nUser Input: {text}"
+        else:
+            final_input = f"【当前系统时间】：{now_str}\n\nUser Input: {text}"
 
-        try:
-            # 只有在默认模式（后台监控）下才强制 JSON，聊天模式下不强制
-            fmt = 'json' if json_mode else None
+        # Request payload configuration 
+        payload = { 
+            "output_type": "chat", 
+            "input_type": "chat", 
+            "input_value": final_input 
+        } 
+        payload["session_id"] = str(uuid.uuid4()) 
+        
+        headers = {"x-api-key": self.API_KEY} 
+        
+        try: 
+            # Send API request 
+            response = requests.post(self.URL, json=payload, headers=headers, timeout=30) 
+            response.raise_for_status()  # Raise exception for bad status codes 
+        
+            # Parse response
+            # LangFlow API response structure:
+            # {
+            #   "outputs": [
+            #     {
+            #       "outputs": [
+            #         {
+            #           "results": {
+            #             "message": {
+            #               "text": "The actual response text"
+            #             }
+            #           }
+            #         }
+            #       ]
+            #     }
+            #   ]
+            # }
             
-            response = self.client.chat(
-                model='qwen2:7b',
-                messages=messages,
-                format=fmt 
-            )
-            return response['message']['content']
-        except Exception as e:
+            resp_json = response.json()
+            try:
+                result_text = resp_json["outputs"][0]["outputs"][0]["results"]["message"]["text"]
+                
+                # 如果需要返回 JSON 格式，且结果看起来像 Markdown 代码块，则尝试提取
+                if json_mode:
+                    try:
+                        # 尝试使用正则提取最外层的 JSON 对象
+                        json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
+                        if json_match:
+                            clean_json_str = json_match.group(0)
+                            # 验证是否为有效 JSON
+                            json.loads(clean_json_str)
+                            return clean_json_str
+                    except Exception:
+                        pass # 如果正则提取失败，还是返回原始文本，让上层处理
+                
+                return result_text
+            except (KeyError, IndexError) as e:
+                # Fallback parsing if structure changes
+                print(f"LangFlow Response Structure Error: {e}")
+                return str(resp_json)
+
+        except requests.exceptions.RequestException as e: 
+            error_msg = f"Error making API request: {e}"
+            print(error_msg)
             if json_mode:
-                 return f'{{"error": "AI处理出错: {str(e)}"}}'
-            else:
-                 return f"AI处理出错: {str(e)}"
+                 return f'{{"error": "{error_msg}"}}'
+            return error_msg
+        except ValueError as e: 
+            error_msg = f"Error parsing response: {e}"
+            print(error_msg)
+            if json_mode:
+                 return f'{{"error": "{error_msg}"}}'
+            return error_msg
+        except Exception as e:
+            error_msg = f"AI处理出错: {str(e)}"
+            print(error_msg)
+            if json_mode:
+                 return f'{{"error": "{error_msg}"}}'
+            return error_msg
 
 # 单例实例
 ai_processor = AIProcessor()

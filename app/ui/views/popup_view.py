@@ -114,6 +114,9 @@ class CardPopup(QtWidgets.QWidget):
         self.monitor_timer.timeout.connect(self._checkMousePos)
         self.ball_ref = None
         
+        # 交互标志位：如果在进行交互（如输入），则暂停自动隐藏
+        self.is_interacting = False
+        
         # 报告窗口引用
         self.daily_report_window = None
 
@@ -146,6 +149,10 @@ class CardPopup(QtWidgets.QWidget):
         """
         if not self.isVisible() or not self.ball_ref:
             self.monitor_timer.stop()
+            return
+
+        # 如果正在进行交互（如弹出对话框），则暂停检测
+        if getattr(self, 'is_interacting', False):
             return
 
         pos = QtGui.QCursor.pos()
