@@ -256,21 +256,21 @@ def create_app(ai_busy_flag=None):
             
         try:
             from app.data.web_report.report_generator import ReportGenerator
-            
-            # 使用标准的 app 包导入
             from app.service.detector.extract_core_events import extract_core_events
             from app.service.detector.calculate_period_stats import calculate_period_stats
-            from datetime import date
+            from datetime import date, timedelta
             
-            # 1. 实时触发核心事件提取 + 周期统计更新 (今天)
             try:
-                today_str = date.today().strftime('%Y-%m-%d')
-                print(f"【Web服务】正在实时提取今日({today_str})数据...")
-                extract_core_events(today_str)
-                
-                calculate_period_stats(today_str)
+                end_d = date.today()
+                start_d = end_d - timedelta(days=days - 1)
+                cur = start_d
+                while cur <= end_d:
+                    d_str = cur.strftime('%Y-%m-%d')
+                    extract_core_events(d_str)
+                    calculate_period_stats(d_str)
+                    cur += timedelta(days=1)
             except Exception as e:
-                print(f"【Web服务】实时提取失败 (不影响后续流程): {e}")
+                print(f"【Web服务】实时提取失败: {e}")
 
             # 2. 准备数据和回调
             # 这里我们使用 remove_chat.py 中验证过的逻辑，直接调用 LangFlow API
@@ -307,40 +307,96 @@ def create_app(ai_busy_flag=None):
                 core_items = {}
                 for log in context['daily_logs']:
                     date_str = log['date']
+                    
+                    # 获取多条目上下文
+                    items_info = log.get('items_context', '')
+                    # 兼容旧逻辑
+                    if not items_info and log.get('top_app'):
+                         items_info = f"[工作] {log['top_app']} - {log['title']}"
+
                     prompt_event = f"""
 Role: 你是一个极其敏锐的数据分析师。
-Task: 请阅读以下用户在 {date_str} 的应用使用记录，总结出当天唯一的一个核心事项。
+Task: 阅读用户在 {date_str} 的主要活动记录，输出当天核心事项的中文短句，使用中文逗号“，”分隔。
 Data Context:
-- Top App: {log['top_app']}
-- Window Title: {log['title']}
-- Duration: {log['hours']} 小时
+{items_info}
+
 Constraints:
-- 输出必须少于 15 个字。
-- 格式：[动词] [核心名词]
-- 例如："重构后端代码"。
-- 不要包含任何解释性文字，只输出结果。
+- 只输出一行短句，由 2~3 个短语组成，使用“，”分隔。
+- 覆盖最重要的 1-2 项工作；如有[娱乐]也要简述，但不要使用括号，直接以短语表达，例如“看B站”。
+- 不要使用句号、分号或项目符号；不要加多余说明。
+- 总字数 ≤ 30。
+- 示例："编写后端代码，调试脚本，看B站"
 """
                     # 只有当有有效数据时才调用
-                    if log['top_app']:
+                    if items_info and len(items_info) > 5:
+                        print(f"  [AI] Generating summary for {date_str}...")
                         res = call_langflow(URL_1, API_KEY_1, prompt_event)
-                        if res: core_items[date_str] = res
+                        if res: 
+                            print(f"  [AI] Result: {res}")
+                            core_items[date_str] = res
+                        else:
+                            print(f"  [AI] Failed to get response for {date_str}")
+                    else:
+                        print(f"  [AI] Skip {date_str} (not enough info)")
                 
-                # B. 生成致奋斗者 (Encouragement)
+                # B. 生成致追梦者 (深度总结 + 分析 + 建议)
                 peak_info = context['peak_day']
                 peak_str = f"{peak_info.get('date_str', '无')} ({peak_info.get('hours', 0)}h)"
+                rows = context.get('period_stats_rows', [])
+                top_apps = context.get('top_apps', '')
                 
+                # 简要聚合期内关键信息
+                total_focus_hours = context['total_focus_hours']
+                wins = context['willpower_wins']
+                avg_eff = 0
+                peak_hours = []
+                summaries = []
+                frag_vals = []
+                switch_vals = []
+                for r in rows:
+                    avg_eff += (r.get('efficiency_score') or 0)
+                    peak_hours.append(r.get('peak_hour') or 0)
+                    s = r.get('daily_summary') or ''
+                    if s: summaries.append(s)
+                    if r.get('focus_fragmentation_ratio') is not None:
+                        frag_vals.append(r.get('focus_fragmentation_ratio'))
+                    if r.get('context_switch_freq') is not None:
+                        switch_vals.append(r.get('context_switch_freq'))
+                days_len = max(1, len(rows))
+                avg_eff = int(avg_eff / days_len)
+                # 众数黄金时段
+                from collections import Counter
+                best_hour = 0
+                if peak_hours:
+                    best_hour = Counter(peak_hours).most_common(1)[0][0]
+                avg_frag = round(sum(frag_vals)/len(frag_vals), 2) if frag_vals else 0
+                avg_switch = round(sum(switch_vals)/len(switch_vals), 1) if switch_vals else 0
+                summary_join = '；'.join(summaries[:3])  # 取前三天摘要
+
+                # 口语化提示（人话）
+                avg_per_day = round(total_focus_hours / days_len, 1)
+                frag_state = (
+                    '专注占优' if avg_frag >= 1.2 else (
+                        '碎片偏多' if avg_frag < 0.8 else '相对平衡'
+                    )
+                )
+                switch_state = (
+                    '切换较频繁' if avg_switch > 18 else (
+                        '切换略多' if avg_switch > 12 else '切换控制良好'
+                    )
+                )
+                metrics_hint = (
+                    f"近{days_len}天平均每天专注约{avg_per_day}小时，克制分心{wins}次。"
+                    f"黄金时段多在{best_hour}点，{frag_state}；每小时切换约{avg_switch}次，尽量控制在十几次以内。"
+                )
+
                 prompt_enc = f"""
-Role: 你是一个充满激情与同理心的高效能教练。
-Task: 根据用户的专注数据，写一段“致奋斗者”的寄语。
-Data Context:
-- 专注总时长: {context['total_focus_hours']} 小时
-- 意志力胜利: {context['willpower_wins']} 次 (意味着他战胜了诱惑)
-- 巅峰时刻: {peak_str}
-Style:
-- 激昂、真诚、数据驱动。
-- 必须引用上面的具体数字。
-- 结尾要给人以力量。
-- 字数控制在 100 字左右。
+Role: 你是一位深度复盘教练，擅长用事实总结与给出可执行建议。
+Task: 写一段“致追梦者”的复盘寄语，要求：
+1) 用一句话总结这几天你具体做了什么（结合摘要：{summary_join}；主要阵地：{top_apps}）。
+2) 给出数据洞察。不要机械罗列数字，改用口语化描述，如“平均每天约X小时”、“切换较频繁/控制良好”。可参考：{metrics_hint}。
+ 3) 给出两条可执行建议（例如把“黄金时段”用于高强任务、降低切换频率、提升碎片比）。两条建议必须换行，行首标注“建议1：”“建议2：”。
+ 4) 风格简洁真诚，不夸张，不口号；中文 3-4 句，合计不超过 160 字。
 """
                 encouragement = call_langflow(URL_2, API_KEY_2, prompt_enc)
                 if not encouragement:

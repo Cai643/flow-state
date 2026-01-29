@@ -37,6 +37,24 @@ class SimpleDailyReport(QtWidgets.QWidget):
         
         # Entry Animation
         self.setWindowOpacity(1.0)
+        
+        # Auto Refresh Timer
+        self.refresh_timer = QtCore.QTimer(self)
+        self.refresh_timer.setInterval(30000) # 30 seconds
+        self.refresh_timer.timeout.connect(self._refresh_data)
+        self.refresh_timer.start()
+
+    def _refresh_data(self):
+        """Refresh data and update UI"""
+        self._load_data()
+        
+        # Update Dashboard
+        if hasattr(self, 'dashboard_view'):
+            self.dashboard_view.update_data()
+            
+        # Update Timeline
+        if hasattr(self, 'timeline_view'):
+            self.timeline_view.update_data()
 
     def _load_data(self):
         """Load data for both dashboard and timeline"""
@@ -423,6 +441,21 @@ class DailyDashboard(QtWidgets.QWidget):
         
         layout.addWidget(content_widget)
 
+    def update_data(self):
+        """Rebuild timeline with new data"""
+        # Remove old container
+        if hasattr(self, 'timeline_container'):
+            self.timeline_container.deleteLater()
+            
+        # Create new one
+        self.timeline_container = TimelineContainer(self.report.time_blocks)
+        
+        # Set to scroll area
+        # Need to find scroll area from layout
+        scroll = self.layout().itemAt(1).widget()
+        if isinstance(scroll, QtWidgets.QScrollArea):
+            scroll.setWidget(self.timeline_container)
+
     def _build_header(self, parent_layout):
         header = QtWidgets.QWidget()
         header.setFixedHeight(70) 
@@ -481,29 +514,29 @@ class DailyDashboard(QtWidgets.QWidget):
         t1.setStyleSheet("color: #2E7D32; font-weight: bold; font-size: 16px; background: transparent;")
         
         goal_percent_text = f"{int(self.report.goal_completion_rate * 100)}%"
-        t2 = QtWidgets.QLabel(goal_percent_text)
-        t2.setStyleSheet("color: #2E7D32; font-weight: bold; font-size: 20px; background: transparent;")
+        self.lbl_goal_percent = QtWidgets.QLabel(goal_percent_text)
+        self.lbl_goal_percent.setStyleSheet("color: #2E7D32; font-weight: bold; font-size: 20px; background: transparent;")
         top_row.addWidget(t1)
         top_row.addStretch()
-        top_row.addWidget(t2)
+        top_row.addWidget(self.lbl_goal_percent)
         v_layout.addLayout(top_row)
         
         v_layout.addStretch()
         
-        ring = ProgressRingWidget(percentage=self.report.goal_completion_rate, center_text=f"{self.report.hours}\u5c0f\u65f6{self.report.minutes}\u5206", sub_text="\u4eca\u65e5\u4e13\u6ce8") 
-        v_layout.addWidget(ring, 0, QtCore.Qt.AlignCenter)
+        self.ring = ProgressRingWidget(percentage=self.report.goal_completion_rate, center_text=f"{self.report.hours}\u5c0f\u65f6{self.report.minutes}\u5206", sub_text="\u4eca\u65e5\u4e13\u6ce8") 
+        v_layout.addWidget(self.ring, 0, QtCore.Qt.AlignCenter)
         
         v_layout.addStretch()
         
-        f1 = QtWidgets.QLabel(f"\ud83c\udfc6 \u51fb\u8d25\u5168\u56fd {self.report.beat_percentage}% \u7684\u7528\u6237") 
-        f1.setAlignment(QtCore.Qt.AlignCenter)
-        f1.setStyleSheet("color: #1B5E20; font-size: 15px; font-weight: bold; background: transparent;")
+        self.lbl_beat = QtWidgets.QLabel(f"\ud83c\udfc6 \u51fb\u8d25\u5168\u56fd {self.report.beat_percentage}% \u7684\u7528\u6237") 
+        self.lbl_beat.setAlignment(QtCore.Qt.AlignCenter)
+        self.lbl_beat.setStyleSheet("color: #1B5E20; font-size: 15px; font-weight: bold; background: transparent;")
         
         f2 = QtWidgets.QLabel("\u72b6\u6001: \ud83d\udfe2 \u6df1\u5ea6\u6c89\u6d78\u4e2d...") 
         f2.setAlignment(QtCore.Qt.AlignCenter)
         f2.setStyleSheet("color: #2E7D32; font-size: 14px; font-weight: bold; background: #C8E6C9; border-radius: 12px; padding: 6px 12px; margin-top: 10px;")
         
-        v_layout.addWidget(f1)
+        v_layout.addWidget(self.lbl_beat)
         v_layout.addWidget(f2)
         
         parent_layout.addWidget(panel, 1)
@@ -517,18 +550,18 @@ class DailyDashboard(QtWidgets.QWidget):
         grid = QtWidgets.QGridLayout()
         grid.setSpacing(20)
         
-        c1 = StatCard("\u5dc5\u5cf0\u5fc3\u6d41", f"{self.report.peak_flow_mins}", "\u5206\u949f", "\u26a1", "#F0F4C3", "#827717")
-        c2 = StatCard("\u610f\u5fd7\u529b", f"{self.report.willpower_count}", "\u6b21\u6210\u529f", "\ud83d\udee1\ufe0f", "#FFECB3", "#FF6F00")
-        c3 = StatCard("\u5df2\u5145\u80fd", f"{self.report.recharged_mins}", "\u5206\u949f", "\ud83d\udd0b", "#DCEDC8", "#33691E")
-        c4 = StatCard("\u6548\u80fd\u6307\u6570", f"{self.report.efficiency_score}", "\u5206", "\ud83d\udcc8", "#FFCCBC", "#BF360C")
+        self.c1 = StatCard("\u5dc5\u5cf0\u5fc3\u6d41", f"{self.report.peak_flow_mins}", "\u5206\u949f", "\u26a1", "#F0F4C3", "#827717")
+        self.c2 = StatCard("\u610f\u5fd7\u529b", f"{self.report.willpower_count}", "\u6b21\u6210\u529f", "\ud83d\udee1\ufe0f", "#FFECB3", "#FF6F00")
+        self.c3 = StatCard("\u5df2\u5145\u80fd", f"{self.report.recharged_mins}", "\u5206\u949f", "\ud83d\udd0b", "#DCEDC8", "#33691E")
+        self.c4 = StatCard("\u6548\u80fd\u6307\u6570", f"{self.report.efficiency_score}", "\u5206", "\ud83d\udcc8", "#FFCCBC", "#BF360C")
         
-        for c in [c1, c2, c3, c4]:
+        for c in [self.c1, self.c2, self.c3, self.c4]:
             c.setMinimumHeight(125)
         
-        grid.addWidget(c1, 0, 0)
-        grid.addWidget(c2, 0, 1)
-        grid.addWidget(c3, 1, 0)
-        grid.addWidget(c4, 1, 1)
+        grid.addWidget(self.c1, 0, 0)
+        grid.addWidget(self.c2, 0, 1)
+        grid.addWidget(self.c3, 1, 0)
+        grid.addWidget(self.c4, 1, 1)
         
         v_layout.addLayout(grid, 3)
         
@@ -557,6 +590,25 @@ class DailyDashboard(QtWidgets.QWidget):
         v_layout.addWidget(comm_box, 1)
         
         parent_layout.addWidget(right_container, 1)
+
+    def update_data(self):
+        """Update UI with new data from report"""
+        # Update Goal Percent
+        self.lbl_goal_percent.setText(f"{int(self.report.goal_completion_rate * 100)}%")
+        
+        # Update Ring
+        self.ring.percentage = self.report.goal_completion_rate
+        self.ring.center_text = f"{self.report.hours}\u5c0f\u65f6{self.report.minutes}\u5206"
+        self.ring.update()
+        
+        # Update Beat Percent
+        self.lbl_beat.setText(f"\ud83c\udfc6 \u51fb\u8d25\u5168\u56fd {self.report.beat_percentage}% \u7684\u7528\u6237")
+        
+        # Update Cards
+        self.c1.update_value(f"{self.report.peak_flow_mins}")
+        self.c2.update_value(f"{self.report.willpower_count}")
+        self.c3.update_value(f"{self.report.recharged_mins}")
+        self.c4.update_value(f"{self.report.efficiency_score}")
 
 
 class ProgressRingWidget(QtWidgets.QWidget):
@@ -666,6 +718,19 @@ class StatCard(QtWidgets.QFrame):
         layout.addStretch()
 
 
+
+    def update_value(self, value):
+        # Update the large value label
+        # The structure is: layout -> center_layout -> l_val (index 0)
+        try:
+            # Find l_val in layout hierarchy
+            # layout index 1 is center_layout
+            center_layout = self.layout().itemAt(1).layout()
+            l_val = center_layout.itemAt(0).widget()
+            if isinstance(l_val, QtWidgets.QLabel):
+                l_val.setText(str(value))
+        except Exception as e:
+            print(f"Error updating stat card: {e}")
 
 class DailyTimeline(QtWidgets.QWidget):
     back_to_summary = Signal()

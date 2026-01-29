@@ -170,19 +170,64 @@ def calculate_period_stats(target_date):
                 switch_freq = 0
 
         # --- Metric 7: Daily Summary (from Core Events) ---
-        # 简单策略：直接取 Top 1 Core Event 的标题
-        # 如果没有 core events，则填 "无主要活动"
+        # 改进策略：聚合 Top 3 Focus + Top 2 Entertainment
+        # 目标：30字以内的精简摘要
+        
+        # 1. 获取 Focus (Top 3)
         cursor.execute('''
-            SELECT app_name, clean_title FROM core_events 
+            SELECT app_name, clean_title, total_duration 
+            FROM core_events 
             WHERE date = ? AND category = 'focus'
             ORDER BY rank ASC 
-            LIMIT 1
+            LIMIT 3
         ''', (target_date,))
+        focus_events = cursor.fetchall()
         
-        top_event = cursor.fetchone()
-        if top_event:
-            daily_summary = f"{top_event['clean_title']} ({top_event['app_name']})"
-        else:
+        # 2. 获取 Entertainment (Top 2)
+        cursor.execute('''
+            SELECT app_name, clean_title, total_duration 
+            FROM core_events 
+            WHERE date = ? AND category = 'entertainment'
+            ORDER BY rank ASC 
+            LIMIT 2
+        ''', (target_date,))
+        ent_events = cursor.fetchall()
+        
+        items = []
+        total_len = 0
+        
+        # 辅助函数：生成极简标题
+        def get_short_title(ev):
+            t = ev['clean_title']
+            a = ev['app_name']
+            # 如果标题太长或无意义，用 App 名
+            if len(t) > 8 or t == "Unknown":
+                return a.split('.')[0] # 去掉 .exe
+            return t[:6] # 截断
+            
+        # 优先加入 Focus Top 1 & 2
+        for ev in focus_events[:2]:
+            t = get_short_title(ev)
+            items.append(t)
+            
+        # 加入 Ent Top 1 (如果有时长显著)
+        if ent_events:
+            ev = ent_events[0]
+            if ev['total_duration'] > 600: # 至少10分钟
+                t = get_short_title(ev)
+                items.append(f"({t})") # 娱乐用括号标注
+                
+        # 如果字数还够，加入 Focus Top 3
+        if len(" ".join(items)) < 20 and len(focus_events) > 2:
+             t = get_short_title(focus_events[2])
+             items.append(t)
+             
+        # 组合并截断
+        daily_summary = " ".join(items)
+        if len(daily_summary) > 30:
+            daily_summary = daily_summary[:29] + "…"
+            
+        if not daily_summary:
             daily_summary = "无主要活动"
             
         # --- Metric 8: AI Insight Generation ---

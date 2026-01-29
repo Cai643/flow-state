@@ -59,21 +59,27 @@ def test_report_generation():
         # log 结构: {'date': '1月26日', 'top_app': 'Trae.exe', 'title': 'database.py', 'hours': 3.1}
         date_str = log['date']
         
-        # 构造 Prompt
+        # 获取多条目上下文
+        items_info = log.get('items_context', '')
+        if not items_info and log.get('top_app'):
+            items_info = f"[工作] {log['top_app']} - {log['title']}"
+
+        # 构造 Prompt (Updated)
         prompt_event = f"""
 Role: 你是一个极其敏锐的数据分析师。
-Task: 请阅读以下用户在 {date_str} 的应用使用记录，总结出当天唯一的一个核心事项。
+Task: 阅读用户在 {date_str} 的主要活动记录，输出当天核心事项的中文短句，使用中文逗号“，”分隔。
 Data Context:
-- Top App: {log['top_app']}
-- Window Title: {log['title']}
-- Duration: {log['hours']} 小时
+{items_info}
+
 Constraints:
-- 输出必须少于 15 个字。
-- 格式：[动词] [核心名词]
-- 例如："重构后端代码"。
-- 不要包含任何解释性文字，只输出结果。
+- 只输出一行短句，由 2~3 个短语组成，使用“，”分隔。
+- 覆盖最重要的 1-2 项工作；如有[娱乐]也要简述，但不要使用括号，直接以短语表达，例如“看B站”。
+- 不要使用句号、分号或项目符号；不要加多余说明。
+- 总字数 ≤ 30。
+- 示例："编写后端代码，调试脚本，看B站"
 """
-        print(f"  -> 正在处理 {date_str} ({log['title']})...")
+        # print(f"DEBUG PROMPT: {prompt_event}") # Debug
+        print(f"  -> 正在处理 {date_str}...")
         summary = call_langflow_api(URL_1, API_KEY_1, prompt_event)
         if summary:
             print(f"     ✅ AI总结: {summary}")

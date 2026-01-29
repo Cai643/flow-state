@@ -27,6 +27,74 @@
             overflow: hidden;
         }
 
+        /* --- Report Content Typography --- */
+        #report-markdown-content {
+            font-size: 14px;
+            line-height: 1.8;
+            color: var(--color-text-main);
+        }
+        #report-markdown-content h1 {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--color-green-dark);
+            margin: 8px 0 12px;
+        }
+        #report-markdown-content h2 {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--color-green-dark);
+            margin: 14px 0 10px;
+        }
+        #report-markdown-content h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--color-text-main);
+            margin: 10px 0 8px;
+        }
+        #report-markdown-content strong {
+            color: var(--color-green-mid);
+        }
+        #report-markdown-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            background: rgba(255,255,255,0.7);
+            border: 1px solid rgba(164, 191, 90, 0.2);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .report-card {
+            background: var(--color-white);
+            border: 1px solid rgba(164, 191, 90, 0.25);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(79,102,16,0.06);
+            margin-top: 8px;
+        }
+        .report-body {
+            padding: 16px 20px;
+        }
+        .peak-banner {
+            background: rgba(255, 245, 207, 0.7);
+            padding: 10px 12px;
+            border-left: 4px solid var(--color-accent-gold);
+            border-radius: 8px;
+            font-size: 13px;
+            color: var(--color-green-dark);
+            margin: 10px 0 16px;
+        }
+        #report-markdown-content thead th {
+            font-weight: 700;
+            color: var(--color-green-dark);
+            background: rgba(164, 191, 90, 0.12);
+        }
+        #report-markdown-content tbody td {
+            font-size: 14px;
+            color: var(--color-text-main);
+        }
+        #report-markdown-content tbody tr:nth-child(even) td {
+            background: rgba(255,255,255,0.4);
+        }
+
         #app {
             display: flex;
             height: 100vh;
@@ -1137,6 +1205,28 @@
             return text;
         }
 
+        // Replace newlines outside <table> blocks to avoid large gaps
+        function replaceNewlinesOutsideTables(s) {
+            let res = '';
+            let i = 0;
+            while (true) {
+                const start = s.indexOf('<table', i);
+                if (start === -1) {
+                    // Collapse 2+ consecutive newlines to a single <br>
+                    res += s.slice(i).replace(/\n{2,}/g, '<br>');
+                    break;
+                }
+                res += s.slice(i, start).replace(/\n{2,}/g, '<br>');
+                const end = s.indexOf('</table>', start);
+                if (end === -1) { res += s.slice(start); break; }
+                // Keep table part untouched
+                res += s.slice(start, end + 8);
+                i = end + 8;
+            }
+            // Collapse multiple <br> sequences
+            return res.replace(/(?:<br>\s*){2,}/g, '<br>');
+        }
+
         const themes = {
             green: {
                 '--color-bg-light': '#fff5cf',
@@ -1828,8 +1918,25 @@
                         .replace(/^# (.*$)/gim, '<h1>$1</h1>')
                         .replace(/^## (.*$)/gim, '<h2>$1</h2>')
                         .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-                        .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
-                        .replace(/\n/gim, '<br>');
+                        .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>');
+                    function replaceNewlinesOutsideTables(s) {
+                        let res = '';
+                        let i = 0;
+                        while (true) {
+                            const start = s.indexOf('<table', i);
+                            if (start === -1) {
+                                res += s.slice(i).replace(/\n{2,}/g, '<br>');
+                                break;
+                            }
+                            res += s.slice(i, start).replace(/\n{2,}/g, '<br>');
+                            const end = s.indexOf('</table>', start);
+                            if (end === -1) { res += s.slice(start); break; }
+                            res += s.slice(start, end + 8);
+                            i = end + 8;
+                        }
+                        return res.replace(/(?:<br>\s*){2,}/g, '<br>');
+                    }
+                    html = replaceNewlinesOutsideTables(html);
                     
                     markdownContainer.innerHTML = html;
                 }
@@ -1897,8 +2004,8 @@
                         .replace(/^# (.*$)/gim, '<h1>$1</h1>')
                         .replace(/^## (.*$)/gim, '<h2>$1</h2>')
                         .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-                        .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
-                        .replace(/\n/gim, '<br>');
+                        .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>');
+                    html = replaceNewlinesOutsideTables(html);
                     
                     const aiDiv = document.createElement('div');
                     aiDiv.className = 'message ai';

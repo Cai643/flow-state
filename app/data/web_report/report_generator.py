@@ -45,7 +45,9 @@ class ReportGenerator:
                 "total_focus_hours": formatted_data["total_focus_hours"],
                 "willpower_wins": formatted_data["willpower_wins"],
                 "peak_day": formatted_data["peak_day_info"],
-                "daily_logs": formatted_data["daily_logs_for_ai"]
+                "daily_logs": formatted_data["daily_logs_for_ai"],
+                "period_stats_rows": formatted_data.get("period_stats_rows", []),
+                "top_apps": formatted_data.get("top_apps", "")
             }
             try:
                 ai_result = ai_callback(ai_context)
@@ -86,7 +88,7 @@ class ReportGenerator:
             cursor = conn.execute("""
                 SELECT date, app_name, clean_title, total_duration, category 
                 FROM core_events 
-                WHERE date BETWEEN ? AND ? AND rank <= 2
+                WHERE date BETWEEN ? AND ? AND rank <= 3
                 ORDER BY date ASC, rank ASC
             """, (s_str, e_str))
             
@@ -98,12 +100,45 @@ class ReportGenerator:
             events_by_date = {}
             for ev in raw_events:
                 d = ev['date']
-                if d not in events_by_date:
-                    events_by_date[d] = []
-                events_by_date[d].append(ev)
+                try:
+                    d_key = d.strftime('%Y-%m-%d') if hasattr(d, 'strftime') else str(d)
+                except Exception:
+                    d_key = str(d)
+                if d_key not in events_by_date:
+                    events_by_date[d_key] = []
+                events_by_date[d_key].append(ev)
             
             data["core_events_map"] = events_by_date
-            data["core_events"] = raw_events # Keep raw list for Top Apps calculation
+            data["core_events"] = raw_events
+
+            cursor = conn.execute("""
+                SELECT date, total_focus, peak_hour, efficiency_score, daily_summary, focus_fragmentation_ratio, context_switch_freq 
+                FROM period_stats 
+                WHERE date BETWEEN ? AND ?
+                ORDER BY date ASC
+            """, (s_str, e_str))
+            period_map = {}
+            period_rows = []
+            for row in cursor.fetchall():
+                d = row["date"]
+                try:
+                    d_key = d.strftime('%Y-%m-%d') if hasattr(d, 'strftime') else str(d)
+                except Exception:
+                    d_key = str(d)
+                period_map[d_key] = row["daily_summary"] or ""
+                # sqlite3.Row does not support .get; use key checks
+                keys = row.keys()
+                period_rows.append({
+                    "date": d_key,
+                    "total_focus": row["total_focus"] or 0,
+                    "peak_hour": row["peak_hour"] or 0,
+                    "efficiency_score": row["efficiency_score"] or 0,
+                    "daily_summary": row["daily_summary"] or "",
+                    "focus_fragmentation_ratio": (row["focus_fragmentation_ratio"] if "focus_fragmentation_ratio" in keys else 0) or 0,
+                    "context_switch_freq": (row["context_switch_freq"] if "context_switch_freq" in keys else 0) or 0
+                })
+            data["period_summary_map"] = period_map
+            data["period_stats_rows"] = period_rows
             
             # 3. Window Sessions (用于寻找具体的巅峰时刻时间段)
             # 这里简化处理：只找这段时间内持续时间最长的一次会话
@@ -202,53 +237,56 @@ class ReportGenerator:
                 
             fmt_date = f"{dt.month}月{dt.day}日"
             
-            # 选择当天的 Core Event
-            # 逻辑：默认取 Rank 1 的 Focus。但每 3 天（或随机概率 1/3），如果当天有显著的 Entertainment，则展示它。
-            # 这里简单起见，使用日期哈希来决定：日期天数 % 3 == 0 时，优先展示娱乐（如果有）
+            # 改进：不再只选一个，而是收集 Top 3 Focus + Top 2 Ent
             events = core_events_map.get(d_str, [])
-            selected_event = {}
             
-            # 调试信息
-            if not events:
-                # 尝试再次从 core_events_map 查找，可能是日期格式问题
-                # 比如 core_events_map 里的 key 是 datetime.date 对象
-                for k, v in core_events_map.items():
-                    if str(k) == d_str:
-                        events = v
-                        break
+            focus_items = [e for e in events if e['category'] == 'focus'][:3]
+            ent_items = [e for e in events if e['category'] == 'entertainment'][:2]
             
-            if events:
-                # 尝试找到 Focus 和 Entertainment
-                focus_ev = next((e for e in events if e['category'] == 'focus'), None)
-                ent_ev = next((e for e in events if e['category'] == 'entertainment'), None)
-                
-                # 决策逻辑：1/3 概率展示娱乐
-                show_ent = (dt.day % 3 == 0) and ent_ev
-                
-                if show_ent:
-                    selected_event = ent_ev
-                elif focus_ev:
-                    selected_event = focus_ev
-                elif ent_ev: # 如果没有 Focus，只能展示娱乐
-                    selected_event = ent_ev
-                else:
-                    selected_event = events[0]
+            # 1. 构建详细上下文给 AI (用于生成精炼总结)
+            items_desc_list = []
+            for e in focus_items:
+                dur_m = int(e['total_duration'] / 60)
+                items_desc_list.append(f"[工作] {e['app_name']} - {e['clean_title']} ({dur_m}分钟)")
+            
+            for e in ent_items:
+                dur_m = int(e['total_duration'] / 60)
+                items_desc_list.append(f"[娱乐] {e['app_name']} - {e['clean_title']} ({dur_m}分钟)")
+            
+            items_context_str = "\n".join(items_desc_list)
+            
+            # 2. 构建 Fallback 显示 (当 AI 失败时)
+            # 连贯短句: "主要X、Y（看Z）"
+            fb_parts = []
+            for e in focus_items[:2]:
+                t = e['clean_title'][:6]
+                if len(e['clean_title']) > 8: t = e['app_name'].split('.')[0]
+                fb_parts.append(t)
+            
+            if ent_items:
+                titles = []
+                for e in ent_items[:2]:
+                    t = e['clean_title'][:6]
+                    if len(e['clean_title']) > 8:
+                        t = e['app_name'].split('.')[0]
+                    titles.append(t)
+                ent_suffix = ''.join([f"，看{t}" for t in titles])
             else:
-                 # 如果真的找不到，尝试从 daily_summary (Period Stats) 补救
-                 # 但这里先不引入更多依赖，保持简单
-                 pass
-            
-            # 默认核心事项（如果没有 AI 生成，先用原始标题）
-            raw_title = selected_event.get("clean_title", "无核心记录")
-            app_name = selected_event.get("app_name", "")
-            
-            # [Fallback] 如果数据库里有标题，优先显示标题而不是 "无核心记录"
-            fallback_display = f"{app_name} - {raw_title}" if app_name else raw_title
+                ent_suffix = ""
+                 
+            if fb_parts:
+                raw_display = "主要" + "，".join(fb_parts) + ent_suffix
+            else:
+                raw_display = "无主要活动"
+            if raw_display == "无主要活动":
+                ps = data.get("period_summary_map", {}).get(d_str, "")
+                if ps:
+                    raw_display = ps
             
             row_data = {
                 "date": d_str,
                 "fmt_date": fmt_date,
-                "raw_core_item": fallback_display, # 这里将作为 AI 没返回时的默认显示
+                "raw_core_item": raw_display, 
                 "hours": round(stat["total_focus_time"] / 3600, 1),
                 "longest_min": int(stat["max_focus_streak"] / 60)
             }
@@ -256,10 +294,8 @@ class ReportGenerator:
             
             daily_logs_for_ai.append({
                 "date": fmt_date,
-                "top_app": app_name,
-                "title": raw_title,
-                "hours": row_data["hours"],
-                "category": selected_event.get('category', 'unknown') # 传给 AI，让它知道这是娱乐还是工作
+                "items_context": items_context_str, # 新字段：包含多条记录
+                "hours": row_data["hours"]
             })
 
         # 提取主要阵地 (Top Apps)
@@ -283,7 +319,8 @@ class ReportGenerator:
             "efficiency_level": efficiency_level,
             "peak_day_info": peak_day_info,
             "daily_rows_data": daily_rows_data,
-            "daily_logs_for_ai": daily_logs_for_ai
+            "daily_logs_for_ai": daily_logs_for_ai,
+            "period_stats_rows": data.get("period_stats_rows", [])
         }
 
     def _render_template(self, data: Dict, ai_result: Dict) -> str:
@@ -301,27 +338,47 @@ class ReportGenerator:
         core_items_map = ai_result.get("core_items", {}) # AI 返回的 { "2026-01-21": "开发后端" }
         
         for row in data["daily_rows_data"]:
-            # 优先使用 AI 生成的核心事项，否则使用原始数据
+            # 优先使用 AI 生成的核心事项 (尝试多种 key)
+            # 1. 完整日期 "2026-01-29"
+            # 2. 格式化日期 "1月29日"
+            # 3. 原始 Fallback "无主要活动"
             core_item = core_items_map.get(row["date"]) or core_items_map.get(row["fmt_date"]) or row["raw_core_item"]
-            # 截断过长的文本
-            if len(core_item) > 20: core_item = core_item[:18] + "..."
             
-            line = f" {row['fmt_date']} \t {core_item} \t {row['hours']} h \t {row['longest_min']} min"
-            rows_str += line + "\n"
+            # Debug log
+            # print(f"Processing row {row['date']}: AI={core_items_map.get(row['date'])}, Raw={row['raw_core_item']}")
 
-        # 3. 填充主模板
-        return REPORT_TEMPLATE.format(
-            start_date=data["start_date"],
-            end_date=data["end_date"],
-            days=len(data["daily_rows_data"]),
-            top_apps=data["top_apps"],
-            total_focus_hours=data["total_focus_hours"],
-            focus_ratio_insight=data["focus_ratio_insight"],
-            willpower_wins=data["willpower_wins"],
-            willpower_insight=data["willpower_insight"],
-            efficiency_score=data["efficiency_score"],
-            efficiency_level=data["efficiency_level"],
-            peak_moment_desc=peak_moment_desc,
-            daily_rows=rows_str,
-            ai_encouragement=ai_result.get("encouragement", "保持专注，继续前行！")
-        )
+            # 截断过长的文本
+            # if len(core_item) > 20: core_item = core_item[:18] + "..."
+            # 允许更长一点，毕竟现在包含了娱乐
+            if len(core_item) > 32: core_item = core_item[:30] + "..."
+            
+            line = (
+                f"<tr>"
+                f"<td style='padding:6px 8px; border-bottom:1px solid #eee;'>{row['fmt_date']}</td>"
+                f"<td style='padding:6px 8px; border-bottom:1px solid #eee;'>{core_item}</td>"
+                f"<td style='padding:6px 8px; border-bottom:1px solid #eee;'>{row['hours']} h</td>"
+                f"<td style='padding:6px 8px; border-bottom:1px solid #eee;'>{row['longest_min']} min</td>"
+                f"</tr>"
+            )
+            rows_str += line
+
+        # 3. 填充主模板（安全格式化，缺失字段默认空字符串，避免 KeyError）
+        class SafeDict(dict):
+            def __missing__(self, key):
+                return ""
+        fmt_map = {
+            "start_date": data.get("start_date", ""),
+            "end_date": data.get("end_date", ""),
+            "days": len(data.get("daily_rows_data", [])),
+            "top_apps": data.get("top_apps", ""),
+            "total_focus_hours": data.get("total_focus_hours", 0),
+            "focus_ratio_insight": data.get("focus_ratio_insight", ""),
+            "willpower_wins": data.get("willpower_wins", 0),
+            "willpower_insight": data.get("willpower_insight", ""),
+            "efficiency_score": data.get("efficiency_score", 0),
+            "efficiency_level": data.get("efficiency_level", ""),
+            "peak_moment_desc": peak_moment_desc or "",
+            "daily_rows": rows_str or "",
+            "ai_encouragement": ai_result.get("encouragement", "保持专注，继续前行！")
+        }
+        return REPORT_TEMPLATE.format_map(SafeDict(fmt_map))
