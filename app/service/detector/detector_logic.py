@@ -1,6 +1,5 @@
 import os
 import datetime
-import requests
 import uuid
 import json
 import re
@@ -11,11 +10,12 @@ os.environ["NO_PROXY"] = "localhost,127.0.0.1"
 os.environ["HTTP_PROXY"] = ""
 os.environ["HTTPS_PROXY"] = ""
 
+from app.service.ai.langflow_client import LangflowClient
+
 class AIProcessor:
     def __init__(self):
-        # 配置 API (LangFlow)
-        self.API_KEY = 'sk-2nUYtCKss6_D6-R3TQZ96nFfYW2rfjZuYtVFHj0Jnv0'
-        self.URL = "http://localhost:7860/api/v1/run/f45b7d1f-c583-4327-9093-6bfc75f20344"
+        # 统一客户端（环境变量控制）
+        self.client = LangflowClient()
         
         # 默认 System Prompt (保留作为文档，实际上现在通过 LangFlow 流程控制)
         self.system_prompt = r"""你是一个专业的活动摘要助手（专注学习倾向的助手）,专注于分析用户的工作学习状态（工作学习/娱乐/其它）。
@@ -137,72 +137,26 @@ Output:"
         } 
         payload["session_id"] = str(uuid.uuid4()) 
         
-        headers = {"x-api-key": self.API_KEY} 
-        
-        try: 
-            # Send API request 
-            response = requests.post(self.URL, json=payload, headers=headers, timeout=30) 
-            response.raise_for_status()  # Raise exception for bad status codes 
-        
-            # Parse response
-            # LangFlow API response structure:
-            # {
-            #   "outputs": [
-            #     {
-            #       "outputs": [
-            #         {
-            #           "results": {
-            #             "message": {
-            #               "text": "The actual response text"
-            #             }
-            #           }
-            #         }
-            #       ]
-            #     }
-            #   ]
-            # }
-            
-            resp_json = response.json()
-            try:
-                result_text = resp_json["outputs"][0]["outputs"][0]["results"]["message"]["text"]
-                
-                # 如果需要返回 JSON 格式，且结果看起来像 Markdown 代码块，则尝试提取
-                if json_mode:
-                    try:
-                        # 尝试使用正则提取最外层的 JSON 对象
-                        json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
-                        if json_match:
-                            clean_json_str = json_match.group(0)
-                            # 验证是否为有效 JSON
-                            json.loads(clean_json_str)
-                            return clean_json_str
-                    except Exception:
-                        pass # 如果正则提取失败，还是返回原始文本，让上层处理
-                
-                return result_text
-            except (KeyError, IndexError) as e:
-                # Fallback parsing if structure changes
-                print(f"LangFlow Response Structure Error: {e}")
-                return str(resp_json)
+        try:
+            result_text = self.client.call_flow('detector', final_input) or ''
+            if json_mode:
+                try:
+                    json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
+                    if json_match:
+                        clean_json_str = json_match.group(0)
+                        json.loads(clean_json_str)
+                        return clean_json_str
+                except Exception:
+                    pass
+            return result_text
 
-        except requests.exceptions.RequestException as e: 
+        except Exception as e:
             error_msg = f"Error making API request: {e}"
             print(error_msg)
             if json_mode:
                  return f'{{"error": "{error_msg}"}}'
             return error_msg
-        except ValueError as e: 
-            error_msg = f"Error parsing response: {e}"
-            print(error_msg)
-            if json_mode:
-                 return f'{{"error": "{error_msg}"}}'
-            return error_msg
-        except Exception as e:
-            error_msg = f"AI处理出错: {str(e)}"
-            print(error_msg)
-            if json_mode:
-                 return f'{{"error": "{error_msg}"}}'
-            return error_msg
+        
 
 # 单例实例
 ai_processor = AIProcessor()

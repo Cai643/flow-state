@@ -1,40 +1,9 @@
-import requests
-import uuid
 import json
 from datetime import date, timedelta
-from app.data.web_report.report_generator import ReportGenerator
+from report_generator import ReportGenerator
+from app.service.ai.langflow_client import LangflowClient
 
-# --- 配置区 ---
-# API 1: 核心事件总结 (Event Summarizer)
-API_KEY_1 = 'sk-Gwhx0iMED0qlkQS6Oxsuxo5DW192U-w28AM1JDEJsDk'
-URL_1 = "http://localhost:7860/api/v1/run/09733a7e-ecf8-4771-b3fd-d4a367d67f57"
-
-# API 2: 致奋斗者 (Encouragement)
-API_KEY_2 = 'sk-kidtu9j5hqYnpV5rGD81xvNPjQsq5QUmI53HY6JHp0M'
-URL_2 = "http://localhost:7860/api/v1/run/7886edbe-e56a-46b5-ae24-9103becf35f1"
-
-def call_langflow_api(url, api_key, input_text):
-    """通用的 LangFlow API 调用函数"""
-    payload = {
-        "output_type": "chat",
-        "input_type": "chat",
-        "input_value": input_text,
-        "session_id": str(uuid.uuid4())
-    }
-    headers = {"x-api-key": api_key}
-    
-    try:
-        response = requests.post(url, json=payload, headers=headers)
-        response.raise_for_status()
-        data = response.json()
-        # 尝试提取核心文本
-        try:
-            return data["outputs"][0]["outputs"][0]["results"]["message"]["text"]
-        except (KeyError, IndexError):
-            return data # 提取失败返回原始数据
-    except Exception as e:
-        print(f"API Call Failed: {e}")
-        return None
+client = LangflowClient()
 
 def test_report_generation():
     print("🚀 开始测试报告生成流程...")
@@ -80,7 +49,7 @@ Constraints:
 """
         # print(f"DEBUG PROMPT: {prompt_event}") # Debug
         print(f"  -> 正在处理 {date_str}...")
-        summary = call_langflow_api(URL_1, API_KEY_1, prompt_event)
+        summary = client.call_flow('summary', prompt_event)
         if summary:
             print(f"     ✅ AI总结: {summary}")
             core_items_result[date_str] = summary
@@ -96,6 +65,12 @@ Constraints:
     prompt_encouragement = f"""
 Role: 你是一个充满激情与同理心的高效能教练。
 Task: 根据用户的专注数据，写一段“致奋斗者”的寄语。
+- **拒绝套话**：不要写通用的鸡汤。每一句鼓励都必须有数据支撑。
+- **引用细节**：一定要在文中提到具体的文件名、具体的时长（分钟数）或具体的时刻。
+- **主要逻辑**：
+    - 如果数据好：夸奖他的爆发力。
+    - 如果数据看似一般（时长短或分数低）：夸奖他的坚持，解读出数据背后的“难处”（比如在做基础架构、在改Bug）。
+- **语气风格**：像是多年的战友或观察者，深沉、懂他、有人情味。
 Data Context:
 - 专注总时长: {formatted['total_focus_hours']} 小时
 - 意志力胜利: {formatted['willpower_wins']} 次 (意味着他战胜了诱惑)
@@ -106,7 +81,7 @@ Style:
 - 结尾要给人以力量。
 - 字数控制在 100 字左右。
 """
-    encouragement = call_langflow_api(URL_2, API_KEY_2, prompt_encouragement)
+    encouragement = client.call_flow('enc', prompt_encouragement)
     print(f"📝 AI寄语:\n{encouragement}")
 
     # 4. 模拟最终报告组装

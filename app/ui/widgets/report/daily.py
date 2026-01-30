@@ -699,36 +699,30 @@ class StatCard(QtWidgets.QFrame):
         
         # 2. Center: Large Value + Unit
         # Use a centered layout that takes up the remaining space
-        center_layout = QtWidgets.QHBoxLayout()
-        center_layout.setAlignment(QtCore.Qt.AlignCenter)
-        center_layout.setSpacing(6)
+        self._center_layout = QtWidgets.QHBoxLayout()
+        self._center_layout.setAlignment(QtCore.Qt.AlignCenter)
+        self._center_layout.setSpacing(6)
         
-        l_val = QtWidgets.QLabel(str(value))
+        self._value_label = QtWidgets.QLabel(str(value))
         # Significantly larger font
-        l_val.setStyleSheet(f"color: {text_color}; font-size: 52px; font-weight: 900; background: transparent;")
+        self._value_label.setStyleSheet(f"color: {text_color}; font-size: 52px; font-weight: 900; background: transparent;")
         
         l_unit = QtWidgets.QLabel(unit)
         l_unit.setStyleSheet(f"color: {text_color}; font-size: 16px; font-weight: bold; padding-top: 24px; background: transparent; opacity: 0.85;")
         
-        center_layout.addWidget(l_val)
-        center_layout.addWidget(l_unit)
+        self._center_layout.addWidget(self._value_label)
+        self._center_layout.addWidget(l_unit)
         
         layout.addStretch()
-        layout.addLayout(center_layout)
+        layout.addLayout(self._center_layout)
         layout.addStretch()
 
 
 
     def update_value(self, value):
-        # Update the large value label
-        # The structure is: layout -> center_layout -> l_val (index 0)
         try:
-            # Find l_val in layout hierarchy
-            # layout index 1 is center_layout
-            center_layout = self.layout().itemAt(1).layout()
-            l_val = center_layout.itemAt(0).widget()
-            if isinstance(l_val, QtWidgets.QLabel):
-                l_val.setText(str(value))
+            if isinstance(self._value_label, QtWidgets.QLabel):
+                self._value_label.setText(str(value))
         except Exception as e:
             print(f"Error updating stat card: {e}")
 
@@ -749,15 +743,15 @@ class DailyTimeline(QtWidgets.QWidget):
         self._build_header(layout)
         
         # Scroll Area
-        scroll = QtWidgets.QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
-        scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        scroll.setStyleSheet("background: transparent; border: none;")
-        scroll.viewport().setStyleSheet("background: transparent;")
+        self._scroll = QtWidgets.QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self._scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self._scroll.setStyleSheet("background: transparent; border: none;")
+        self._scroll.viewport().setStyleSheet("background: transparent;")
         
         # Styled scrollbar
-        scroll.setStyleSheet("""
+        self._scroll.setStyleSheet("""
             QScrollArea { background: transparent; border: none; }
             QScrollArea > QWidget > QWidget { background: transparent; }
             QScrollBar:horizontal {
@@ -777,9 +771,18 @@ class DailyTimeline(QtWidgets.QWidget):
         
         # Timeline Container
         self.timeline_container = TimelineContainer(self.report.time_blocks)
-        scroll.setWidget(self.timeline_container)
+        self._scroll.setWidget(self.timeline_container)
         
-        layout.addWidget(scroll)
+        layout.addWidget(self._scroll)
+
+    def update_data(self):
+        try:
+            self.timeline_container.deleteLater()
+        except Exception:
+            pass
+        self.timeline_container = TimelineContainer(self.report.time_blocks)
+        if hasattr(self, '_scroll'):
+            self._scroll.setWidget(self.timeline_container)
 
     def _build_header(self, parent_layout):
         header = QtWidgets.QWidget()

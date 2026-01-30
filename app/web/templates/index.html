@@ -1812,8 +1812,8 @@
                     const activeTab = document.querySelector('.nav-btn.active');
                     if (activeTab && (activeTab.id === 'btn-7days' || activeTab.id === 'btn-30days')) {
                         const days = activeTab.id === 'btn-7days' ? 7 : 30;
-                        console.log("New data detected, refreshing...");
-                        silentLoadHistory(days);
+                        console.log("New data detected, refreshing history list...");
+                        loadHistory(days);
                     }
                 }
             } catch (e) {

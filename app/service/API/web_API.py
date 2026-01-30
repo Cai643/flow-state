@@ -272,32 +272,8 @@ def create_app(ai_busy_flag=None):
             except Exception as e:
                 print(f"【Web服务】实时提取失败: {e}")
 
-            # 2. 准备数据和回调
-            # 这里我们使用 remove_chat.py 中验证过的逻辑，直接调用 LangFlow API
-            # 而不是使用本地的 detector_logic (因为 LangFlow 效果更好或用户指定)
-            import requests
-            import uuid
-            
-            # 配置 API (建议移至配置文件)
-            API_KEY_1 = 'sk-Gwhx0iMED0qlkQS6Oxsuxo5DW192U-w28AM1JDEJsDk'
-            URL_1 = "http://localhost:7860/api/v1/run/09733a7e-ecf8-4771-b3fd-d4a367d67f57"
-            
-            API_KEY_2 = 'sk-kidtu9j5hqYnpV5rGD81xvNPjQsq5QUmI53HY6JHp0M'
-            URL_2 = "http://localhost:7860/api/v1/run/7886edbe-e56a-46b5-ae24-9103becf35f1"
-
-            def call_langflow(url, key, text):
-                try:
-                    resp = requests.post(
-                        url, 
-                        json={"input_value": text, "input_type": "chat", "output_type": "chat", "session_id": str(uuid.uuid4())},
-                        headers={"x-api-key": key},
-                        timeout=30
-                    )
-                    resp.raise_for_status()
-                    return resp.json()["outputs"][0]["outputs"][0]["results"]["message"]["text"]
-                except Exception as e:
-                    print(f"LangFlow API Error: {e}")
-                    return None
+            from app.service.ai.langflow_client import LangflowClient
+            client = LangflowClient()
 
             # 定义 AI 回调函数
             def ai_callback(context):
@@ -330,7 +306,7 @@ Constraints:
                     # 只有当有有效数据时才调用
                     if items_info and len(items_info) > 5:
                         print(f"  [AI] Generating summary for {date_str}...")
-                        res = call_langflow(URL_1, API_KEY_1, prompt_event)
+                        res = client.call_flow('summary', prompt_event)
                         if res: 
                             print(f"  [AI] Result: {res}")
                             core_items[date_str] = res
@@ -398,7 +374,7 @@ Task: 写一段“致追梦者”的复盘寄语，要求：
  3) 给出两条可执行建议（例如把“黄金时段”用于高强任务、降低切换频率、提升碎片比）。两条建议必须换行，行首标注“建议1：”“建议2：”。
  4) 风格简洁真诚，不夸张，不口号；中文 3-4 句，合计不超过 160 字。
 """
-                encouragement = call_langflow(URL_2, API_KEY_2, prompt_enc)
+                encouragement = client.call_flow('enc', prompt_enc)
                 if not encouragement:
                     encouragement = "AI 暂时繁忙，但数据见证了你的努力。继续加油！"
 
