@@ -772,10 +772,31 @@
                     </div>
 
                     <div class='search-results-area' id='ai-results-area'>
+<<<<<<< Updated upstream
                         <!-- Empty State -->
                         <div style='text-align: center; color: #789035; margin-top: 40px; opacity: 0.7;'>
                             ÊäÈë¹Ø¼ü´Ê¿ªÊ¼ËÑË÷<br>
                             ÀıÈç£º"ÉÏÖÜµÄÏîÄ¿ÎÄµµ" »ò "Chrome ä¯ÀÀÀúÊ·"
+=======
+                        <!-- New: Suggestion Grid (Empty State) -->
+                        <div class="suggestion-grid">
+                            <div class="suggestion-card" onclick="setSearch('æˆ‘çš„å·¥ä½œæ•ˆç‡')">
+                                <div class="suggestion-icon">?</div>
+                                <div class="suggestion-text">åˆ†ææˆ‘çš„å·¥ä½œæ•ˆç‡</div>
+                            </div>
+                            <div class="suggestion-card" onclick="setSearch('ä¸Šå‘¨çš„é¡¹ç›®è¿›åº¦')">
+                                <div class="suggestion-icon">?</div>
+                                <div class="suggestion-text">ä¸Šå‘¨é¡¹ç›®è¿›åº¦å¦‚ä½•ï¼Ÿ</div>
+                            </div>
+                            <div class="suggestion-card" onclick="setSearch('Chrome æµè§ˆå†å²')">
+                                <div class="suggestion-icon">?</div>
+                                <div class="suggestion-text">æœç´¢ç½‘é¡µæµè§ˆè®°å½•</div>
+                            </div>
+                            <div class="suggestion-card" onclick="setSearch('æœ€è¿‘æ‰“å¼€çš„æ–‡æ¡£')">
+                                <div class="suggestion-icon">?</div>
+                                <div class="suggestion-text">æ‰¾å›æœ€è¿‘çš„æ–‡æ¡£</div>
+                            </div>
+>>>>>>> Stashed changes
                         </div>
                     </div>
                 </div>
@@ -828,7 +849,18 @@
             <!-- General -->
             <div class='settings-section-title' data-i18n="settings.general">³£¹æ</div>
             <div class='setting-item'>
+<<<<<<< Updated upstream
                 <div class='setting-label' data-i18n="settings.language">ÓïÑÔ</div>
+=======
+                <div class='setting-label' data-i18n="settings.autostart">å¼€æœºè‡ªåŠ¨å¯åŠ¨</div>
+                <label class='switch'>
+                    <input type='checkbox' id="autostart-toggle" onchange="toggleAutostart(this.checked)">
+                    <span class='slider'></span>
+                </label>
+            </div>
+            <div class='setting-item'>
+                <div class='setting-label' data-i18n="settings.language">è¯­è¨€</div>
+>>>>>>> Stashed changes
                 <select class="settings-select" id="language-select" onchange="changeLanguage(this.value)">
                     <option value="zh">ÖĞÎÄ</option>
                     <option value="en">English</option>
@@ -882,6 +914,7 @@
         // --- Settings Logic (Hoisted) ---
         const i18n = {
             zh: {
+<<<<<<< Updated upstream
                 "settings.title": "ÉèÖÃ",
                 "settings.general": "³£¹æ",
                 "settings.language": "ÓïÑÔ",
@@ -906,6 +939,33 @@
                 "search.filter.web": "ÍøÒ³",
                 "search.filter.chat": "ÁÄÌì",
                 "search.recent": "×î½üËÑË÷",
+=======
+                "settings.title": "è®¾ç½®",
+                "settings.general": "å¸¸è§„",
+                "settings.autostart": "å¼€æœºè‡ªåŠ¨å¯åŠ¨",
+                "settings.language": "è¯­è¨€",
+                "settings.appearance": "å¤–è§‚",
+                "settings.theme": "ä¸»é¢˜è‰²",
+                "settings.compact": "ç´§å‡‘æ¨¡å¼",
+                "settings.data": "æ•°æ®",
+                "settings.auto_record": "è‡ªåŠ¨è®°å½•æµè§ˆæ•°æ®",
+                "settings.notifications": "é€šçŸ¥æé†’",
+                "settings.save": "ä¿å­˜",
+                "nav.7days": "æœ€è¿‘7å¤©",
+                "nav.30days": "æœ€è¿‘30å¤©",
+                "nav.search": "AI æœç´¢",
+                "history.title.7": "æœ€è¿‘7å¤©æµè§ˆè®°å½•",
+                "history.title.30": "æœ€è¿‘30å¤©æµè§ˆè®°å½•",
+                "history.source": "æ•°æ®æ¥æº: æœ¬åœ°ç›‘æ§",
+                "search.title": "AI æ™ºèƒ½æœç´¢",
+                "search.subtitle": "æ¢ç´¢ä½ çš„æ•°å­—è¶³è¿¹ä¸è®°å¿†",
+                "search.placeholder": "æœç´¢å…³é”®è¯ã€åº”ç”¨æˆ–ä¸»é¢˜...",
+                "search.filter.all": "å…¨éƒ¨",
+                "search.filter.doc": "æ–‡æ¡£",
+                "search.filter.web": "ç½‘é¡µ",
+                "search.filter.chat": "èŠå¤©",
+                "search.recent": "æœ€è¿‘æœç´¢",
+>>>>>>> Stashed changes
                 "chat.title": "Flow-State Chat",
                 "chat.placeholder": "Ñ¯ÎÊ Flow-State ÖúÊÖ...",
                 "chat.welcome": "ÄãºÃ£¡ÎÒÊÇÄãµÄ Flow-State ÖúÊÖ¡£ÕâÀï¿ÉÒÔ²é¿´ÄãµÄÀúÊ·ĞĞÎªÊı¾İ£¬Ò²¿ÉÒÔºÍÎÒÁÄÌì¡£",
@@ -923,6 +983,7 @@
             en: {
                 "settings.title": "Settings",
                 "settings.general": "General",
+                "settings.autostart": "Auto Start at Boot",
                 "settings.language": "Language",
                 "settings.appearance": "Appearance",
                 "settings.theme": "Theme Color",
@@ -1061,6 +1122,41 @@
             const toggle = document.getElementById('compact-toggle');
             if(toggle) toggle.checked = isCompact;
             toggleCompactMode(isCompact);
+
+            loadAutostartSetting();
+        }
+
+        async function loadAutostartSetting() {
+            try {
+                const response = await fetch('/api/settings/autostart');
+                const data = await response.json();
+                const toggle = document.getElementById('autostart-toggle');
+                if(toggle) toggle.checked = data.enabled;
+            } catch (e) {
+                console.error("Failed to load autostart setting", e);
+            }
+        }
+
+        async function toggleAutostart(enabled) {
+            try {
+                const response = await fetch('/api/settings/autostart', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({enabled: enabled})
+                });
+                const data = await response.json();
+                if(data.error) {
+                    alert('è®¾ç½®å¤±è´¥: ' + data.error);
+                    // Revert UI
+                    const toggle = document.getElementById('autostart-toggle');
+                    if(toggle) toggle.checked = !enabled;
+                }
+            } catch (e) {
+                console.error("Failed to set autostart", e);
+                alert('è®¾ç½®å¤±è´¥ï¼Œç½‘ç»œé”™è¯¯');
+                const toggle = document.getElementById('autostart-toggle');
+                if(toggle) toggle.checked = !enabled;
+            }
         }
 
         // --- Drag Logic ---
@@ -1387,10 +1483,35 @@
             }, 800);
         }
 
+<<<<<<< Updated upstream
         sendBtn.addEventListener('click', handleSend);
         chatInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') handleSend();
         });
+=======
+        // Handle Enter key in number input
+        document.getElementById('days-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') triggerReportGeneration();
+        });
+
+        // Deprecated old handleSend but kept if needed for other logic
+        async function handleSend() {
+             // ... old logic ...
+        }
+        
+        // Remove old event listeners that might conflict
+        // sendBtn.removeEventListener('click', handleSend); 
+        // We replaced onclick in HTML directly for simplicity
+        
+        // --- End New Logic ---
+
+        // sendBtn.addEventListener('click', handleSend);
+        // if (chatInput) {
+        //     chatInput.addEventListener('keypress', function(e) {
+        //         if (e.key === 'Enter') handleSend();
+        //     });
+        // }
+>>>>>>> Stashed changes
 
         // Run Init
         initSettings();
