@@ -421,6 +421,11 @@ class CardPopup(QtWidgets.QWidget):
         """
         self.stop_anim()
         self.anim_type = 'hide'
+        if hasattr(self, "card") and self.card:
+            try:
+                self.card.reset_to_dashboard()
+            except Exception:
+                pass
         
         end_rect = self.topLeftTarget(ball_widget)
         anchor_x = end_rect.right()

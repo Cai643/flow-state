@@ -44,6 +44,8 @@ def ai_monitor_worker(msg_queue, running_event, ai_busy_flag=None):
         # 记录当前状态 (status) 是从什么时候开始的
         current_status_start_time = time.time()
         last_status_type = "focus" # 默认初始状态
+        entertainment_block_start = 0
+        MICRO_BREAK_SEC = 90
         
         while running_event.is_set():
             start_loop = time.time()
@@ -111,27 +113,10 @@ def ai_monitor_worker(msg_queue, running_event, ai_busy_flag=None):
                          should_analyze = True
                          
                 if should_analyze:
-                    # --- 错峰执行检查 ---
-                    if ai_busy_flag and ai_busy_flag.value:
-                        print(f"[AI Worker] AI正忙(Web端占用)，跳过本次实时分析: {window_title}")
-                        
-                        # 虽然跳过 AI 分析，但我们仍需要记录这条活动
-                        # 构造一个仅包含基础信息的 raw_data
-                        raw_data_str = json.dumps({
-                            "window": window_title,
-                            "process": process_name,
-                            "ai_raw": {} # 空的 AI 数据
-                        }, ensure_ascii=False)
-                        
-                        # 存入数据库 (使用默认状态 focus)
-                        history_manager.update("focus", summary=window_title, raw_data=raw_data_str)
-                        
-                        # 标记为已分析，避免下一轮循环立刻重试
-                        last_analysis_time = time.time()
-                        last_analyzed_window = window_title
-                        
-                        # 继续下一次循环
-                        continue
+                    # --- 错峰执行检查 (已移除，允许并行) ---
+                    # if ai_busy_flag and ai_busy_flag.value:
+                    #     print(f"[AI Worker] AI正忙(Web端占用)，跳过本次实时分析: {window_title}")
+                    #     ... (代码已移除以支持并行)
                         
                     prompt = f"窗口: '{window_title}' | 进程: {process_name} | 持续: {duration:.2f}s"
                     print(f"[AI Worker] 请求分析: {prompt}")
@@ -177,92 +162,32 @@ def ai_monitor_worker(msg_queue, running_event, ai_busy_flag=None):
                         # 使用本地维护的 global_focus_start_time 来计算连续时长
                         
                         current_time = time.time()
-                        
-                        # --- 维护当前状态的持续时间 (用于娱乐提醒) ---
-                        
-                        # 初始化变量 (利用 Python 闭包特性，但这里是在循环里，需要放到循环外初始化)
-                        # 为了修复这个问题，我们需要把这些变量提升到 while 循环外面
-                        # 但为了最小化改动，我们这里用 locals() 检查
-                        if 'last_entertainment_end_time' not in locals():
-                            last_entertainment_end_time = 0
-                        
-                        if status == 'entertainment':
-                            # 如果从上次娱乐结束到现在 < 30秒 (说明是短暂切换，比如弹窗，或者切歌)
-                            # 且上次确实有娱乐记录
-                            if 0 < (current_time - last_entertainment_end_time) < 30:
-                                # 关键：由于 status 变成了 entertainment，last_status_type 肯定也更新了
-                                # 但我们需要恢复之前的 current_status_start_time
-                                # 逻辑：如果中断时间很短，我们认为 current_status_start_time 应该保持不变（也就是继承之前的）
-                                # 可是 current_status_start_time 在上面 "if status != last_status_type" 时已经被重置为 current_time 了
-                                # 所以我们需要一个机制来"回滚"或者"维持"
-                                
-                                # 修正方案：
-                                # 不要在上面直接重置，而是结合宽容度判断
-                                pass
-                        
-                        # --- 重写状态切换逻辑 ---
                         if status != last_status_type:
-                            # 只有当：新状态不是娱乐，或者 (新状态是娱乐 且 距离上次娱乐结束超过了30秒) 时，才重置
-                            should_reset = True
-                            
+                            current_status_start_time = current_time
                             if status == 'entertainment':
-                                if 0 < (current_time - last_entertainment_end_time) < 30:
-                                    should_reset = False
-                                    # 恢复之前的开始时间？
-                                    # 此时 current_status_start_time 其实还没变，因为我们还没执行赋值
-                                    # 但如果中间夹杂了 focus 状态，current_status_start_time 可能在变成 focus 时变过了
-                                    # 所以我们需要一个持久的 entertainment_start_time
-                                    pass
-                            
-                            if should_reset:
-                                current_status_start_time = current_time
+                                if entertainment_block_start == 0:
+                                    entertainment_block_start = current_time
                             else:
-                                # 如果是宽容期内的回归，我们需要把 current_status_start_time 恢复成 (current_time - 之前的累计时长)
-                                # 这比较复杂。
-                                # 简单做法：引入 cached_entertainment_start_time
-                                if 'cached_entertainment_start_time' in locals() and cached_entertainment_start_time > 0:
-                                    current_status_start_time = cached_entertainment_start_time
-
+                                if last_status_type == 'entertainment' and entertainment_block_start > 0:
+                                    last_entertainment_duration = int(current_time - entertainment_block_start)
+                                    entertainment_block_start = 0
                             last_status_type = status
-
-                        # 计算逻辑
-                        current_activity_duration = 0
-                        
                         if status == 'entertainment':
-                            last_entertainment_end_time = current_time
-                            if 'cached_entertainment_start_time' not in locals() or should_reset:
-                                cached_entertainment_start_time = current_status_start_time
-                            
-                            # 持续时间 = 当前 - 缓存的开始时间
-                            current_activity_duration = int(current_time - cached_entertainment_start_time)
-                        
+                            current_activity_duration = int(current_time - entertainment_block_start) if entertainment_block_start else 0
                         else:
-                            # 非娱乐状态
-                            # 检查宽容度
-                            if 0 < (current_time - last_entertainment_end_time) < 30:
-                                # 还在宽容期，显示之前的时长
-                                if 'cached_entertainment_start_time' in locals():
-                                     current_activity_duration = int(last_entertainment_end_time - cached_entertainment_start_time)
-                            else:
-                                # 超过宽容度，彻底归零
-                                cached_entertainment_start_time = 0
-                                current_activity_duration = 0 
-                                
-                        # -----------------------------------------------
-                        
-                        # --- 维护专注总时长 (用于主界面显示) ---
-                        # 状态判定：如果是工作或专注，维护连续计时
+                            current_activity_duration = 0
                         if status in ['work', 'focus']:
                             if global_focus_start_time is None:
                                 global_focus_start_time = current_time
-                                # 如果是刚开始，可以减去当前窗口已经持续的时间，以补偿首次分析的延迟
-                                # global_focus_start_time -= duration 
-                            
                             total_focus_duration = int(current_time - global_focus_start_time)
+                        elif status == 'entertainment':
+                            ent_elapsed = int(current_time - entertainment_block_start) if entertainment_block_start else 0
+                            if global_focus_start_time is not None and ent_elapsed > MICRO_BREAK_SEC:
+                                global_focus_start_time = None
+                            total_focus_duration = int(current_time - global_focus_start_time) if global_focus_start_time else 0
                         else:
-                            # 如果是娱乐或其他，重置计时器
                             global_focus_start_time = None
-                            total_focus_duration = 0 
+                            total_focus_duration = 0
                         
                         ui_msg = {
                             "status": status,

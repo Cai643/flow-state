@@ -274,14 +274,16 @@ def create_app(ai_busy_flag=None):
 
             from app.service.ai.langflow_client import LangflowClient
             client = LangflowClient()
+            import concurrent.futures
 
             # 定义 AI 回调函数
             def ai_callback(context):
                 print("【Web服务】正在请求 AI (LangFlow) 生成洞察...")
                 
-                # A. 生成核心事项 (Core Items)
+                # A. 生成核心事项 (Core Items) - 并行版
                 core_items = {}
-                for log in context['daily_logs']:
+                
+                def process_log(log):
                     date_str = log['date']
                     
                     # 获取多条目上下文
@@ -289,6 +291,11 @@ def create_app(ai_busy_flag=None):
                     # 兼容旧逻辑
                     if not items_info and log.get('top_app'):
                          items_info = f"[工作] {log['top_app']} - {log['title']}"
+
+                    # 只有当有有效数据时才调用
+                    if not items_info or len(items_info) <= 5:
+                        print(f"  [AI] Skip {date_str} (not enough info)")
+                        return None
 
                     prompt_event = f"""
 Role: 你是一个极其敏锐的数据分析师。
@@ -303,17 +310,29 @@ Constraints:
 - 总字数 ≤ 30。
 - 示例："编写后端代码，调试脚本，看B站"
 """
-                    # 只有当有有效数据时才调用
-                    if items_info and len(items_info) > 5:
-                        print(f"  [AI] Generating summary for {date_str}...")
+                    print(f"  [AI] Generating summary for {date_str}...")
+                    try:
                         res = client.call_flow('summary', prompt_event)
                         if res: 
-                            print(f"  [AI] Result: {res}")
-                            core_items[date_str] = res
+                            print(f"  [AI] Result for {date_str}: {res}")
+                            return (date_str, res)
                         else:
                             print(f"  [AI] Failed to get response for {date_str}")
-                    else:
-                        print(f"  [AI] Skip {date_str} (not enough info)")
+                            return None
+                    except Exception as e:
+                        print(f"  [AI] Error processing {date_str}: {e}")
+                        return None
+
+                # 使用线程池并发执行 (最大5个并发，适合网络IO密集型)
+                with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+                    futures = [executor.submit(process_log, log) for log in context['daily_logs']]
+                    for future in concurrent.futures.as_completed(futures):
+                        try:
+                            result = future.result()
+                            if result:
+                                core_items[result[0]] = result[1]
+                        except Exception as e:
+                            print(f"  [AI] Thread error: {e}")
                 
                 # B. 生成致追梦者 (深度总结 + 分析 + 建议)
                 peak_info = context['peak_day']

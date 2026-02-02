@@ -399,7 +399,7 @@
             left: 0;
             width: 4px;
             height: 100%;
-            background: linear-gradient(to bottom, #a4bf5a, #4f6610);
+            background: linear-gradient(to bottom, var(--color-green-light), var(--color-green-dark));
         }
         .ai-summary-title {
             font-size: 16px;
@@ -828,6 +828,24 @@
             margin-left: 2px;
         }
 
+        /* --- Stats Dashboard Cards (Theme-aware) --- */
+        .stats-card-focus {
+            background: linear-gradient(135deg, var(--color-green-light), var(--color-green-mid));
+            padding: 15px;
+            border-radius: 12px;
+            color: var(--color-white);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+            flex: 1;
+        }
+        .stats-card-ent {
+            background: var(--color-white);
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid var(--color-green-light);
+            color: var(--color-text-main);
+            flex: 1;
+        }
+
         /* --- Right Sidebar (Collapsed) --- */
         .right-sidebar {
             width: 0;
@@ -924,16 +942,16 @@
             </div>
 
             <!-- Dashboard Stats (New) -->
-            <div id="stats-dashboard" style="padding: 15px 20px 0 20px; display: flex; gap: 15px;">
-                <div style="flex: 1; background: linear-gradient(135deg, #a4bf5a, #789035); padding: 15px; border-radius: 12px; color: white; box-shadow: 0 4px 10px rgba(120, 144, 53, 0.2);">
+                <div id="stats-dashboard" style="padding: 15px 20px 0 20px; display: flex; gap: 15px;">
+                <div class="stats-card-focus">
                     <div style="font-size: 12px; opacity: 0.9; margin-bottom: 5px;">今日专注时长</div>
                     <div style="font-size: 24px; font-weight: bold;" id="today-focus-time">--:--</div>
                     <div style="font-size: 12px; margin-top: 5px; opacity: 0.8;">高效产出</div>
                 </div>
-                <div style="flex: 1; background: white; padding: 15px; border-radius: 12px; border: 1px solid #e0e0e0; color: #4f6610;">
+                <div class="stats-card-ent">
                     <div style="font-size: 12px; color: #789035; margin-bottom: 5px;">今日娱乐/休息</div>
                     <div style="font-size: 24px; font-weight: bold;" id="today-ent-time">--:--</div>
-                    <div style="font-size: 12px; margin-top: 5px; color: #a4bf5a;">适当放松</div>
+                    <div style="font-size: 12px; margin-top: 5px; color: var(--color-green-light);">适当放松</div>
                 </div>
             </div>
 
@@ -960,7 +978,7 @@
                     </div>
                     
                     <div class='ai-input-box'>
-                        <svg viewBox='0 0 24 24' width='24' height='24' fill='#a4bf5a'><path d='M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z'/></svg>
+                        <svg viewBox='0 0 24 24' width='24' height='24' fill='var(--color-green-light)'><path d='M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z'/></svg>
                         <input type='text' class='ai-input' id='ai-search-input' data-i18n-placeholder="search.placeholder" placeholder='搜索关键词、应用或主题...' onkeypress='handleAiSearch(event)'>
                     </div>
 
@@ -1395,6 +1413,7 @@
         });
 
         // --- Unified Navigation Logic ---
+        let lastHistoryDays = 7;
         function switchTab(tabId) {
             // Update Tab UI
             document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
@@ -1411,10 +1430,10 @@
             if (tabId === 'search') {
                 showPanel('search');
             } else {
+                lastHistoryDays = (tabId === '7days') ? 7 : 30;
+                document.getElementById('history-title').textContent = (lastHistoryDays === 7) ? '最近7天浏览记录' : '最近30天浏览记录';
                 showPanel('history');
-                const days = (tabId === '7days') ? 7 : 30;
-                document.getElementById('history-title').textContent = (days === 7) ? '最近7天浏览记录' : '最近30天浏览记录';
-                loadHistory(days);
+                loadHistory(lastHistoryDays);
             }
         }
 
@@ -1436,11 +1455,12 @@
                 renderRecentSearches();
                 document.getElementById('ai-search-input').focus();
             } else if (panelName === 'history') {
-                 // Default to 7 days if returning to history via sidebar
-                 // But ideally we should remember last state. For now reset to 7.
+                 // 保持用户最近选择的区间，不再强制重置为 7 天
                  document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-                 document.getElementById('btn-7days').classList.add('active');
-                 loadHistory(7);
+                 const activeId = (lastHistoryDays === 30) ? 'btn-30days' : 'btn-7days';
+                 document.getElementById(activeId).classList.add('active');
+                 document.getElementById('history-title').textContent = (lastHistoryDays === 7) ? '最近7天浏览记录' : '最近30天浏览记录';
+                 loadHistory(lastHistoryDays);
             }
         }
 

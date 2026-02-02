@@ -162,7 +162,7 @@ class FocusStatusCard(QtWidgets.QWidget):
         threshold_layout.setSpacing(10)
         
         threshold_label = QtWidgets.QLabel("疲劳阈值:")
-        threshold_label.setStyleSheet("color: #5D4037; font-size: 14px;")
+        threshold_label.setStyleSheet("color: white; font-size: 14px;")
         
         self.threshold_combo = QtWidgets.QComboBox()
         self.threshold_combo.addItems(["15分钟", "30分钟", "45分钟 (默认)", "自定义..."])
@@ -268,6 +268,10 @@ class FocusStatusCard(QtWidgets.QWidget):
         
         layout.addWidget(self.dashboard_container)
         layout.addWidget(self.settings_panel)
+
+    def reset_to_dashboard(self):
+        self.settings_panel.setVisible(False)
+        self.dashboard_container.setVisible(True)
 
     def enterEvent(self, event):
         self.hovering = True
