@@ -10,6 +10,7 @@ import math
 from datetime import datetime, date
 import re
 from urllib.parse import quote_plus
+from app.ui.widgets.screen_time_panel import ScreenTimePanel
 # from app.data import ActivityHistoryManager
 
 class SimpleDailyReport(QtWidgets.QWidget):
@@ -472,6 +473,20 @@ class DailyDashboard(QtWidgets.QWidget):
         lbl_date = QtWidgets.QLabel(date.today().strftime("%Y.%m.%d %A"))
         lbl_date.setStyleSheet("color: #2E4E3F; font-size: 20px; font-weight: bold;") 
         
+        # ==== 屏幕时间面板按钮 ====
+        btn_screen_time = QtWidgets.QPushButton("屏幕时间面板")
+        btn_screen_time.setCursor(QtCore.Qt.PointingHandCursor)
+        btn_screen_time.setStyleSheet("""
+            QPushButton {
+                background: #7fae0f; color: #fff;
+                border:none; border-radius:14px;
+                font-size:16px; font-weight:bold;
+                padding:7px 18px;
+            }
+            QPushButton:hover { background: #558a12; }
+        """)
+        btn_screen_time.clicked.connect(self.open_screen_time_panel)
+    
         # Switch
         btn_switch = QtWidgets.QPushButton("\u5207\u6362\u5230\u65f6\u95f4\u8f74 >") 
         btn_switch.setCursor(QtCore.Qt.PointingHandCursor)
@@ -489,15 +504,25 @@ class DailyDashboard(QtWidgets.QWidget):
             }
         """)
         btn_switch.clicked.connect(self.switch_to_timeline.emit)
-        
+        # ======= 排列顺序调整 =======
         h_layout.addWidget(btn_back)
         h_layout.addStretch()
         h_layout.addWidget(lbl_date)
         h_layout.addStretch()
-        h_layout.addWidget(btn_switch)
+        h_layout.addWidget(btn_screen_time)  # “屏幕时间面板”按钮在左
+        h_layout.addWidget(btn_switch)       # “切换到时间轴”按钮在右
         
         parent_layout.addWidget(header)
 
+        # 保存面板实例，防止多窗口
+        self._screen_time_panel = None
+
+    def open_screen_time_panel(self):
+        if self._screen_time_panel is None or not self._screen_time_panel.isVisible():
+            self._screen_time_panel = ScreenTimePanel()
+        self._screen_time_panel.show()
+        self._screen_time_panel.raise_()
+        
     def _build_left_panel(self, parent_layout):
         panel = QtWidgets.QWidget()
         panel.setStyleSheet("""
