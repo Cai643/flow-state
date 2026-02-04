@@ -3,7 +3,7 @@ import uuid
 import requests
 
 class LangflowClient:
-    def __init__(self, timeout: int = 30):
+    def __init__(self, timeout: int = 180):
         self.summary_url = os.getenv('LANGFLOW_SUMMARY_URL', 'http://localhost:7860/api/v1/run/9608210a-cdbb-4c53-879f-8b37984d6d9b')
         self.summary_key = os.getenv('LANGFLOW_SUMMARY_KEY', 'sk-ivJj5oRPiiUD51xPwM6qPERLLedQM6qzW9YZcDUKUm8')
         self.enc_url = os.getenv('LANGFLOW_ENC_URL', 'http://localhost:7860/api/v1/run/9608210a-cdbb-4c53-879f-8b37984d6d9b')

@@ -61,19 +61,19 @@ class SimpleDailyReport(QtWidgets.QWidget):
         """Load data for both dashboard and timeline"""
         self.today = date.today()
         
-        # 1. Stats Summary
-        summary = {}
+        # 1. Stats Summary（统一使用每日统计表 daily_stats）
         try:
             from app.data.dao.activity_dao import StatsDAO
-            summary = StatsDAO.get_daily_summary(self.today) or {}
-            f_time = summary.get('total_focus_time') or summary.get('focus_time') or 0
-            total_focus_seconds = f_time 
-            
-            self.efficiency = summary.get('efficiency_score', 0)
-            self.max_streak = summary.get('max_focus_streak', 0)
-            
-        except:
-            summary = {}
+            try:
+                StatsDAO.recompute_today_from_sessions()
+            except Exception:
+                pass
+            ds = StatsDAO.get_daily_summary(self.today) or {}
+            f_time = ds.get('total_focus_time') or ds.get('focus_time') or 0
+            total_focus_seconds = f_time
+            self.efficiency = ds.get('efficiency_score', 0)
+            self.max_streak = ds.get('max_focus_streak', 0)
+        except Exception:
             total_focus_seconds = 0
             self.efficiency = 0
             self.max_streak = 0
@@ -99,10 +99,10 @@ class SimpleDailyReport(QtWidgets.QWidget):
         self.minutes = minutes
         self.total_focus_mins = self.total_focus_minutes
         
-        e_time = summary.get("total_entertainment_time") or 0
-        self.recharged_mins = int(int(e_time) / 60)
+        e_time = int((ds or {}).get("total_entertainment_time") or 0)
+        self.recharged_mins = int(e_time / 60)
         
-        self.willpower_count = summary.get("willpower_wins", 0) 
+        self.willpower_count = int((ds or {}).get("willpower_wins") or 0)
         self.efficiency_score = self.efficiency
 
         # 2. Timeline Logs
@@ -473,17 +473,21 @@ class DailyDashboard(QtWidgets.QWidget):
         lbl_date = QtWidgets.QLabel(date.today().strftime("%Y.%m.%d %A"))
         lbl_date.setStyleSheet("color: #2E4E3F; font-size: 20px; font-weight: bold;") 
         
-        # ==== 屏幕时间面板按钮 ====
-        btn_screen_time = QtWidgets.QPushButton("屏幕时间面板")
+        # ==== 今日进程统计（文字样式） ====
+        btn_screen_time = QtWidgets.QPushButton("今日进程统计")
         btn_screen_time.setCursor(QtCore.Qt.PointingHandCursor)
         btn_screen_time.setStyleSheet("""
             QPushButton {
-                background: #7fae0f; color: #fff;
-                border:none; border-radius:14px;
-                font-size:16px; font-weight:bold;
-                padding:7px 18px;
+                background-color: transparent;
+                color: #2E7D32;
+                border: none;
+                padding: 6px 18px;
+                font-weight: bold;
+                font-size: 16px;
             }
-            QPushButton:hover { background: #558a12; }
+            QPushButton:hover {
+                color: #1B5E20;
+            }
         """)
         btn_screen_time.clicked.connect(self.open_screen_time_panel)
     

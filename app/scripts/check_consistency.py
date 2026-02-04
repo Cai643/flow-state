@@ -1,9 +1,12 @@
 import sqlite3
 import os
+import sys
 from datetime import date
 
-# 数据库路径
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'focus_app.db')
+# Add project root to sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+
+from app.data.core.database import DB_PATH
 
 def check_consistency():
     if not os.path.exists(DB_PATH):

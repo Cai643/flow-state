@@ -4,7 +4,7 @@ import re
 from datetime import datetime, timedelta
 
 # Add project root to sys.path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from app.data.core.database import get_db_connection, init_db
 
@@ -18,6 +18,11 @@ def clean_title(title, app_name):
     t = title.strip()
     app_lower = app_name.lower()
     
+    # 0. Manual 手动会话特殊处理
+    if app_lower == "manual":
+        # Manual 会话的 window_title 即为用户输入的摘要，直接返回
+        return t
+
     # 1. 浏览器通用清洗 (Edge, Chrome, Firefox)
     if any(browser in app_lower for browser in ['edge', 'chrome', 'firefox', 'browser']):
         # 提取核心网站名 (简单关键词匹配)
@@ -140,7 +145,8 @@ def extract_core_events(target_date):
                  print(f"  No {cat} sessions found for {target_date}")
                  continue
 
-            # --- Step 2: 聚合 ---
+            # --- Step 2: 全局聚合 (New Logic) ---
+            # 不再依赖相邻合并，而是将全天所有的 (App, Cleaned Title) 进行累加
             events_map = {}
             
             for row in rows:
@@ -151,12 +157,13 @@ def extract_core_events(target_date):
                 # 清洗标题
                 ct = clean_title(raw_title, app)
                 
-                # 组合键
+                # 组合键 (App, Cleaned Title)
                 key = (app, ct)
                 
                 if key not in events_map:
                     events_map[key] = {'duration': 0, 'count': 0}
                 
+                # 累加时长和次数
                 events_map[key]['duration'] += dur
                 events_map[key]['count'] += 1
                 
@@ -170,10 +177,10 @@ def extract_core_events(target_date):
                     'count': stats['count']
                 })
                 
-            # Sort by duration desc
+            # 按总时长降序排列
             event_list.sort(key=lambda x: x['duration'], reverse=True)
             
-            # Take Top N for each category
+            # Take Top N for each category (Top 3 Focus, Top 2 Entertainment)
             limit = 3 if cat == 'focus' else 2
             top_events = event_list[:limit]
             

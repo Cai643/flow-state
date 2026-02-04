@@ -18,9 +18,9 @@ signal.signal(signal.SIGTERM, force_exit)
 # Add the current directory to sys.path to make the 'app' package importable
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
-from app.main import main
+from app.ui.main import main
 from app.service.API.web_API import run_server
-from app.service.API.thread import ai_monitor_worker
+from app.service.monitor_service import ai_monitor_worker
 import multiprocessing
 
 if __name__ == "__main__":

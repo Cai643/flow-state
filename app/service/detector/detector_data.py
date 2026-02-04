@@ -259,7 +259,7 @@ class FocusDetector:
         #截图
         self._last_screenshot_time = 0
         self.screenshot_interval = 5  # 秒
-        os.makedirs("screenshot", exist_ok=True)
+        # os.makedirs("screenshot", exist_ok=True)
     
     def _get_active_window_info(self) -> Optional[Dict]:
         """获取当前活动窗口信息"""

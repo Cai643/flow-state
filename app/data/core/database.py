@@ -5,7 +5,10 @@ from contextlib import contextmanager
 # 数据库文件路径
 # 使用绝对路径，确保在不同工作目录下（如 Flask 线程中）也能正确找到数据库
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-DB_PATH = os.path.join(BASE_DIR, 'focus_app.db')
+DB_DIR = os.path.join(BASE_DIR, 'app', 'data', 'dao', 'storage')
+if not os.path.exists(DB_DIR):
+    os.makedirs(DB_DIR)
+DB_PATH = os.path.join(DB_DIR, 'focus_app.db')
 
 @contextmanager
 def get_db_connection():
@@ -124,6 +127,7 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 date DATE,          -- 统计日期
                 total_focus INTEGER, -- 专注总时长 (秒)
+                total_entertainment INTEGER, -- 娱乐总时长 (秒)
                 max_streak INTEGER,  -- 最长心流 (秒)
                 willpower_wins INTEGER, -- 意志力胜利次数
                 peak_hour INTEGER,   -- 黄金时段 (0-23)
@@ -151,6 +155,10 @@ def init_db():
         try:
             cursor.execute('ALTER TABLE period_stats ADD COLUMN ai_insight TEXT')
         except sqlite3.OperationalError: pass # 字段已存在
+        
+        try:
+            cursor.execute('ALTER TABLE period_stats ADD COLUMN total_entertainment INTEGER')
+        except sqlite3.OperationalError: pass
 
         # 索引优化
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_period_stats_date ON period_stats(date)')

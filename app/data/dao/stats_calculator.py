@@ -4,7 +4,7 @@ import sqlite3
 from datetime import datetime, timedelta
 
 # Add project root to sys.path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from app.data.core.database import get_db_connection, init_db
 
@@ -48,36 +48,51 @@ def calculate_period_stats(target_date):
         ''', (target_date,))
         daily_stat_row = cursor.fetchone()
         
+        # [Fix] 优先使用 daily_stats 的总时长，但重新计算 max_streak
+        # 原因：daily_stats 中的 max_focus_streak 是实时更新的，可能受旧脏数据影响（如之前的 515min 异常值）。
+        # 而 window_sessions 已经清理过，重新计算更准确。
+        
         if daily_stat_row:
             total_focus = daily_stat_row['total_focus_time']
-            max_streak = daily_stat_row['max_focus_streak']
-            print(f"  [Sync] Using daily_stats: Focus={total_focus}s, Streak={max_streak}s")
+            # max_streak = daily_stat_row['max_focus_streak'] # <--- 移除这行，改用重新计算
+            print(f"  [Sync] Using daily_stats for Total Focus: {total_focus}s")
         else:
-            # Fallback if daily_stats is missing (e.g. old data)
-            print("  [Sync] daily_stats missing, calculating from window_sessions...")
             total_focus = sum(r['duration'] for r in focus_rows)
-            # Calculate Max Streak manually
-            max_streak = 0
-            current_streak = 0
-            last_end_time = None
-            for r in focus_rows:
-                if isinstance(r['start_time'], str):
-                    start = datetime.strptime(r['start_time'], "%Y-%m-%d %H:%M:%S")
+            print("  [Sync] daily_stats missing, calculating from window_sessions...")
+
+        # [Re-calculate Max Streak] 强制基于当前的 window_sessions 重新计算
+        # 确保数据清理后的准确性
+        max_streak = 0
+        current_streak = 0
+        last_end_time = None
+        for r in focus_rows:
+            if isinstance(r['start_time'], str):
+                start = datetime.strptime(r['start_time'], "%Y-%m-%d %H:%M:%S")
+            else:
+                start = r['start_time']
+            dur = r['duration']
+            
+            if last_end_time:
+                diff = (start - last_end_time).total_seconds()
+                # 如果间隔小于 2 分钟，视为连续
+                if diff < 120: 
+                    current_streak += dur
                 else:
-                    start = r['start_time']
-                dur = r['duration']
-                
-                if last_end_time:
-                    diff = (start - last_end_time).total_seconds()
-                    if diff < 120: 
-                        current_streak += dur
-                    else:
-                        max_streak = max(max_streak, current_streak)
-                        current_streak = dur
-                else:
+                    max_streak = max(max_streak, current_streak)
                     current_streak = dur
-                last_end_time = start + timedelta(seconds=dur)
-            max_streak = max(max_streak, current_streak)
+            else:
+                current_streak = dur
+            last_end_time = start + timedelta(seconds=dur)
+        max_streak = max(max_streak, current_streak)
+        print(f"  [Re-calc] Max Streak re-calculated from sessions: {max_streak}s ({int(max_streak/60)} min)")
+        
+        # 将重算的 max_streak 回写到 daily_stats (修正旧数据)
+        cursor.execute('''
+            UPDATE daily_stats 
+            SET max_focus_streak = ? 
+            WHERE date = ?
+        ''', (max_streak, target_date))
+        conn.commit()
         
         # --- Metric 3: Willpower Wins ---
         # Willpower Wins 必须通过回溯 window_sessions 计算，因为 daily_stats 没有存这个复杂指标

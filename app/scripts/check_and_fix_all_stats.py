@@ -4,7 +4,7 @@ import sys
 import os
 from datetime import datetime
 
-sys.path.append(os.getcwd())
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 from app.data.core.database import get_db_path
 
 def check_and_fix_all_stats():

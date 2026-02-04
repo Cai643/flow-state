@@ -339,6 +339,61 @@ Task: 写一段“致追梦者”的复盘寄语，要求：
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+    @app.route('/api/sessions/manual/add', methods=['POST'])
+    def add_manual_session():
+        try:
+            data = request.json
+            start_time = data.get('start_time')
+            end_time = data.get('end_time')
+            summary = data.get('summary')
+            status = data.get('status') # focus/entertainment
+
+            if not all([start_time, end_time, summary, status]):
+                return jsonify({"error": "Missing fields"}), 400
+
+            from app.data.dao.activity_dao import WindowSessionDAO, StatsDAO
+            
+            # Check overlap
+            if WindowSessionDAO.check_overlap(start_time, end_time):
+                return jsonify({"error": "Time range overlaps with existing sessions"}), 409
+
+            # Create
+            WindowSessionDAO.create_manual_session(start_time, end_time, summary, status)
+            
+            # Recompute stats
+            StatsDAO.recompute_today_from_sessions()
+            
+            return jsonify({"success": True})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route('/api/sessions/manual/delete', methods=['POST'])
+    def delete_manual_session():
+        try:
+            data = request.json
+            session_id = data.get('id')
+            if not session_id:
+                return jsonify({"error": "Missing ID"}), 400
+
+            from app.data.dao.activity_dao import WindowSessionDAO, StatsDAO
+            
+            WindowSessionDAO.delete_session(session_id)
+            StatsDAO.recompute_today_from_sessions()
+            
+            return jsonify({"success": True})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route('/api/sessions/manual/list', methods=['GET'])
+    def list_manual_sessions():
+        try:
+            from app.data.dao.activity_dao import WindowSessionDAO
+            limit = request.args.get('limit', 50, type=int)
+            sessions = WindowSessionDAO.get_manual_sessions(limit)
+            return jsonify(sessions)
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
     return app
 
 

@@ -2,11 +2,16 @@ import sqlite3
 import pandas as pd
 import os
 import re
+import sys
 from datetime import datetime
 
+# Add project root to sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../')))
+from app.data.core.database import DB_PATH
+
 # 1. 数据库路径
-SOURCE_DB = 'focus_app.db'
-TARGET_DB = 'cleaned_data.db'
+SOURCE_DB = DB_PATH
+TARGET_DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'storage', 'cleaned_data.db')
 
 # 2. 读取数据
 def load_data():

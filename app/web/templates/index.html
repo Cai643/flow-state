@@ -936,8 +936,8 @@
             
             <!-- Persistent Navigation Tabs -->
             <div class="nav-tabs">
-                <div class="nav-btn active" id="btn-7days" onclick="switchTab('7days')" data-i18n="nav.7days">最近7天</div>
-                <div class="nav-btn" id="btn-30days" onclick="switchTab('30days')" data-i18n="nav.30days">最近30天</div>
+                <div class="nav-btn active" id="btn-all" onclick="switchTab('all')" data-i18n="nav.all">全部</div>
+                <div class="nav-btn" id="btn-custom" onclick="switchTab('custom')" data-i18n="nav.custom">自定义</div>
                 <div class="nav-btn" id="btn-search" onclick="switchTab('search')" data-i18n="nav.search">AI 搜索</div>
             </div>
 
@@ -959,12 +959,25 @@
             <div id="panel-history" class="panel-view active">
                 <div class="history-container">
                     <div class="history-header">
-                        <span id="history-title" data-i18n="history.title.7">最近7天浏览记录</span>
+                        <span id="history-title" data-i18n="history.title.all">全部浏览记录</span>
                         <span style="font-size: 12px; font-weight: normal; color: #789035;" data-i18n="history.source">数据来源: 本地监控</span>
                     </div>
                     <div class="history-list" id="history-list">
                         <!-- JS Dynamic -->
                         <div style="text-align: center; color: #789035; margin-top: 50px;">正在加载数据...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View 1.5: Custom Fragments -->
+            <div id="panel-custom" class="panel-view">
+                <div class="history-container">
+                    <div class="history-header">
+                        <span data-i18n="custom.title">自定义片段</span>
+                        <button onclick="openAddFragmentModal()" style="padding: 6px 12px; background: var(--color-green-mid); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;">+ 添加片段</button>
+                    </div>
+                    <div class="history-list" id="custom-list">
+                        <!-- JS Dynamic -->
                     </div>
                 </div>
             </div>
@@ -1139,6 +1152,51 @@
         </div>
     </div>
 
+    <!-- Fragment Modal -->
+    <div class='modal-overlay' id='fragment-modal'>
+        <div class='settings-modal'>
+            <div class='settings-header'>
+                <span>添加片段</span>
+                <span class='close-btn' onclick='closeFragmentModal()'>&times;</span>
+            </div>
+            
+            <div class="setting-item" style="flex-direction: column; align-items: flex-start;">
+                <div class="setting-label" style="margin-bottom: 8px;">开始时间</div>
+                <div style="display: flex; gap: 8px; width: 100%;">
+                    <input type="date" id="start-date" class="settings-select" style="flex: 2;">
+                    <select id="start-hour" class="settings-select" style="flex: 1; min-width: 60px;"></select>
+                    <span style="align-self: center;">:</span>
+                    <select id="start-minute" class="settings-select" style="flex: 1; min-width: 60px;"></select>
+                </div>
+            </div>
+
+            <div class="setting-item" style="flex-direction: column; align-items: flex-start;">
+                <div class="setting-label" style="margin-bottom: 8px;">结束时间</div>
+                <div style="display: flex; gap: 8px; width: 100%;">
+                    <input type="date" id="end-date" class="settings-select" style="flex: 2;">
+                    <select id="end-hour" class="settings-select" style="flex: 1; min-width: 60px;"></select>
+                    <span style="align-self: center;">:</span>
+                    <select id="end-minute" class="settings-select" style="flex: 1; min-width: 60px;"></select>
+                </div>
+            </div>
+
+            <div class="setting-item">
+                <div class="setting-label">描述</div>
+                <input type="text" id="frag-summary" class="settings-select" placeholder="例如: 阅读书籍">
+            </div>
+            <div class="setting-item">
+                <div class="setting-label">类型</div>
+                <select id="frag-status" class="settings-select">
+                    <option value="focus">专注 (Focus)</option>
+                    <option value="entertainment">娱乐 (Entertainment)</option>
+                </select>
+            </div>
+            <div style='margin-top: 20px; text-align: right;'>
+                <button onclick='saveFragment()' style='padding: 8px 20px; background: var(--color-green-dark); color: white; border: none; border-radius: 6px; cursor: pointer;'>保存</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // --- Settings Logic (Hoisted) ---
         const i18n = {
@@ -1156,9 +1214,13 @@
                 "settings.save": "保存",
                 "nav.7days": "最近7天",
                 "nav.30days": "最近30天",
+                "nav.all": "全部",
+                "nav.custom": "自定义",
                 "nav.search": "AI 搜索",
                 "history.title.7": "最近7天浏览记录",
                 "history.title.30": "最近30天浏览记录",
+                "history.title.all": "全部浏览记录",
+                "custom.title": "自定义片段管理",
                 "history.source": "数据来源: 本地监控",
                 "search.title": "AI 智能搜索",
                 "search.subtitle": "探索你的数字足迹与记忆",
@@ -1464,18 +1526,30 @@
             
             // Map tabId to button ID
             let btnId = '';
-            if (tabId === '7days') btnId = 'btn-7days';
-            else if (tabId === '30days') btnId = 'btn-30days';
+            if (tabId === '7days') btnId = 'btn-7days'; // Legacy
+            else if (tabId === '30days') btnId = 'btn-30days'; // Legacy
+            else if (tabId === 'all') btnId = 'btn-all';
+            else if (tabId === 'custom') btnId = 'btn-custom';
             else if (tabId === 'search') btnId = 'btn-search';
             
-            if(btnId) document.getElementById(btnId).classList.add('active');
+            if(btnId) {
+                const btn = document.getElementById(btnId);
+                if(btn) btn.classList.add('active');
+            }
 
             // Handle View Switching
             if (tabId === 'search') {
                 showPanel('search');
+            } else if (tabId === 'custom') {
+                showPanel('custom');
+                loadCustomFragments();
             } else {
-                lastHistoryDays = (tabId === '7days') ? 7 : 30;
-                document.getElementById('history-title').textContent = (lastHistoryDays === 7) ? '最近7天浏览记录' : '最近30天浏览记录';
+                // 'all' logic (replacing 7days/30days in UI but keeping logic flexible)
+                if (tabId === 'all') lastHistoryDays = 365;
+                else if (tabId === '7days') lastHistoryDays = 7;
+                else if (tabId === '30days') lastHistoryDays = 30;
+                
+                document.getElementById('history-title').textContent = t('history.title.all');
                 showPanel('history');
                 loadHistory(lastHistoryDays);
             }
@@ -1490,7 +1564,8 @@
 
             // Toggle Panels
             document.querySelectorAll('.panel-view').forEach(el => el.classList.remove('active'));
-            document.getElementById('panel-' + panelName).classList.add('active');
+            const panel = document.getElementById('panel-' + panelName);
+            if(panel) panel.classList.add('active');
 
             // Sync Top Tabs if switching via sidebar
             if (panelName === 'search') {
@@ -1499,12 +1574,11 @@
                 renderRecentSearches();
                 document.getElementById('ai-search-input').focus();
             } else if (panelName === 'history') {
-                 // 保持用户最近选择的区间，不再强制重置为 7 天
+                 // Default to All
                  document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-                 const activeId = (lastHistoryDays === 30) ? 'btn-30days' : 'btn-7days';
-                 document.getElementById(activeId).classList.add('active');
-                 document.getElementById('history-title').textContent = (lastHistoryDays === 7) ? '最近7天浏览记录' : '最近30天浏览记录';
-                 loadHistory(lastHistoryDays);
+                 document.getElementById('btn-all').classList.add('active');
+                 document.getElementById('history-title').textContent = t('history.title.all');
+                 loadHistory(365);
             }
         }
 
@@ -2087,8 +2161,170 @@
             if (e.key === 'Enter') triggerReportGeneration();
         });
 
+        async function loadCustomFragments() {
+            const listEl = document.getElementById('custom-list');
+            listEl.innerHTML = "<div style='text-align: center; color: #789035; margin-top: 50px;'>" + t('msg.loading') + "</div>";
+            
+            try {
+                const response = await fetch('/api/sessions/manual/list?limit=100');
+                const data = await response.json();
+                
+                if (data.error) {
+                     listEl.innerHTML = `<div style="color:red; text-align:center;">Error: ${data.error}</div>`;
+                     return;
+                }
+                
+                if (data.length === 0) {
+                    listEl.innerHTML = "<div style='text-align: center; color: #789035; margin-top: 20px;'>暂无自定义片段</div>";
+                    return;
+                }
+                
+                const html = data.map(item => {
+                    const timeRange = `${item.start_time} - ${item.end_time.split(' ')[1]}`;
+                    return `
+                    <div class='history-item'>
+                        <div class='item-icon' style='font-size:12px;'>MANUAL</div>
+                        <div class='item-content'>
+                            <div class='item-title'>${item.window_title || item.summary}</div>
+                            <div class='item-subtitle'>
+                                <span class='item-time'>${timeRange}</span>
+                                <span style='margin-left: 8px;'>${item.status}</span>
+                            </div>
+                        </div>
+                        <div style='cursor:pointer; color:brown; padding:5px; font-size:18px; font-weight:bold;' onclick='deleteFragment(${item.id})'>
+                           &times;
+                        </div>
+                    </div>
+                    `;
+                }).join('');
+                listEl.innerHTML = html;
+                
+            } catch (e) {
+                console.error(e);
+                listEl.innerHTML = "Load failed";
+            }
+        }
+
+        function initFragmentModal() {
+            // Populate hours
+            const hours = [];
+            for(let i=0; i<24; i++) hours.push(String(i).padStart(2, '0'));
+            
+            // Populate minutes
+            const minutes = [];
+            for(let i=0; i<60; i++) minutes.push(String(i).padStart(2, '0'));
+            
+            ['start', 'end'].forEach(prefix => {
+                const hSel = document.getElementById(prefix + '-hour');
+                const mSel = document.getElementById(prefix + '-minute');
+                if(hSel && mSel) {
+                    hSel.innerHTML = hours.map(h => `<option value="${h}">${h}</option>`).join('');
+                    mSel.innerHTML = minutes.map(m => `<option value="${m}">${m}</option>`).join('');
+                }
+            });
+        }
+
+        function openAddFragmentModal() {
+            document.getElementById('fragment-modal').classList.add('active');
+            
+            // Populate selects if empty
+            if(document.getElementById('start-hour').options.length === 0) {
+                initFragmentModal();
+            }
+
+            const now = new Date();
+            const oneHourAgo = new Date(now - 3600000);
+            
+            // Helper to format Date input YYYY-MM-DD
+            const toDateStr = (d) => {
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
+            
+            // Set Start
+            document.getElementById('start-date').value = toDateStr(oneHourAgo);
+            document.getElementById('start-hour').value = String(oneHourAgo.getHours()).padStart(2, '0');
+            document.getElementById('start-minute').value = String(oneHourAgo.getMinutes()).padStart(2, '0');
+            
+            // Set End
+            document.getElementById('end-date').value = toDateStr(now);
+            document.getElementById('end-hour').value = String(now.getHours()).padStart(2, '0');
+            document.getElementById('end-minute').value = String(now.getMinutes()).padStart(2, '0');
+        }
+
+        function closeFragmentModal() {
+            document.getElementById('fragment-modal').classList.remove('active');
+        }
+
+        async function saveFragment() {
+            const sDate = document.getElementById('start-date').value;
+            const sHour = document.getElementById('start-hour').value;
+            const sMin = document.getElementById('start-minute').value;
+            
+            const eDate = document.getElementById('end-date').value;
+            const eHour = document.getElementById('end-hour').value;
+            const eMin = document.getElementById('end-minute').value;
+            
+            const summary = document.getElementById('frag-summary').value;
+            const status = document.getElementById('frag-status').value;
+            
+            if(!sDate || !eDate || !summary) {
+                alert("请填写完整信息");
+                return;
+            }
+            
+            const start = `${sDate} ${sHour}:${sMin}:00`;
+            const end = `${eDate} ${eHour}:${eMin}:00`;
+            
+            try {
+                const res = await fetch('/api/sessions/manual/add', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        start_time: start,
+                        end_time: end,
+                        summary: summary,
+                        status: status
+                    })
+                });
+                const json = await res.json();
+                if(json.error) {
+                    alert("添加失败: " + json.error);
+                } else {
+                    closeFragmentModal();
+                    loadCustomFragments();
+                    loadTodayStats(); // Refresh stats
+                }
+            } catch(e) {
+                alert("Network Error");
+            }
+        }
+
+        async function deleteFragment(id) {
+            if(!confirm("确定删除此片段吗?")) return;
+            try {
+                const res = await fetch('/api/sessions/manual/delete', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({id: id})
+                });
+                const json = await res.json();
+                if(json.error) {
+                    alert("删除失败: " + json.error);
+                } else {
+                    loadCustomFragments();
+                    loadTodayStats();
+                }
+            } catch(e) {
+                alert("Network Error");
+            }
+        }
+
         // Run Init
         initSettings();
+        switchTab('all');
 
     </script>
 </body>

@@ -155,6 +155,10 @@ class CardPopup(QtWidgets.QWidget):
         if getattr(self, 'is_interacting', False):
             return
 
+        # 关键修正：如果当前有活动的弹出窗口（如 QComboBox 的下拉列表），则不执行隐藏
+        if QtWidgets.QApplication.activePopupWidget():
+            return
+
         pos = QtGui.QCursor.pos()
         
         # 获取几何信息（屏幕坐标）

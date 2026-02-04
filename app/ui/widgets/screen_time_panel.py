@@ -133,7 +133,15 @@ class CategoryBar(QtWidgets.QWidget):
         self.process_data = process_data
         self.setMinimumHeight(90)
         self.setMaximumHeight(320)
-    def setData(self, process_data): self.process_data=process_data; self.update()
+        self.setAttribute(QtCore.Qt.WA_StyledBackground, True)
+        self.setStyleSheet("background: transparent;")
+    def setData(self, process_data):
+        self.process_data = process_data
+        rows = max(1, len(self.process_data))
+        new_h = rows * 38 + 40
+        self.setMinimumHeight(new_h)
+        self.setMaximumHeight(new_h)
+        self.update()
     def paintEvent(self, _):
         p = QtGui.QPainter(self)
         try:
@@ -143,31 +151,35 @@ class CategoryBar(QtWidgets.QWidget):
             Y = 20
             total_val = sum(x['value'] for x in self.process_data) or 1
             bar_h = 22
-            x0 = 32
+            x0 = 24
             row_h = 38
             font = QtGui.QFont("Microsoft YaHei", 11)
+            name_w = 200
+            bar_start_x = x0 + name_w
+            base_w = max(80, W - (bar_start_x + 120))
+            bar_total_w = min(W - (bar_start_x + 20), int(base_w * 1.5))
             for i, entry in enumerate(self.process_data):
-                pname = truncate_label(entry['name'])
+                pname = truncate_label(entry['name'], maxlen=22)
                 color = entry.get('color', "#7FAE0F")
                 y = Y + i*row_h
                 percent = entry['value']/total_val if total_val>0 else 0
-                fill_w = int(percent * (W-170))
+                fill_w = int(percent * bar_total_w)
                 # 进程名 label
                 p.setFont(font); p.setPen(QtGui.QColor(color))
-                p.drawText(12, y+2, 110, 18, QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter, pname)
+                p.drawText(x0, y+2, name_w, 18, QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter, pname)
                 # 进度条背景条
-                bg_rect=QtCore.QRect(x0+80, y+2, W-200, bar_h)
+                bg_rect=QtCore.QRect(bar_start_x, y+2, bar_total_w, bar_h)
                 p.setBrush(QtGui.QColor("#F3F7E3")); p.setPen(QtCore.Qt.NoPen)
                 p.drawRoundedRect(bg_rect, 10,10)
                 # 进度条填充条
-                fill_rect=QtCore.QRect(x0+80, y+2, fill_w, bar_h)
+                fill_rect=QtCore.QRect(bar_start_x, y+2, fill_w, bar_h)
                 p.setBrush(QtGui.QColor(color)); p.drawRoundedRect(fill_rect, 10,10)
                 # 百分比
                 p.setPen(QtGui.QColor("#333"))
                 p.setFont(QtGui.QFont("Microsoft YaHei",10))
-                p.drawText(x0+80+fill_w+6, y+2, 44, bar_h, QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter, f"{percent*100:.1f}%")
+                p.drawText(bar_start_x+fill_w+6, y+2, 54, bar_h, QtCore.Qt.AlignLeft|QtCore.Qt.AlignVCenter, f"{percent*100:.1f}%")
                 hours = round(entry['value']/3600, 1)
-                p.drawText(W-54, y+2, 47, bar_h, QtCore.Qt.AlignRight|QtCore.Qt.AlignVCenter, f"{hours:.1f}h")
+                p.drawText(W-64, y+2, 57, bar_h, QtCore.Qt.AlignRight|QtCore.Qt.AlignVCenter, f"{hours:.1f}h")
         finally:
             p.end()
 
@@ -176,195 +188,128 @@ class ScreenTimePanel(QtWidgets.QWidget):
         super().__init__(parent)
         self.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.Tool | QtCore.Qt.WindowStaysOnTopHint)
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
-        self.setMinimumSize(420, 530)
-        self.resize(570, 870)
-        self._drag_active = False
-        self._drag_pos = None
+        self.setFixedSize(540, 360)
+        self._center_on_screen()
 
-        self.period_mode = "week"  # 默认本周
-        self.daily_data, self.process_data, self.total_time, self.module_times = self.load_screen_time_stats(self.period_mode)
+        self.period_mode = "today"
 
         lay = QtWidgets.QVBoxLayout(self)
-        lay.setContentsMargins(32, 38, 32, 30)
-        lay.setSpacing(24)
-        titlelay = QtWidgets.QHBoxLayout()
-        label = QtWidgets.QLabel("📱  屏幕时间")
-        label.setStyleSheet("""
-            font-family: "Microsoft YaHei";
-            font-size: 24px; font-weight:600;
-            color: #5D4037; padding-top:5px;
-        """)
-        titlelay.addWidget(label)
-        titlelay.addStretch()
-        self.range_combo = QtWidgets.QComboBox()
-        self.range_combo.addItems(["今日","最近7天"])
-        self.range_combo.setFixedSize(110, 32)
-        self.range_combo.setStyleSheet("""
-            QComboBox {font-size:15px;background:rgba(255,255,255,0.72);border-radius:9px;padding:4px 16px;}
-            QComboBox::drop-down{border:0;}
-            QComboBox::down-arrow {image:none;}
-        """)
-        self.range_combo.setCurrentIndex(1)
-        self.range_combo.currentIndexChanged.connect(self.on_mode_change)
-        titlelay.addWidget(self.range_combo)
-
-        close = QtWidgets.QPushButton("×")
-        close.setFixedSize(34, 34)
-        close.setCursor(QtCore.Qt.PointingHandCursor)
-        close.setStyleSheet("""
-            QPushButton {
-                background: #7FAE0F;  color: #fff; border:none; border-radius:18px; font-size:22px; font-weight:bold;
-            }
-            QPushButton:hover { background: #558a12; }
-        """)
-        close.clicked.connect(self.close)
-        titlelay.addWidget(close)
-        lay.addLayout(titlelay)
-
-        cardrow = QtWidgets.QHBoxLayout()
-        cardrow.setSpacing(16)
-        cardrow.setContentsMargins(6,18,6,8)
-
-        # --- 这三行才是正确的卡片属性引用！！---
-        self.card_total = MiniStatCard("⏱️", "总时间", self.format_time_hm(self.total_time), "#7FAE0F")
-        self.card_focus = MiniStatCard("💼", "学习工作", self.format_time_hm(self.module_times.get("学习工作",0)), "#7AA97D")
-        self.card_ent = MiniStatCard("🎮", "娱乐", self.format_time_hm(self.module_times.get("娱乐",0)), "#FFC107")
-        cardrow.addWidget(self.card_total)
-        cardrow.addWidget(self.card_focus)
-        cardrow.addWidget(self.card_ent)
-        lay.addLayout(cardrow)
-
-        chart_lab = QtWidgets.QLabel("📊 用时分布柱状图")
-        chart_lab.setStyleSheet("font-size:16px; font-weight:500; color:#5D4037; margin-top:10px;font-family:'Microsoft YaHei';")
-        lay.addWidget(chart_lab)
-        self.barchart = BarChart(self.daily_data, mode=self.period_mode)
-        lay.addWidget(self.barchart)
-        dist_lab = QtWidgets.QLabel("📈 进程排行分布")
-        dist_lab.setStyleSheet("font-size:16px; font-weight:500; color:#5D4037;margin-top:10px;font-family:'Microsoft YaHei';")
-        lay.addWidget(dist_lab)
+        lay.setContentsMargins(20, 16, 20, 16)
+        lay.setSpacing(8)
+        hdr = QtWidgets.QHBoxLayout()
+        title = QtWidgets.QLabel("今日进程使用信息统计")
+        title.setStyleSheet("font-family:'Microsoft YaHei'; font-size:16px; font-weight:600; color:#5D4037;")
+        hdr.addWidget(title, 0, QtCore.Qt.AlignLeft)
+        hdr.addStretch()
+        close_btn = QtWidgets.QPushButton("×")
+        close_btn.setFixedSize(28, 28)
+        close_btn.setCursor(QtCore.Qt.PointingHandCursor)
+        close_btn.setStyleSheet("QPushButton{color:#5D4037; background:transparent; border:none; font-size:18px; font-weight:bold;} QPushButton:hover{color:#7FAE0F;}")
+        close_btn.clicked.connect(self.close)
+        hdr.addWidget(close_btn, 0, QtCore.Qt.AlignRight)
+        lay.addLayout(hdr)
+        # 内容：进程排行分布（可滚动）
+        self.process_data = self._load_today_process_data()
         self.catbar = CategoryBar(self.process_data)
-        lay.addWidget(self.catbar)
+        self.catbar.setData(self.process_data)
+        scroll = QtWidgets.QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
+        scroll.setStyleSheet("""
+            QScrollArea{background: transparent;}
+            QScrollArea > QWidget {background: transparent;}
+            QScrollArea viewport {background: transparent;}
+            QScrollBar:vertical {
+                background: rgba(127, 174, 15, 40);
+                width: 10px;
+                margin: 8px 2px 8px 2px;
+                border-radius: 5px;
+            }
+            QScrollBar::handle:vertical {
+                background: #7FAE0F;
+                min-height: 24px;
+                border-radius: 5px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #6a9c1f;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px; background: transparent; border: none;
+            }
+            QScrollBar:horizontal {
+                background: rgba(127, 174, 15, 40);
+                height: 10px;
+                margin: 2px 8px 2px 8px;
+                border-radius: 5px;
+            }
+            QScrollBar::handle:horizontal {
+                background: #7FAE0F;
+                min-width: 24px;
+                border-radius: 5px;
+            }
+            QScrollBar::handle:horizontal:hover {
+                background: #6a9c1f;
+            }
+            QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+                width: 0px; background: transparent; border: none;
+            }
+        """)
+        container = QtWidgets.QWidget()
+        container.setStyleSheet("background: transparent;")
+        c_layout = QtWidgets.QVBoxLayout(container)
+        c_layout.setContentsMargins(0, 6, 0, 6)
+        c_layout.addWidget(self.catbar)
+        scroll.setWidget(container)
+        lay.addWidget(scroll)
         lay.addStretch()
 
-    def on_mode_change(self, idx):
-        mode = "today" if idx == 0 else "week"
-        self.period_mode = mode
-        daily_data, process_data, total_time, module_times = self.load_screen_time_stats(mode)
-        self.set_data(daily_data, process_data, total_time, module_times)
-        self.barchart.setData(daily_data, mode=self.period_mode)
+        return
+
+        # （空界面，无内容）
+
+    def on_proc_change(self, idx):
+        return
 
     def mousePressEvent(self, event):
-        if event.button() == QtCore.Qt.LeftButton:
-            self._drag_active = True
-            self._drag_pos = event.globalPos() - self.frameGeometry().topLeft()
-            event.accept()
-        super().mousePressEvent(event)
+        return
     def mouseMoveEvent(self, event):
-        if self._drag_active and event.buttons() & QtCore.Qt.LeftButton:
-            self.move(event.globalPos() - self._drag_pos)
-            event.accept()
-        super().mouseMoveEvent(event)
+        return
     def mouseReleaseEvent(self, event):
-        self._drag_active = False
-        super().mouseReleaseEvent(event)
+        return
 
     def set_data(self, daily_data, process_data, total_time, module_times):
-        self.daily_data = daily_data
-        self.process_data = process_data
-        self.total_time = total_time
-        self.module_times = module_times
-
-        # --- 卡片内容正确刷新的部分 ---
-        self.card_total.value = self.format_time_hm(total_time)
-        self.card_focus.value = self.format_time_hm(module_times.get('学习工作',0))
-        self.card_ent.value = self.format_time_hm(module_times.get('娱乐',0))
-        self.card_total.update()
-        self.card_focus.update()
-        self.card_ent.update()
-
-        self.barchart.setData(daily_data, mode=self.period_mode)
-        self.catbar.setData(process_data)
-        self.update()
+        return
 
     @staticmethod
     def format_time_hm(total_sec):
-        hours = total_sec / 3600.0
-        return f"{hours:.1f}h"
+        return "0.0h"
 
     def load_screen_time_stats(self, mode="week"):
-        today = datetime.date.today()
-        process_data = []
-        module_times = {"学习工作":0, "娱乐":0}
-        total_time = 0
-        if mode == "today":
-            date_str = today.strftime("%Y-%m-%d")
-            daily_data = []
-            with get_db_connection() as conn:
-                # 柱状图和分布条都用进程当天用时 排序
-                for row in conn.execute(
-                    "SELECT process_name, SUM(duration) as total_sec FROM window_sessions WHERE date(start_time) = ? GROUP BY process_name ORDER BY total_sec DESC", (date_str,)
-                ):
-                    pname = row['process_name'] or "未知进程"
-                    sec = row['total_sec'] or 0
-                    hours = round(sec / 3600.0, 1)
-                    daily_data.append({'name': pname, 'hours': hours})
-                    process_data.append({'name': pname, 'value': sec, 'color': "#9bc284"})
-                for row in conn.execute(
-                    "SELECT status, SUM(duration) as total_sec FROM window_sessions WHERE date(start_time) = ? GROUP BY status", (date_str,)
-                ):
-                    state = (row["status"] or "").lower()
-                    if state in ["focus", "work"]:
-                        module_times["学习工作"] += row["total_sec"] or 0
-                    elif state == "entertainment":
-                        module_times["娱乐"] += row["total_sec"] or 0
-            total_time = sum(module_times.values())
-            return daily_data, process_data, total_time, module_times
+        return [], [], 0, {"学习工作":0, "娱乐":0}
 
-        # week模式
-        days = 7
-        date_list = [today - datetime.timedelta(days=days-1-i) for i in range(days)]
-        day_labels = ['周一','周二','周三','周四','周五','周六','周日']
-        sql_day = """
-            SELECT date(start_time) as date, SUM(duration) as total_sec
-            FROM window_sessions
-            WHERE start_time >= ?
-            GROUP BY date(start_time)
-            ORDER BY date(start_time)
-        """
-        days_ago = (today - datetime.timedelta(days=days-1)).strftime("%Y-%m-%d")
-        daily_data = []
-        with get_db_connection() as conn:
-            for i, dt in enumerate(date_list):
-                ds = dt.strftime("%Y-%m-%d")
-                label = day_labels[dt.weekday()]
-                sec = 0
-                row = conn.execute("SELECT SUM(duration) as total_sec FROM window_sessions WHERE date(start_time)=?",(ds,)).fetchone()
-                if row and row["total_sec"]: sec = row["total_sec"]
-                hours = round(sec / 3600.0, 1)
-                daily_data.append({'day': label, 'hours': hours})
-            for row in conn.execute(
-                "SELECT process_name, SUM(duration) as total_sec FROM window_sessions WHERE start_time >= ? GROUP BY process_name ORDER BY total_sec DESC", (days_ago,)
-            ):
-                pname = row['process_name'] or "未知进程"
-                sec = row['total_sec'] or 0
-                process_data.append({'name': pname, 'value': sec, 'color': "#9bc284"})
-            for row in conn.execute(
-                "SELECT status, SUM(duration) as total_sec FROM window_sessions WHERE start_time >= ? GROUP BY status", (days_ago,)
-            ):
-                state = (row["status"] or "").lower()
-                if state in ["focus", "work"]:
-                    module_times["学习工作"] += row["total_sec"] or 0
-                elif state == "entertainment":
-                    module_times["娱乐"] += row["total_sec"] or 0
-            total_time = sum(module_times.values())
-        return daily_data, process_data, total_time, module_times
+    def _load_today_process_data(self):
+        import datetime
+        today_str = datetime.date.today().strftime("%Y-%m-%d")
+        result = []
+        try:
+            with get_db_connection() as conn:
+                for row in conn.execute(
+                    "SELECT process_name, SUM(duration) as total_sec FROM window_sessions WHERE date(start_time) = ? GROUP BY process_name ORDER BY total_sec DESC",
+                    (today_str,)
+                ):
+                    pname = row["process_name"] or "未知进程"
+                    sec = int(row["total_sec"] or 0)
+                    result.append({"name": pname, "value": sec, "color": "#7FAE0F"})
+        except Exception as e:
+            print(f"Load today process data failed: {e}")
+        return result
 
     def paintEvent(self, evt):
         p = QtGui.QPainter(self)
         try:
             p.setRenderHint(QtGui.QPainter.Antialiasing)
             rect = self.rect().adjusted(2, 2, -2, -2)
-            r = 22
+            r = 20
             grad = QtGui.QLinearGradient(rect.topLeft(), rect.bottomRight())
             grad.setColorAt(0, QtGui.QColor("#F4F9EC"))
             grad.setColorAt(1, QtGui.QColor("#E0E1AC"))
@@ -377,9 +322,15 @@ class ScreenTimePanel(QtWidgets.QWidget):
         finally:
             p.end()
 
+    def _center_on_screen(self):
+        screen = QtWidgets.QApplication.primaryScreen()
+        if not screen:
+            return
+        geo = screen.availableGeometry()
+        self.move(geo.center().x() - self.width() // 2, geo.center().y() - self.height() // 2)
+
 if __name__ == "__main__":
     import sys
     app = QtWidgets.QApplication(sys.argv)
     win = ScreenTimePanel()
-    win.show()
-    sys.exit(app.exec())
+    sys.exit(0)

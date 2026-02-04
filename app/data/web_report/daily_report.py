@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 
 # Add project root to sys.path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../')))
 
 from app.data.dao.analysis_dao import AnalysisDAO
 from app.service.detector.detector_logic import analyze # Assuming this is your local AI interface

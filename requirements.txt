@@ -7,3 +7,4 @@ ollama
 flask
 flask-cors
 requests
+pandas

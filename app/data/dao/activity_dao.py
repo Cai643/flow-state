@@ -157,6 +157,57 @@ class WindowSessionDAO:
             ).fetchall()
             return [dict(row) for row in rows]
 
+    @staticmethod
+    def check_overlap(start_time_str, end_time_str):
+        """检查时间段是否与现有会话重叠"""
+        # Overlap logic: (StartA < EndB) and (EndA > StartB)
+        with get_db_connection() as conn:
+            row = conn.execute(
+                '''SELECT count(*) as count FROM window_sessions 
+                   WHERE start_time < ? AND end_time > ?''',
+                (end_time_str, start_time_str)
+            ).fetchone()
+            return row['count'] > 0
+
+    @staticmethod
+    def create_manual_session(start_time_str, end_time_str, summary, status):
+        """创建手动会话记录"""
+        # Calculate duration in seconds
+        from datetime import datetime
+        fmt = "%Y-%m-%d %H:%M:%S"
+        t1 = datetime.strptime(start_time_str, fmt)
+        t2 = datetime.strptime(end_time_str, fmt)
+        duration = int((t2 - t1).total_seconds())
+        
+        with get_db_connection() as conn:
+            conn.execute(
+                '''INSERT INTO window_sessions 
+                   (window_title, process_name, start_time, end_time, duration, status, summary) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                (summary, "Manual", start_time_str, end_time_str, duration, status, summary)
+            )
+            conn.commit()
+
+    @staticmethod
+    def delete_session(session_id):
+        """删除会话记录"""
+        with get_db_connection() as conn:
+            conn.execute('DELETE FROM window_sessions WHERE id = ?', (session_id,))
+            conn.commit()
+
+    @staticmethod
+    def get_manual_sessions(limit=50):
+        """获取最近的手动添加记录"""
+        with get_db_connection() as conn:
+            rows = conn.execute(
+                '''SELECT * FROM window_sessions 
+                   WHERE process_name = 'Manual' 
+                   ORDER BY start_time DESC LIMIT ?''',
+                (limit,)
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+
 class StatsDAO:
     """统计数据访问对象"""
     
@@ -260,3 +311,116 @@ class StatsDAO:
                 (days,)
             ).fetchall()
             return [dict(row) for row in rows]
+
+    @staticmethod
+    def recompute_today_from_sessions():
+        """一刀切：从今日00:00开始统计，重算并回写 daily_stats"""
+        from datetime import date
+        today_str = date.today().strftime('%Y-%m-%d')
+        start_time = f"{today_str} 00:00:00"
+        focus_sum = 0
+        ent_sum = 0
+        with get_db_connection() as conn:
+            # 聚合今日开始的会话
+            for row in conn.execute(
+                "SELECT status, SUM(duration) AS total_sec FROM window_sessions WHERE start_time >= ? GROUP BY status",
+                (start_time,)
+            ):
+                status = (row["status"] or "").lower()
+                total_sec = int(row["total_sec"] or 0)
+                if status in ["focus", "work"]:
+                    focus_sum += total_sec
+                elif status == "entertainment":
+                    ent_sum += total_sec
+            # 确保存在记录
+            conn.execute("INSERT OR IGNORE INTO daily_stats (date) VALUES (?)", (today_str,))
+            # 写入总时长
+            conn.execute("""
+                UPDATE daily_stats
+                SET total_focus_time = ?,
+                    total_entertainment_time = ?,
+                    efficiency_score = CASE 
+                        WHEN (? + ?) > 0 THEN (? * 100 / (? + ?))
+                        ELSE 0 END
+                WHERE date = ?
+            """, (focus_sum, ent_sum, focus_sum, ent_sum, focus_sum, focus_sum, ent_sum, today_str))
+            conn.commit()
+
+    # ====== Period Stats 访问接口 ======
+    @staticmethod
+    def get_period_summary(date_obj):
+        """获取周期统计(period_stats)的当日摘要"""
+        with get_db_connection() as conn:
+            row = conn.execute(
+                "SELECT * FROM period_stats WHERE date = ?", (date_obj,)
+            ).fetchone()
+            if row:
+                return dict(row)
+        return {
+            "date": date_obj,
+            "total_focus": 0,
+            "total_entertainment": 0,
+            "max_streak": 0,
+            "willpower_wins": 0,
+            "peak_hour": 0,
+            "efficiency_score": 0,
+            "daily_summary": "",
+            "focus_fragmentation_ratio": 0.0,
+            "context_switch_freq": 0.0,
+            "ai_insight": ""
+        }
+
+    @staticmethod
+    def recompute_today_period_from_sessions():
+        """一刀切：从今日00:00开始统计，重算并写入 period_stats"""
+        from datetime import date
+        today_str = date.today().strftime('%Y-%m-%d')
+        start_time = f"{today_str} 00:00:00"
+        focus_sum = 0
+        ent_sum = 0
+        max_streak = 0
+        willpower_wins = 0
+        with get_db_connection() as conn:
+            # 聚合总时长
+            for row in conn.execute(
+                "SELECT status, SUM(duration) AS total_sec FROM window_sessions WHERE start_time >= ? GROUP BY status",
+                (start_time,)
+            ):
+                status = (row["status"] or "").lower()
+                total_sec = int(row["total_sec"] or 0)
+                if status in ["focus", "work"]:
+                    focus_sum += total_sec
+                elif status == "entertainment":
+                    ent_sum += total_sec
+            # 计算最长心流 (取当日 focus/work 会话的最大 duration)
+            r = conn.execute(
+                "SELECT MAX(duration) AS max_dur FROM window_sessions WHERE start_time >= ? AND status IN ('focus','work')",
+                (start_time,)
+            ).fetchone()
+            max_streak = int((r or {}).get("max_dur") or 0)
+            # 计算意志力胜利次数：统计娱乐 -> (focus/work) 的切换次数
+            rows = conn.execute(
+                "SELECT status FROM window_sessions WHERE start_time >= ? ORDER BY start_time ASC",
+                (start_time,)
+            ).fetchall()
+            last_status = None
+            for rr in rows or []:
+                cur = (rr["status"] or "").lower()
+                if last_status == "entertainment" and cur in ["focus", "work"]:
+                    willpower_wins += 1
+                last_status = cur
+            eff = int((focus_sum * 100 / (focus_sum + ent_sum)) if (focus_sum + ent_sum) > 0 else 0)
+            # UPSERT period_stats
+            exists = conn.execute("SELECT id FROM period_stats WHERE date = ?", (today_str,)).fetchone()
+            if exists:
+                conn.execute("""
+                    UPDATE period_stats
+                    SET total_focus = ?, total_entertainment = ?, efficiency_score = ?, max_streak = ?, willpower_wins = ?
+                    WHERE date = ?
+                """, (focus_sum, ent_sum, eff, max_streak, willpower_wins, today_str))
+            else:
+                conn.execute("""
+                    INSERT INTO period_stats (date, total_focus, total_entertainment, efficiency_score, max_streak, willpower_wins)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (today_str, focus_sum, ent_sum, eff, max_streak, willpower_wins))
+            conn.commit()

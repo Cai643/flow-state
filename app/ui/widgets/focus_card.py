@@ -165,8 +165,8 @@ class FocusStatusCard(QtWidgets.QWidget):
         threshold_label.setStyleSheet("color: white; font-size: 14px;")
         
         self.threshold_combo = QtWidgets.QComboBox()
-        self.threshold_combo.addItems(["15分钟", "30分钟", "45分钟 (默认)", "自定义..."])
-        self.threshold_combo.setCurrentIndex(2) # 默认 45分钟
+        self.threshold_combo.addItems(["无", "15分钟", "30分钟", "45分钟 (默认)", "自定义..."])
+        self.threshold_combo.setCurrentIndex(3) # 默认 45分钟
         self.threshold_combo.setEditable(True) # 允许编辑
         self.threshold_combo.setInsertPolicy(QtWidgets.QComboBox.NoInsert) # 不自动插入新项
         
@@ -424,11 +424,11 @@ class FocusStatusCard(QtWidgets.QWidget):
     def _on_threshold_changed(self, index):
         """处理阈值变更 (下拉选择)"""
         # 映射 index 到 秒数
-        # ["15分钟", "30分钟", "45分钟 (默认)", "自定义..."]
-        # index: 0=900s, 1=1800s, 2=2700s, 3=Custom
+        # ["无", "15分钟", "30分钟", "45分钟 (默认)", "自定义..."]
+        # index: 0=Disabled, 1=900s, 2=1800s, 3=2700s, 4=Custom
         
         # 检查是否选择了 "自定义..." (最后一个选项)
-        if index == 3:
+        if index == 4:
             # 选中 "自定义..." 时，清空文本框并聚焦，让用户输入
             # 获取当前自定义的分钟数，如果没有则默认为 45
             current_mins = getattr(self, '_custom_minutes', 45)
@@ -452,21 +452,22 @@ class FocusStatusCard(QtWidgets.QWidget):
         self.threshold_combo.lineEdit().setInputMask("")
         
         threshold_map = {
-            0: 900,
-            1: 1800,
-            2: 2700
+            0: 0,    # 无 (关闭)
+            1: 900,  # 15min
+            2: 1800, # 30min
+            3: 2700  # 45min
         }
         seconds = threshold_map.get(index, 2700)
         self.fatigue_threshold = seconds
         
         # 如果切换回其他选项，需要把最后一项的文本重置为 "自定义..."
-        if self.threshold_combo.itemText(3) != "自定义...":
-            self.threshold_combo.setItemText(3, "自定义...")
+        if self.threshold_combo.itemText(4) != "自定义...":
+            self.threshold_combo.setItemText(4, "自定义...")
 
     def _on_custom_text_changed(self, text):
         """实时处理自定义输入文本变化"""
-        # 只有在 index 为 3 (自定义) 时才处理
-        if self.threshold_combo.currentIndex() != 3:
+        # 只有在 index 为 4 (自定义) 时才处理
+        if self.threshold_combo.currentIndex() != 4:
             return
 
         # 尝试提取数字并更新阈值
@@ -489,8 +490,8 @@ class FocusStatusCard(QtWidgets.QWidget):
 
     def _on_custom_input_finished(self):
         """处理自定义输入完成 (回车或失焦)"""
-        # 只有在 index 为 3 (自定义) 时才处理
-        if self.threshold_combo.currentIndex() != 3:
+        # 只有在 index 为 4 (自定义) 时才处理
+        if self.threshold_combo.currentIndex() != 4:
             return
 
         text = self.threshold_combo.currentText().strip()
@@ -518,8 +519,8 @@ class FocusStatusCard(QtWidgets.QWidget):
             
             # 下拉列表里始终显示 "自定义..."
             self.threshold_combo.blockSignals(True)
-            self.threshold_combo.setItemText(3, "自定义...")
-            self.threshold_combo.setCurrentIndex(3)
+            self.threshold_combo.setItemText(4, "自定义...")
+            self.threshold_combo.setCurrentIndex(4)
             self.threshold_combo.blockSignals(False)
             
             # 关键：强制设置 lineEdit 文本为 "X 分钟"
@@ -541,7 +542,7 @@ class FocusStatusCard(QtWidgets.QWidget):
             # 清除掩码以便显示普通文本
             if self.threshold_combo.lineEdit():
                 self.threshold_combo.lineEdit().setInputMask("")
-            self.threshold_combo.setCurrentIndex(2)
+            self.threshold_combo.setCurrentIndex(3)
             
     def _handle_custom_threshold(self):
         """已废弃，改用直接输入"""
@@ -557,20 +558,15 @@ class FocusStatusCard(QtWidgets.QWidget):
         try:
             from app.data.dao.activity_dao import StatsDAO
             from datetime import date
-            
+            try:
+                StatsDAO.recompute_today_from_sessions()
+            except Exception:
+                pass
             summary = StatsDAO.get_daily_summary(date.today())
-            total_focus_sec = 0
-            if summary:
-                # 只读取 total_focus_time
-                f_time = summary.get('total_focus_time') or 0
-                total_focus_sec = f_time
-            
-            # 加上当前这一段还没入库的时长 (如果当前状态也是工作/专注)
+            total_focus_sec = int((summary or {}).get('total_focus_time') or 0)
             if current_status in ['work', 'focus']:
-                total_focus_sec += current_duration
-                
+                total_focus_sec += int(current_duration or 0)
             display_focus_hours = total_focus_sec / 3600.0
-            
         except Exception as e:
             print(f"Stats error: {e}")
             display_focus_hours = 0.0
