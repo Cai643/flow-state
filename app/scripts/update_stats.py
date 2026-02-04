@@ -4,7 +4,7 @@ import os
 from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
-from app.service.detector.calculate_period_stats import calculate_period_stats
+from app.data.dao.stats_calculator import calculate_period_stats
 
 def update_recent_stats():
     print("Updating period stats for the last 7 days...")
