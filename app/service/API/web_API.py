@@ -139,8 +139,8 @@ def create_app(ai_busy_flag=None):
             flag.value = True
         try:
             from app.data.web_report.report_generator import ReportGenerator
-            from app.service.detector.extract_core_events import extract_core_events
-            from app.service.detector.calculate_period_stats import calculate_period_stats
+            from app.data.dao.core_events_extractor import extract_core_events
+            from app.data.dao.stats_calculator import calculate_period_stats
             from datetime import date, timedelta
             try:
                 end_d = date.today()
