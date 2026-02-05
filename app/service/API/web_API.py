@@ -350,12 +350,22 @@ Task: 写一段“致追梦者”的复盘寄语，要求：
 
             if not all([start_time, end_time, summary, status]):
                 return jsonify({"error": "Missing fields"}), 400
+                
+            import dateutil.parser
+            try:
+                start_dt = dateutil.parser.parse(start_time)
+                end_dt = dateutil.parser.parse(end_time)
+            except Exception:
+                return jsonify({"error": "时间格式有误"}), 400
+            
+            if start_dt >= end_dt:
+                return jsonify({"error": "开始时间不能晚于或等于结束时间"}), 400
 
             from app.data.dao.activity_dao import WindowSessionDAO, StatsDAO
             
             # Check overlap
             if WindowSessionDAO.check_overlap(start_time, end_time):
-                return jsonify({"error": "Time range overlaps with existing sessions"}), 409
+                return jsonify({"error": "该段时间已存在活动"}), 409
 
             # Create
             WindowSessionDAO.create_manual_session(start_time, end_time, summary, status)
