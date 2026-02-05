@@ -527,6 +527,24 @@ class DailyDashboard(QtWidgets.QWidget):
         lbl_date = QtWidgets.QLabel(date.today().strftime("%Y.%m.%d %A"))
         lbl_date.setStyleSheet("color: #2E4E3F; font-size: 20px; font-weight: bold;") 
         
+        # ==== 历史回溯 (跳转网页) ====
+        btn_history = QtWidgets.QPushButton("历史回溯")
+        btn_history.setCursor(QtCore.Qt.PointingHandCursor)
+        btn_history.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #2E7D32;
+                border: none;
+                padding: 6px 18px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                color: #1B5E20;
+            }
+        """)
+        btn_history.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl("http://localhost:8080")))
+
         # ==== 今日进程统计（文字样式） ====
         btn_screen_time = QtWidgets.QPushButton("今日进程统计")
         btn_screen_time.setCursor(QtCore.Qt.PointingHandCursor)
@@ -567,6 +585,7 @@ class DailyDashboard(QtWidgets.QWidget):
         h_layout.addStretch()
         h_layout.addWidget(lbl_date)
         h_layout.addStretch()
+        h_layout.addWidget(btn_history)      # “历史回溯”按钮
         h_layout.addWidget(btn_screen_time)  # “屏幕时间面板”按钮在左
         h_layout.addWidget(btn_switch)       # “切换到时间轴”按钮在右
         
@@ -659,10 +678,25 @@ class DailyDashboard(QtWidgets.QWidget):
         comm_layout = QtWidgets.QVBoxLayout(comm_box)
         comm_layout.setContentsMargins(20, 15, 20, 15) 
         
-        title = QtWidgets.QLabel("\ud83d\udcac \u5854\u53f0\u901a\u8baf (\u5b9e\u65f6\u64ad\u62a5)")
+        title = QtWidgets.QLabel("\ud83d\udca1 \u6bcf\u65e5\u6d1e\u89c1") # Daily Insight
         title.setStyleSheet("color: #455A64; font-weight: 900; font-size: 14px; border: none;") 
         
-        msg = QtWidgets.QLabel('"\u68c0\u6d4b\u5230\u5f3a\u5927\u7684\u610f\u5fd7\u529b\u6ce2\u52a8\uff01\n\u4f60\u5df2\u6210\u529f\u62e6\u622a5\u6b21\u5e72\u6270\u3002" (Mock)')
+        import random
+        quotes = [
+            "\u4e13\u6ce8\u662f\u7075\u9b42\u7684\u547c\u5438\uff0c\u5728\u6bcf\u4e00\u6b21\u6df1\u547c\u5438\u4e2d\uff0c\u4f60\u4e0e\u66f4\u597d\u7684\u81ea\u5df1\u76f8\u9047\u3002",
+            "\u6d41\u6c34\u4e0d\u4e89\u5148\uff0c\u4e89\u7684\u662f\u6ed4\u6ed4\u4e0d\u7edd\u3002\u6301\u7eed\u7684\u4e13\u6ce8\u80dc\u8fc7\u77b3\u95f4\u7684\u7206\u53d1\u3002",
+            "\u5fc3\u6d41\u72b6\u6001\u4e0b\uff0c\u65f6\u95f4\u4e0d\u662f\u6d41\u901d\u7684\uff0c\u800c\u662f\u4e3a\u4f60\u505c\u7559\u7684\u3002",
+            "\u5728\u55a7\u56a3\u7684\u4e16\u754c\u91cc\uff0c\u4e13\u6ce8\u529b\u662f\u4f60\u6700\u5b9d\u8d35\u7684\u8d44\u4ea7\u3002",
+            "\u6548\u7387\u4e0d\u662f\u505a\u5f97\u66f4\u5feb\uff0c\u800c\u662f\u628a\u751f\u547d\u7684\u5149\u7167\u8fdb\u6700\u91cd\u8981\u7684\u4e8b\u60c5\u91cc\u3002",
+            "\u6700\u597d\u7684\u4f11\u606f\u4e0d\u662f\u505c\u6b62\u601d\u8003\uff0c\u800c\u662f\u8ba9\u5927\u8111\u5728\u4e13\u6ce8\u4e0e\u653e\u677e\u95f4\u81ea\u7531\u5207\u6362\u3002",
+            "\u4f60\u628a\u65f6\u95f4\u82b1\u5728\u54ea\u91cc\uff0c\u4f60\u7684\u6210\u5c31\u5c31\u5728\u54ea\u91cc\u3002",
+            "\u4e0d\u8981\u7b49\u5f85\u7075\u611f\uff0c\u4e13\u6ce8\u672c\u8eab\u5c31\u662f\u5524\u9192\u7075\u611f\u7684\u4eea\u5f0f\u3002",
+            "\u79cd\u4e00\u68f5\u6811\u6700\u597d\u7684\u65f6\u95f4\u662f\u5341\u5e74\u524d\uff0c\u517c\u6b21\u662f\u73b0\u5728\u3002\u4e13\u6ce8\u4ea6\u7136\u3002",
+            "\u5b81\u9759\u81f4\u8fdc\uff0c\u4e13\u6ce8\u81f4\u6df1\u3002"
+        ]
+        selected_quote = random.choice(quotes)
+        
+        msg = QtWidgets.QLabel(f'"{selected_quote}"')
         msg.setWordWrap(True)
         msg.setStyleSheet("color: #37474F; font-size: 13px; font-weight: bold; margin-top: 5px; border: none; line-height: 1.4;") 
         
@@ -893,6 +927,43 @@ class DailyTimeline(QtWidgets.QWidget):
         lbl_date = QtWidgets.QLabel(date.today().strftime("%Y.%m.%d %A"))
         lbl_date.setStyleSheet("color: #2E4E3F; font-size: 20px; font-weight: bold;")
         
+        # ==== 历史回溯 (跳转网页) ====
+        btn_history = QtWidgets.QPushButton("历史回溯")
+        btn_history.setCursor(QtCore.Qt.PointingHandCursor)
+        btn_history.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #2E7D32;
+                border: none;
+                padding: 6px 18px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                color: #1B5E20;
+            }
+        """)
+        btn_history.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl("http://localhost:8080")))
+
+        # ==== 今日进程统计 ====
+        btn_screen_time = QtWidgets.QPushButton("今日进程统计")
+        btn_screen_time.setCursor(QtCore.Qt.PointingHandCursor)
+        btn_screen_time.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #2E7D32;
+                border: none;
+                padding: 6px 18px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                color: #1B5E20;
+            }
+        """)
+        # 调用 report.dashboard_view 中的方法，复用同一个面板实例
+        btn_screen_time.clicked.connect(lambda: self.report.dashboard_view.open_screen_time_panel())
+
         btn_summary = QtWidgets.QPushButton("< \u56de\u5230\u4eca\u65e5\u603b\u7ed3") 
         btn_summary.setCursor(QtCore.Qt.PointingHandCursor)
         btn_summary.setStyleSheet("""
@@ -914,6 +985,8 @@ class DailyTimeline(QtWidgets.QWidget):
         h_layout.addStretch()
         h_layout.addWidget(lbl_date)
         h_layout.addStretch()
+        h_layout.addWidget(btn_history)
+        h_layout.addWidget(btn_screen_time)
         h_layout.addWidget(btn_summary)
         
         parent_layout.addWidget(header)
