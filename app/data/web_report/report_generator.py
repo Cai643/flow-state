@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, date
 from typing import Dict, List, Optional
 import json
 
-from app.data.core.database import get_db_connection
+from app.data.core.database import get_db_connection, get_period_stats_db_connection, get_core_events_db_connection
 from app.data.web_report.templates import REPORT_TEMPLATE
 
 class ReportGenerator:
@@ -72,8 +72,9 @@ class ReportGenerator:
         s_str = start_date.strftime("%Y-%m-%d")
         e_str = end_date.strftime("%Y-%m-%d")
 
+        # 1. Main DB: Daily Stats & Window Sessions
         with get_db_connection() as conn:
-            # 1. Daily Stats
+            # Daily Stats
             cursor = conn.execute("""
                 SELECT date, total_focus_time, max_focus_streak, willpower_wins, efficiency_score 
                 FROM daily_stats 
@@ -82,7 +83,24 @@ class ReportGenerator:
             """, (s_str, e_str))
             data["daily_stats"] = [dict(row) for row in cursor.fetchall()]
 
-            # 2. Core Events (Top 1 per day, prioritize Focus but include Entertainment if significant)
+            # Window Sessions (用于寻找具体的巅峰时刻时间段)
+            # 这里简化处理：只找这段时间内持续时间最长的一次会话
+            cursor = conn.execute("""
+                SELECT start_time, end_time, duration, window_title, process_name
+                FROM window_sessions
+                WHERE date(start_time) BETWEEN ? AND ?
+                ORDER BY duration DESC
+                LIMIT 1
+            """, (s_str, e_str))
+            row = cursor.fetchone()
+            if row:
+                data["peak_session"] = dict(row)
+            else:
+                data["peak_session"] = None
+
+        # 2. Core Events DB
+        with get_core_events_db_connection() as conn:
+            # Core Events (Top 1 per day, prioritize Focus but include Entertainment if significant)
             # 策略调整：不仅仅取 rank=1 的，而是获取前 2 名，方便后续逻辑判断是否要展示“娱乐”
             print(f"DEBUG: Fetching core events between {s_str} and {e_str}")
             cursor = conn.execute("""
@@ -95,7 +113,6 @@ class ReportGenerator:
             # 将 Core Events 按日期分组
             raw_events = [dict(row) for row in cursor.fetchall()]
             print(f"DEBUG: Fetched {len(raw_events)} core events")
-            # print(f"DEBUG: First event: {raw_events[0] if raw_events else 'None'}")
             
             events_by_date = {}
             for ev in raw_events:
@@ -111,6 +128,8 @@ class ReportGenerator:
             data["core_events_map"] = events_by_date
             data["core_events"] = raw_events
 
+        # 3. Period Stats DB
+        with get_period_stats_db_connection() as conn:
             cursor = conn.execute("""
                 SELECT date, total_focus, peak_hour, efficiency_score, daily_summary, focus_fragmentation_ratio, context_switch_freq 
                 FROM period_stats 
@@ -139,21 +158,6 @@ class ReportGenerator:
                 })
             data["period_summary_map"] = period_map
             data["period_stats_rows"] = period_rows
-            
-            # 3. Window Sessions (用于寻找具体的巅峰时刻时间段)
-            # 这里简化处理：只找这段时间内持续时间最长的一次会话
-            cursor = conn.execute("""
-                SELECT start_time, end_time, duration, window_title, process_name
-                FROM window_sessions
-                WHERE date(start_time) BETWEEN ? AND ?
-                ORDER BY duration DESC
-                LIMIT 1
-            """, (s_str, e_str))
-            row = cursor.fetchone()
-            if row:
-                data["peak_session"] = dict(row)
-            else:
-                data["peak_session"] = None
 
         return data
 

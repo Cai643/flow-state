@@ -526,43 +526,8 @@ class DailyDashboard(QtWidgets.QWidget):
         # Date
         lbl_date = QtWidgets.QLabel(date.today().strftime("%Y.%m.%d %A"))
         lbl_date.setStyleSheet("color: #2E4E3F; font-size: 20px; font-weight: bold;") 
+        lbl_date.setAlignment(QtCore.Qt.AlignCenter)
         
-        # ==== 历史回溯 (跳转网页) ====
-        btn_history = QtWidgets.QPushButton("历史回溯")
-        btn_history.setCursor(QtCore.Qt.PointingHandCursor)
-        btn_history.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                color: #2E7D32;
-                border: none;
-                padding: 6px 18px;
-                font-weight: bold;
-                font-size: 16px;
-            }
-            QPushButton:hover {
-                color: #1B5E20;
-            }
-        """)
-        btn_history.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl("http://localhost:8080")))
-
-        # ==== 今日进程统计（文字样式） ====
-        btn_screen_time = QtWidgets.QPushButton("今日进程统计")
-        btn_screen_time.setCursor(QtCore.Qt.PointingHandCursor)
-        btn_screen_time.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                color: #2E7D32;
-                border: none;
-                padding: 6px 18px;
-                font-weight: bold;
-                font-size: 16px;
-            }
-            QPushButton:hover {
-                color: #1B5E20;
-            }
-        """)
-        btn_screen_time.clicked.connect(self.open_screen_time_panel)
-    
         # Switch
         btn_switch = QtWidgets.QPushButton("\u5207\u6362\u5230\u65f6\u95f4\u8f74 >") 
         btn_switch.setCursor(QtCore.Qt.PointingHandCursor)
@@ -585,8 +550,6 @@ class DailyDashboard(QtWidgets.QWidget):
         h_layout.addStretch()
         h_layout.addWidget(lbl_date)
         h_layout.addStretch()
-        h_layout.addWidget(btn_history)      # “历史回溯”按钮
-        h_layout.addWidget(btn_screen_time)  # “屏幕时间面板”按钮在左
         h_layout.addWidget(btn_switch)       # “切换到时间轴”按钮在右
         
         parent_layout.addWidget(header)
@@ -673,13 +636,13 @@ class DailyDashboard(QtWidgets.QWidget):
             border-radius: 16px;
             border: 2px solid #C8E6C9;
         """)
-        comm_box.setMaximumHeight(140) 
+        comm_box.setFixedHeight(130) # Changed from setMaximumHeight to setFixedHeight to force size
         
         comm_layout = QtWidgets.QVBoxLayout(comm_box)
         comm_layout.setContentsMargins(20, 15, 20, 15) 
         
-        title = QtWidgets.QLabel("\ud83d\udca1 \u6bcf\u65e5\u6d1e\u89c1") # Daily Insight
-        title.setStyleSheet("color: #455A64; font-weight: 900; font-size: 14px; border: none;") 
+        title = QtWidgets.QLabel("\ud83d\udca1 \u6bcf\u65e5\u91d1\u53e5") # Daily Golden Quote
+        title.setStyleSheet("color: #455A64; font-weight: 900; font-size: 16px; border: none;") # Increased font size from 14 to 16
         
         import random
         quotes = [
@@ -698,13 +661,59 @@ class DailyDashboard(QtWidgets.QWidget):
         
         msg = QtWidgets.QLabel(f'"{selected_quote}"')
         msg.setWordWrap(True)
-        msg.setStyleSheet("color: #37474F; font-size: 13px; font-weight: bold; margin-top: 5px; border: none; line-height: 1.4;") 
+        msg.setStyleSheet("color: #37474F; font-size: 15px; font-weight: bold; margin-top: 8px; border: none; line-height: 1.5;") # Increased font size from 13 to 15, margin-top from 5 to 8, line-height from 1.4 to 1.5 
         
         comm_layout.addWidget(title)
         comm_layout.addWidget(msg)
         comm_layout.addStretch()
         
         v_layout.addWidget(comm_box, 1)
+
+        # Bottom Buttons (History & Screen Time)
+        btns_layout = QtWidgets.QHBoxLayout()
+        btns_layout.setAlignment(QtCore.Qt.AlignCenter)
+        btns_layout.setSpacing(100) # Increased spacing to push buttons apart
+        
+        # History Button
+        btn_history = QtWidgets.QPushButton("历史回溯")
+        btn_history.setCursor(QtCore.Qt.PointingHandCursor)
+        btn_history.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #2E7D32;
+                border: none;
+                padding: 6px 18px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                color: #1B5E20;
+            }
+        """)
+        btn_history.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl("http://localhost:8080")))
+        
+        # Screen Time Button
+        btn_screen_time = QtWidgets.QPushButton("今日进程统计")
+        btn_screen_time.setCursor(QtCore.Qt.PointingHandCursor)
+        btn_screen_time.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #2E7D32;
+                border: none;
+                padding: 6px 18px;
+                font-weight: bold;
+                font-size: 16px;
+            }
+            QPushButton:hover {
+                color: #1B5E20;
+            }
+        """)
+        btn_screen_time.clicked.connect(self.open_screen_time_panel)
+        
+        btns_layout.addWidget(btn_history)
+        btns_layout.addWidget(btn_screen_time)
+        
+        v_layout.addLayout(btns_layout)
         
         parent_layout.addWidget(right_container, 1)
 
@@ -926,44 +935,8 @@ class DailyTimeline(QtWidgets.QWidget):
         
         lbl_date = QtWidgets.QLabel(date.today().strftime("%Y.%m.%d %A"))
         lbl_date.setStyleSheet("color: #2E4E3F; font-size: 20px; font-weight: bold;")
+        lbl_date.setAlignment(QtCore.Qt.AlignCenter)
         
-        # ==== 历史回溯 (跳转网页) ====
-        btn_history = QtWidgets.QPushButton("历史回溯")
-        btn_history.setCursor(QtCore.Qt.PointingHandCursor)
-        btn_history.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                color: #2E7D32;
-                border: none;
-                padding: 6px 18px;
-                font-weight: bold;
-                font-size: 16px;
-            }
-            QPushButton:hover {
-                color: #1B5E20;
-            }
-        """)
-        btn_history.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl("http://localhost:8080")))
-
-        # ==== 今日进程统计 ====
-        btn_screen_time = QtWidgets.QPushButton("今日进程统计")
-        btn_screen_time.setCursor(QtCore.Qt.PointingHandCursor)
-        btn_screen_time.setStyleSheet("""
-            QPushButton {
-                background-color: transparent;
-                color: #2E7D32;
-                border: none;
-                padding: 6px 18px;
-                font-weight: bold;
-                font-size: 16px;
-            }
-            QPushButton:hover {
-                color: #1B5E20;
-            }
-        """)
-        # 调用 report.dashboard_view 中的方法，复用同一个面板实例
-        btn_screen_time.clicked.connect(lambda: self.report.dashboard_view.open_screen_time_panel())
-
         btn_summary = QtWidgets.QPushButton("< \u56de\u5230\u4eca\u65e5\u603b\u7ed3") 
         btn_summary.setCursor(QtCore.Qt.PointingHandCursor)
         btn_summary.setStyleSheet("""
@@ -985,8 +958,6 @@ class DailyTimeline(QtWidgets.QWidget):
         h_layout.addStretch()
         h_layout.addWidget(lbl_date)
         h_layout.addStretch()
-        h_layout.addWidget(btn_history)
-        h_layout.addWidget(btn_screen_time)
         h_layout.addWidget(btn_summary)
         
         parent_layout.addWidget(header)

@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 # Add project root to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from app.data.core.database import get_db_connection, init_db
+from app.data.core.database import get_db_connection, get_period_stats_db_connection, get_core_events_db_connection, init_db
 
 def calculate_period_stats(target_date):
     """
@@ -22,6 +22,18 @@ def calculate_period_stats(target_date):
     start_ts = f"{target_date} 00:00:00"
     end_ts = f"{target_date} 23:59:59"
     
+    # 变量初始化，确保跨作用域可用
+    all_rows = []
+    focus_rows = []
+    total_focus = 0
+    max_streak = 0
+    willpower_wins = 0
+    peak_hour = 0
+    score = 0
+    focus_frag_ratio = 0.0
+    switch_freq = 0.0
+    
+    # --- Phase 1: Main DB (Window Sessions & Daily Stats) ---
     with get_db_connection() as conn:
         cursor = conn.cursor()
         
@@ -62,7 +74,6 @@ def calculate_period_stats(target_date):
 
         # [Re-calculate Max Streak] 强制基于当前的 window_sessions 重新计算
         # 确保数据清理后的准确性
-        max_streak = 0
         current_streak = 0
         last_end_time = None
         for r in focus_rows:
@@ -96,7 +107,6 @@ def calculate_period_stats(target_date):
         
         # --- Metric 3: Willpower Wins ---
         # Willpower Wins 必须通过回溯 window_sessions 计算，因为 daily_stats 没有存这个复杂指标
-        willpower_wins = 0
         state = 0 
         # 0: Seek Focus > 300s
         # 1: Found Focus, Seek Distraction
@@ -168,7 +178,6 @@ def calculate_period_stats(target_date):
         # 6.2 Context Switch Frequency (切换频率)
         # 总切换次数 / 总活跃小时数
         # 活跃小时数 = (最后一条记录结束 - 第一条记录开始) / 3600
-        switch_freq = 0
         if all_rows:
             # 获取最早和最晚时间
             start_dt = all_rows[0]['start_time']
@@ -184,9 +193,14 @@ def calculate_period_stats(target_date):
             else:
                 switch_freq = 0
 
-        # --- Metric 7: Daily Summary (from Core Events) ---
-        # 改进策略：聚合 Top 3 Focus + Top 2 Entertainment
-        # 目标：30字以内的精简摘要
+    # --- Metric 7: Daily Summary (from Core Events DB) ---
+    # 改进策略：聚合 Top 3 Focus + Top 2 Entertainment
+    # 目标：30字以内的精简摘要
+    
+    daily_summary = ""
+    
+    with get_core_events_db_connection() as conn:
+        cursor = conn.cursor()
         
         # 1. 获取 Focus (Top 3)
         cursor.execute('''
@@ -209,7 +223,6 @@ def calculate_period_stats(target_date):
         ent_events = cursor.fetchall()
         
         items = []
-        total_len = 0
         
         # 辅助函数：生成极简标题
         def get_short_title(ev):
@@ -245,30 +258,32 @@ def calculate_period_stats(target_date):
         if not daily_summary:
             daily_summary = "无主要活动"
             
-        # --- Metric 8: AI Insight Generation ---
-        insights = []
+    # --- Metric 8: AI Insight Generation ---
+    insights = []
+    
+    # 1. 状态判断 (基于 Ratio & Freq)
+    if focus_frag_ratio > 1.2 and switch_freq < 10:
+        insights.append("深度心流态")
+    elif focus_frag_ratio < 0.8 and switch_freq > 20:
+        insights.append("碎片化焦虑")
+    elif focus_frag_ratio > 1.0 and switch_freq > 15:
+        insights.append("高压多任务")
+    else:
+        insights.append("常规工作态")
         
-        # 1. 状态判断 (基于 Ratio & Freq)
-        if focus_frag_ratio > 1.2 and switch_freq < 10:
-            insights.append("深度心流态")
-        elif focus_frag_ratio < 0.8 and switch_freq > 20:
-            insights.append("碎片化焦虑")
-        elif focus_frag_ratio > 1.0 and switch_freq > 15:
-            insights.append("高压多任务")
-        else:
-            insights.append("常规工作态")
-            
-        # 2. 补充标签
-        if max_streak > 5400: # 90 min
-            insights.append("铁人模式")
-        if willpower_wins > 8:
-            insights.append("意志力爆发")
-        if score == 100:
-            insights.append("完美表现")
-            
-        ai_insight = " | ".join(insights)
+    # 2. 补充标签
+    if max_streak > 5400: # 90 min
+        insights.append("铁人模式")
+    if willpower_wins > 8:
+        insights.append("意志力爆发")
+    if score == 100:
+        insights.append("完美表现")
         
-        # --- Save to DB ---
+    ai_insight = " | ".join(insights)
+    
+    # --- Save to DB (Period Stats DB) ---
+    with get_period_stats_db_connection() as conn:
+        cursor = conn.cursor()
         cursor.execute("DELETE FROM period_stats WHERE date = ?", (target_date,))
         cursor.execute('''
             INSERT INTO period_stats (date, total_focus, max_streak, willpower_wins, peak_hour, efficiency_score, daily_summary, focus_fragmentation_ratio, context_switch_freq, ai_insight)

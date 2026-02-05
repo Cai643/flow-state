@@ -9,20 +9,39 @@ DB_DIR = os.path.join(BASE_DIR, 'app', 'data', 'dao', 'storage')
 if not os.path.exists(DB_DIR):
     os.makedirs(DB_DIR)
 DB_PATH = os.path.join(DB_DIR, 'focus_app.db')
+PERIOD_STATS_DB_PATH = os.path.join(DB_DIR, 'period_stats.db')
+CORE_EVENTS_DB_PATH = os.path.join(DB_DIR, 'core_events.db')
 
 @contextmanager
-def get_db_connection():
-    """获取数据库连接的上下文管理器"""
-    conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
+def get_db_connection(db_path=None):
+    """获取数据库连接的上下文管理器
+    Args:
+        db_path: 数据库路径，默认为 DB_PATH (focus_app.db)
+    """
+    target_path = db_path if db_path else DB_PATH
+    conn = sqlite3.connect(target_path, detect_types=sqlite3.PARSE_DECLTYPES)
     conn.row_factory = sqlite3.Row  # 允许通过列名访问数据
     try:
         yield conn
     finally:
         conn.close()
 
+@contextmanager
+def get_period_stats_db_connection():
+    """获取 Period Stats 数据库连接"""
+    with get_db_connection(PERIOD_STATS_DB_PATH) as conn:
+        yield conn
+
+@contextmanager
+def get_core_events_db_connection():
+    """获取 Core Events 数据库连接"""
+    with get_db_connection(CORE_EVENTS_DB_PATH) as conn:
+        yield conn
+
 def init_db():
     """初始化数据库表结构 (统一管理所有表)"""
-    with get_db_connection() as conn:
+    # 1. 初始化主数据库 (focus_app.db)
+    with get_db_connection(DB_PATH) as conn:
         cursor = conn.cursor()
         
         # 2. 活动日志表
@@ -37,7 +56,6 @@ def init_db():
                 raw_data TEXT
             )
         ''')
-        #窗口会话表 () 
         # 3. 窗口会话表 - 用于记录聚合后的窗口使用时长
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS window_sessions (
@@ -93,12 +111,18 @@ def init_db():
             cursor.execute('ALTER TABLE daily_stats ADD COLUMN efficiency_score INTEGER DEFAULT 0')
         except sqlite3.OperationalError:
             pass
-
+        
         try:
             cursor.execute('ALTER TABLE daily_stats ADD COLUMN willpower_wins INTEGER DEFAULT 0')
         except sqlite3.OperationalError:
             pass
-        
+            
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_activity_timestamp ON activity_logs(timestamp)')
+        conn.commit()
+
+    # 2. 初始化 Core Events 数据库
+    with get_db_connection(CORE_EVENTS_DB_PATH) as conn:
+        cursor = conn.cursor()
         # 5. 核心事件表 (Core Events)
         # 存储经过漏斗筛选法提取出的每日核心高频事件，供AI写日报使用
         cursor.execute('''
@@ -119,7 +143,13 @@ def init_db():
             cursor.execute('ALTER TABLE core_events ADD COLUMN category TEXT DEFAULT "focus"')
         except sqlite3.OperationalError:
             pass
-        
+            
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_core_events_date ON core_events(date)')
+        conn.commit()
+
+    # 3. 初始化 Period Stats 数据库
+    with get_db_connection(PERIOD_STATS_DB_PATH) as conn:
+        cursor = conn.cursor()
         # 6. 周期统计表 (Period Stats)
         # 存储按日/按周计算的“致追梦者”核心指标，避免每次生成报告时重复计算
         cursor.execute('''
@@ -160,13 +190,10 @@ def init_db():
             cursor.execute('ALTER TABLE period_stats ADD COLUMN total_entertainment INTEGER')
         except sqlite3.OperationalError: pass
 
-        # 索引优化
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_period_stats_date ON period_stats(date)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_core_events_date ON core_events(date)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_activity_timestamp ON activity_logs(timestamp)')
-        
         conn.commit()
-        print(f"[Database] Initialized at {DB_PATH}")
+        
+    print(f"[Database] Initialized databases at {DB_DIR}")
 
 def get_db_path():
     return DB_PATH

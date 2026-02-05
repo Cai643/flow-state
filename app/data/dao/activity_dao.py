@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from app.data.core.database import get_db_connection
+from app.data.core.database import get_db_connection, get_period_stats_db_connection
 
 from datetime import datetime
 
@@ -363,7 +363,7 @@ class StatsDAO:
     @staticmethod
     def get_period_summary(date_obj):
         """获取周期统计(period_stats)的当日摘要"""
-        with get_db_connection() as conn:
+        with get_period_stats_db_connection() as conn:
             row = conn.execute(
                 "SELECT * FROM period_stats WHERE date = ?", (date_obj,)
             ).fetchone()
@@ -393,6 +393,8 @@ class StatsDAO:
         ent_sum = 0
         max_streak = 0
         willpower_wins = 0
+        
+        # 1. 计算 (从 Main DB)
         with get_db_connection() as conn:
             # 聚合总时长
             for row in conn.execute(
@@ -422,7 +424,10 @@ class StatsDAO:
                 if last_status == "entertainment" and cur in ["focus", "work"]:
                     willpower_wins += 1
                 last_status = cur
-            eff = int((focus_sum * 100 / (focus_sum + ent_sum)) if (focus_sum + ent_sum) > 0 else 0)
+        
+        # 2. 写入 (到 Period Stats DB)
+        eff = int((focus_sum * 100 / (focus_sum + ent_sum)) if (focus_sum + ent_sum) > 0 else 0)
+        with get_period_stats_db_connection() as conn:
             # UPSERT period_stats
             exists = conn.execute("SELECT id FROM period_stats WHERE date = ?", (today_str,)).fetchone()
             if exists:

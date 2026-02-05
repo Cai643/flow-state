@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 # Add project root to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from app.data.core.database import get_db_connection, init_db
+from app.data.core.database import get_db_connection, get_core_events_db_connection, init_db
 
 def clean_title(title, app_name):
     """
@@ -94,11 +94,12 @@ def extract_core_events(target_date):
     start_ts = f"{target_date} 00:00:00"
     end_ts = f"{target_date} 23:59:59"
     
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
+    with get_db_connection() as conn_main, get_core_events_db_connection() as conn_core:
+        cursor_main = conn_main.cursor()
+        cursor_core = conn_core.cursor()
         
         # 先清除当天的旧数据 (支持重跑)
-        cursor.execute("DELETE FROM core_events WHERE date = ?", (target_date,))
+        cursor_core.execute("DELETE FROM core_events WHERE date = ?", (target_date,))
 
         # 定义要提取的类别和对应的 status
         categories = {
@@ -118,9 +119,9 @@ def extract_core_events(target_date):
                 AND duration > 30
             '''
             params = [start_ts, end_ts] + statuses
-            cursor.execute(query, params)
+            cursor_main.execute(query, params)
             
-            rows = cursor.fetchall()
+            rows = cursor_main.fetchall()
             
             if not rows and cat == 'focus':
                 # [兜底逻辑] 如果 Focus 没找到，尝试找 Unknown 或其他状态中最长的
@@ -133,8 +134,8 @@ def extract_core_events(target_date):
                     ORDER BY duration DESC
                     LIMIT 5
                 '''
-                cursor.execute(fallback_query, [start_ts, end_ts])
-                rows = cursor.fetchall()
+                cursor_main.execute(fallback_query, [start_ts, end_ts])
+                rows = cursor_main.fetchall()
                 # 标记为 'misc' 以便区分，但存入数据库时仍可暂用 focus 或新建 misc 类别
                 # 这里为了兼容性，仍存为 focus，但在标题上做标记
                 # 仅当完全没有行时才跳过
@@ -186,7 +187,7 @@ def extract_core_events(target_date):
             
             # --- Step 4: 存储 ---
             for rank, event in enumerate(top_events, 1):
-                cursor.execute('''
+                cursor_core.execute('''
                     INSERT INTO core_events (date, app_name, clean_title, total_duration, event_count, rank, category)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                 ''', (
@@ -200,7 +201,7 @@ def extract_core_events(target_date):
                 ))
                 print(f"  [{cat.upper()}] Rank {rank}: [{event['app']}] {event['title']} ({int(event['duration']/60)}m)")
             
-        conn.commit()
+        conn_core.commit()
         print("Done.")
 
 def run_backfill(days=3):

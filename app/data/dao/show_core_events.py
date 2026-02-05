@@ -8,13 +8,13 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(current_dir, '../../'))
 sys.path.insert(0, project_root)
 
-from app.data.core.database import get_db_connection
+from app.data.core.database import get_db_connection, get_core_events_db_connection
 
 def show_today_core_events():
     today_str = date.today().strftime('%Y-%m-%d')
     print(f"Fetching Core Events for today ({today_str})...")
     
-    with get_db_connection() as conn:
+    with get_core_events_db_connection() as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             "SELECT * FROM core_events WHERE date = ? ORDER BY category, rank",
