@@ -4,12 +4,12 @@ import requests
 
 class LangflowClient:
     def __init__(self, timeout: int = 180):
-        self.summary_url = os.getenv('LANGFLOW_SUMMARY_URL', 'http://localhost:7860/api/v1/run/689df559-e798-40c3-b57b-b95fe3143206')
-        self.summary_key = os.getenv('LANGFLOW_SUMMARY_KEY', 'sk-7m7C1bso4H6gLMEb1o03oZuq_lJEvmbP0iEvDQhhWw0')
-        self.enc_url = os.getenv('LANGFLOW_ENC_URL', 'hhttp://localhost:7860/api/v1/run/689df559-e798-40c3-b57b-b95fe3143206')
-        self.enc_key = os.getenv('LANGFLOW_ENC_KEY', 'sk-7m7C1bso4H6gLMEb1o03oZuq_lJEvmbP0iEvDQhhWw0')
-        self.detect_url = os.getenv('LANGFLOW_DETECT_URL', 'http://localhost:7860/api/v1/run/689df559-e798-40c3-b57b-b95fe3143206')
-        self.detect_key = os.getenv('LANGFLOW_DETECT_KEY', 'sk-7m7C1bso4H6gLMEb1o03oZuq_lJEvmbP0iEvDQhhWw0')
+        self.summary_url = os.getenv('LANGFLOW_SUMMARY_URL', 'http://localhost:7860/api/v1/run/1255147a-9699-4558-b764-93a9ac1a2297')
+        self.summary_key = os.getenv('LANGFLOW_SUMMARY_KEY', 'sk-av_kDHxW4nvAcbpnWu0ECP_Co-qckUW4ELFhQjBAFDQ')
+        self.enc_url = os.getenv('LANGFLOW_ENC_URL', 'http://localhost:7860/api/v1/run/1255147a-9699-4558-b764-93a9ac1a2297')
+        self.enc_key = os.getenv('LANGFLOW_ENC_KEY', 'sk-av_kDHxW4nvAcbpnWu0ECP_Co-qckUW4ELFhQjBAFDQ')
+        self.detect_url = os.getenv('LANGFLOW_DETECT_URL', 'http://localhost:7860/api/v1/run/1255147a-9699-4558-b764-93a9ac1a2297')
+        self.detect_key = os.getenv('LANGFLOW_DETECT_KEY', 'sk-av_kDHxW4nvAcbpnWu0ECP_Co-qckUW4ELFhQjBAFDQ')
         self.timeout = timeout
 
     def call_flow(self, flow: str, text: str):
