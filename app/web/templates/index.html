@@ -913,6 +913,38 @@
         body.compact .message {
             padding: 10px 15px;
         }
+        /* Toast Notification */
+        .toast-container {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+        .toast {
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .toast.success { background-color: var(--color-green-dark); }
+        .toast.error { background-color: #d32f2f; }
     </style>
 </head>
 <body>
@@ -1008,19 +1040,19 @@
                         <!-- New: Suggestion Grid (Empty State) -->
                         <div class="suggestion-grid">
                             <div class="suggestion-card" onclick="setSearch('我的工作效率')">
-                                <div class="suggestion-icon">⚡️</div>
+                                <div class="suggestion-icon">??</div>
                                 <div class="suggestion-text">分析我的工作效率</div>
                             </div>
                             <div class="suggestion-card" onclick="setSearch('上周的项目进度')">
-                                <div class="suggestion-icon">📊</div>
+                                <div class="suggestion-icon">?</div>
                                 <div class="suggestion-text">上周项目进度如何？</div>
                             </div>
                             <div class="suggestion-card" onclick="setSearch('Chrome 浏览历史')">
-                                <div class="suggestion-icon">🌐</div>
+                                <div class="suggestion-icon">?</div>
                                 <div class="suggestion-text">搜索网页浏览记录</div>
                             </div>
                             <div class="suggestion-card" onclick="setSearch('最近打开的文档')">
-                                <div class="suggestion-icon">📄</div>
+                                <div class="suggestion-icon">?</div>
                                 <div class="suggestion-text">找回最近的文档</div>
                             </div>
                         </div>
@@ -1422,7 +1454,41 @@
             }
         }
 
+        function showToast(message, type = 'info') {
+            let container = document.querySelector('.toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.className = 'toast-container';
+                document.body.appendChild(container);
+            }
+
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = message;
+            
+            container.appendChild(toast);
+            
+            // Trigger reflow
+            toast.offsetHeight;
+            
+            requestAnimationFrame(() => {
+                toast.classList.add('show');
+            });
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            }, 3000);
+        }
+
         async function toggleAutostart(enabled) {
+            const toggle = document.getElementById('autostart-toggle');
+            toggle.disabled = true;
+            toggle.parentElement.style.opacity = '0.6';
+            toggle.parentElement.style.cursor = 'not-allowed';
+
             try {
                 const response = await fetch('/api/settings/autostart', {
                     method: 'POST',
@@ -1430,17 +1496,24 @@
                     body: JSON.stringify({enabled: enabled})
                 });
                 const data = await response.json();
+                
                 if(data.error) {
-                    alert('设置失败: ' + data.error);
-                    // Revert UI
-                    const toggle = document.getElementById('autostart-toggle');
-                    if(toggle) toggle.checked = !enabled;
+                    throw new Error(data.error);
                 }
+                
+                showToast(enabled ? '已开启开机自启' : '已关闭开机自启', 'success');
+                
             } catch (e) {
                 console.error("Failed to set autostart", e);
-                alert('设置失败，网络错误');
-                const toggle = document.getElementById('autostart-toggle');
+                showToast('设置失败: ' + (e.message || '网络错误'), 'error');
+                // Revert UI
                 if(toggle) toggle.checked = !enabled;
+            } finally {
+                if(toggle) {
+                    toggle.disabled = false;
+                    toggle.parentElement.style.opacity = '1';
+                    toggle.parentElement.style.cursor = 'pointer';
+                }
             }
         }
 
