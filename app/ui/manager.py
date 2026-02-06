@@ -126,8 +126,8 @@ class FlowStateApp(QtCore.QObject):
                 self.last_fatigue_remind_time = current_time
 
     def _check_entertainment(self, status, duration, current_time):
-        # 如果疲劳提醒窗口正在显示，禁止分心窗口弹出
-        if self.fatigue_dialog is not None and not self.fatigue_dialog.isHidden():
+        # 如果疲劳提醒窗口正在倒计时（无论窗口是否可见/最小化），禁止分心窗口弹出
+        if self.fatigue_dialog is not None and self.fatigue_dialog.is_rest_timing():
             return
         
         current_mode = ActivityHistoryManager.get_current_mode()
