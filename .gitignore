@@ -1,0 +1,19 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv
+
+# Database files (Privacy & Local Data)
+*.db
+*.sqlite3
+
+# Logs
+*.log
+
+# IDE settings
+.vscode/
+.idea/
