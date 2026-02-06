@@ -690,6 +690,7 @@ class DailyDashboard(QtWidgets.QWidget):
                 color: #1B5E20;
             }
         """)
+        # Open Web Interface for history
         btn_history.clicked.connect(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl("http://localhost:8080")))
         
         # Screen Time Button

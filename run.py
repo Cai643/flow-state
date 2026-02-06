@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 from app.ui.main import main
 from app.service.API.web_API import run_server
 from app.service.monitor_service import ai_monitor_worker
+from app.ui.widgets.dialogs.model_selection import show_model_selection
 
 def ensure_ollama_running():
     """检查并启动 Ollama 服务"""
@@ -74,6 +75,19 @@ if __name__ == "__main__":
     
     # 0. 自动启动 Ollama 服务
     ollama_process = ensure_ollama_running()
+    
+    # 新增: 模型选择
+    # 必须在 Ollama 启动后调用，以便获取模型列表
+    print("正在启动模型选择窗口...")
+    selected_model = show_model_selection()
+    
+    if not selected_model:
+        print("用户取消了模型选择，程序退出。")
+        sys.exit(0)
+        
+    # 设置环境变量，供子进程 (AI Worker) 使用
+    os.environ['OLLAMA_MODEL'] = selected_model
+    print(f"已选择 AI 模型: {selected_model}")
     
     # 1. 创建进程间通信队列 (用于 AI 进程向 UI 进程发送状态)
     msg_queue = multiprocessing.Queue()

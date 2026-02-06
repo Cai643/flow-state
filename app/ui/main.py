@@ -9,7 +9,10 @@ def main(msg_queue=None):
     except Exception:
         pass
 
-    app = QtWidgets.QApplication(sys.argv)
+    # 检查是否已存在 QApplication 实例（例如在启动器中创建过）
+    app = QtWidgets.QApplication.instance()
+    if not app:
+        app = QtWidgets.QApplication(sys.argv)
     
     # 初始化应用管理器
     flow_manager = FlowStateApp(msg_queue)
