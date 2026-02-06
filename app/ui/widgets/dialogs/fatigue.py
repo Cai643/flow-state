@@ -673,10 +673,6 @@ class FatigueReminderDialog(QDialog):
         except Exception:
             # 作为回退，隐藏窗口但保持计时器运行
             self.hide()
-    
-    def is_rest_timing(self):
-        """检查是否还在休息倒计时中（无论窗口是否可见）"""
-        return self.rest_timer.isActive() and self.remaining_time > 0
 
     def mousePressEvent(self, event):
         """鼠标按下：持续跟踪位置用于拖拽。"""
