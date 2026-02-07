@@ -6,6 +6,45 @@ import multiprocessing
 import time
 import socket
 import subprocess
+import logging
+from logging.handlers import RotatingFileHandler
+
+# Add the current directory to sys.path to make the 'app' package importable
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+
+from app.core.config import DATA_DIR
+
+# --- Logging Setup ---
+def setup_logging():
+    log_file = os.path.join(DATA_DIR, 'app.log')
+    
+    # Configure root logger
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    
+    # File Handler (Rotating)
+    # Max size 5MB, keep 3 backups
+    file_handler = RotatingFileHandler(
+        log_file, maxBytes=5*1024*1024, backupCount=3, encoding='utf-8'
+    )
+    file_formatter = logging.Formatter(
+        '%(asctime)s [%(levelname)s] %(processName)s: %(message)s'
+    )
+    file_handler.setFormatter(file_formatter)
+    logger.addHandler(file_handler)
+    
+    # Console Handler (if not frozen or if needed)
+    console_handler = logging.StreamHandler()
+    console_formatter = logging.Formatter(
+        '[%(levelname)s] %(message)s'
+    )
+    console_handler.setFormatter(console_formatter)
+    logger.addHandler(console_handler)
+    
+    print(f"Logging initialized. Log file: {log_file}")
+
+# Initialize logging immediately
+setup_logging()
 
 def force_exit(signum, frame):
     # 只让主进程打印消息
@@ -18,7 +57,7 @@ signal.signal(signal.SIGINT, force_exit)
 signal.signal(signal.SIGTERM, force_exit)
 
 # Add the current directory to sys.path to make the 'app' package importable
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+# sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 from app.ui.main import main
 from app.service.API.web_API import run_server

@@ -7,6 +7,7 @@ except ImportError:
     from PyQt5 import QtCore, QtWidgets
 
 from app.ui.widgets.float_ball import SuspensionBall
+from app.ui.widgets.exit_option import ExitOptionWidget
 from app.ui.views.popup_view import CardPopup
 from app.ui.widgets.dialogs.fatigue import FatigueReminderDialog
 from app.ui.widgets.dialogs.reminder import EntertainmentReminder
@@ -23,6 +24,7 @@ class FlowStateApp(QtCore.QObject):
         
         # 2. 初始化 UI 组件
         self.ball = SuspensionBall()
+        self.exit_option = ExitOptionWidget()
         self.popup = CardPopup(target_margin=(5, 7), ball_size=self.ball.height())
         self.popup.update_focus_status({"status": "working", "duration": 0, "message": "初始化..."})
         
@@ -50,17 +52,41 @@ class FlowStateApp(QtCore.QObject):
         # 悬浮球交互
         self.ball.entered.connect(self._on_ball_hover)
         self.ball.clicked.connect(self._on_ball_clicked)
+        self.ball.right_clicked.connect(self._on_ball_right_clicked)
         self.ball.positionChanged.connect(lambda pos: self.popup.followBall(self.ball))
 
     def _on_ball_hover(self):
+        if self.exit_option.isVisible():
+            return
         if not self.popup.isVisible():
             self.popup.showFromBall(self.ball)
 
     def _on_ball_clicked(self):
+        if self.exit_option.isVisible():
+            self.exit_option.close()
+            return
+            
         if self.popup.isVisible():
             self.popup.hideToBall(self.ball)
         else:
             self.popup.showFromBall(self.ball)
+
+    def _on_ball_right_clicked(self):
+        # 隐藏常规弹窗
+        if self.popup.isVisible():
+            self.popup.hide()
+            
+        # 显示退出选项
+        # 位置：悬浮球左下角 (Option.Right = Ball.Left - 5, Option.Bottom = Ball.Bottom)
+        ball_geo = self.ball.frameGeometry()
+        opt_w = self.exit_option.width()
+        opt_h = self.exit_option.height()
+        
+        x = ball_geo.left() - opt_w - 5
+        y = ball_geo.bottom() - opt_h
+        
+        self.exit_option.move(x, y)
+        self.exit_option.show()
 
     def _check_queue(self):
         try:

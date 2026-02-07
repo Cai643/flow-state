@@ -20,6 +20,7 @@ class SuspensionBall(QtWidgets.QWidget):
     
     # 信号定义
     clicked = Signal()
+    right_clicked = Signal()
     double_clicked = Signal()
     entered = Signal()
     left = Signal()
@@ -475,6 +476,8 @@ class SuspensionBall(QtWidgets.QWidget):
             self.scale_anim.start()
             
             self.clicked.emit()
+        elif event.button() == QtCore.Qt.RightButton:
+            self.right_clicked.emit()
             
     def mouseReleaseEvent(self, event):
         self._dragging = False

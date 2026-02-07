@@ -118,15 +118,28 @@ def ai_monitor_worker(msg_queue, running_event, ai_busy_flag=None):
                     #     print(f"[AI Worker] AI正忙(Web端占用)，跳过本次实时分析: {window_title}")
                     #     ... (代码已移除以支持并行)
                         
-                    prompt = f"窗口: '{window_title}' | 进程: {process_name} | 持续: {duration:.2f}s"
-                    print(f"[AI Worker] 请求分析: {prompt}")
-                    
                     try:
-                        # 调用 Ollama
-                        json_str = analyze(prompt)
+                        ai_data = None
+                        json_str = ""
                         
-                        # 解析 JSON
-                        ai_data = json.loads(json_str)
+                        # 1. 优先检查空值情况 (如果窗口标题或进程名为空)
+                        if not window_title.strip() or not process_name.strip():
+                             print(f"[AI Worker] 检测到空窗口或进程名，判定为锁屏离开: '{window_title}' | '{process_name}'")
+                             ai_data = {
+                                 "状态": "娱乐", 
+                                 "活动摘要": "锁屏离开"
+                             }
+                        
+                        # 2. 如果不是空值，则调用 AI 分析
+                        if ai_data is None:
+                            prompt = f"窗口: '{window_title}' | 进程: {process_name} | 持续: {duration:.2f}s"
+                            print(f"[AI Worker] 请求分析: {prompt}")
+                            
+                            # 调用 Ollama
+                            json_str = analyze(prompt)
+                            
+                            # 解析 JSON
+                            ai_data = json.loads(json_str)
                         
                         # 提取关键字段
                         # 兼容 AI 可能返回的不同字段名 (容错)

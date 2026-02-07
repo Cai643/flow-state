@@ -1,16 +1,47 @@
 import os
 import multiprocessing
 import time
+import sys
 from flask import Flask, render_template, jsonify, request
 from flask_cors import CORS
 import concurrent.futures
 
+def get_resource_path(relative_path):
+    """ 获取资源绝对路径，兼容打包前后的环境 """
+    if hasattr(sys, '_MEIPASS'):
+        # 打包后，资源被解压到 sys._MEIPASS 目录下
+        return os.path.join(sys._MEIPASS, relative_path)
+    # 打包前，正常使用当前路径
+    return os.path.join(os.path.abspath("."), relative_path)
+
 
 def create_app(ai_busy_flag=None):
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    base_dir = os.path.abspath(os.path.join(current_dir, '../../../app'))
-    template_dir = os.path.join(base_dir, 'web', 'templates')
-    static_dir = os.path.join(base_dir, 'web', 'static')
+    # 使用兼容打包路径的方式定位 templates 和 static 目录
+    # 策略：
+    # 1. 优先查找 EXE 同级目录下的 templates 文件夹 (支持用户自定义/外挂 UI)
+    # 2. 如果没有，则使用打包进 EXE 的内部资源 (sys._MEIPASS)
+    
+    template_dir = None
+    static_dir = None
+    
+    if getattr(sys, 'frozen', False):
+        base_dir = os.path.dirname(sys.executable)
+        external_templates = os.path.join(base_dir, 'templates')
+        external_static = os.path.join(base_dir, 'static')
+        
+        if os.path.exists(external_templates):
+            print(f"【Web】使用外部模版目录: {external_templates}")
+            template_dir = external_templates
+            
+        if os.path.exists(external_static):
+            print(f"【Web】使用外部静态资源目录: {external_static}")
+            static_dir = external_static
+
+    # 如果没有外部资源，使用内部资源
+    if not template_dir:
+        template_dir = get_resource_path(os.path.join('app', 'web', 'templates'))
+    if not static_dir:
+        static_dir = get_resource_path(os.path.join('app', 'web', 'static'))
 
     app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
     CORS(app)

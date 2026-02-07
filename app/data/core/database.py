@@ -1,16 +1,58 @@
 import sqlite3
 import os
+import sys
+import shutil
 from contextlib import contextmanager
+from app.core.config import DATA_DIR, BASE_DIR
 
-# 数据库文件路径
-# 使用绝对路径，确保在不同工作目录下（如 Flask 线程中）也能正确找到数据库
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-DB_DIR = os.path.join(BASE_DIR, 'app', 'data', 'dao', 'storage')
+# 数据库文件路径 (使用统一配置)
+DB_DIR = DATA_DIR
+
 if not os.path.exists(DB_DIR):
-    os.makedirs(DB_DIR)
+    try:
+        os.makedirs(DB_DIR)
+    except OSError:
+        pass # 可能已存在
+
 DB_PATH = os.path.join(DB_DIR, 'focus_app.db')
 PERIOD_STATS_DB_PATH = os.path.join(DB_DIR, 'period_stats.db')
 CORE_EVENTS_DB_PATH = os.path.join(DB_DIR, 'core_events.db')
+
+def check_and_restore_db(db_name, target_path):
+    """
+    检查数据库是否存在，如果不存在且在打包环境中存在模板，则恢复
+    """
+    if getattr(sys, 'frozen', False):
+        if not os.path.exists(target_path):
+            # 尝试从临时目录(_MEIPASS)寻找模板
+            # 假设打包时将数据库放在了 app/data/dao/storage 下
+            # 注意：这取决于 --add-data 的具体配置
+            # 尝试常见路径
+            possible_template_paths = [
+                os.path.join(sys._MEIPASS, 'app', 'data', 'dao', 'storage', db_name),
+                os.path.join(sys._MEIPASS, db_name)
+            ]
+            
+            for template_path in possible_template_paths:
+                if os.path.exists(template_path):
+                    print(f"[Database] Restoring {db_name} from template...")
+                    try:
+                        shutil.copy2(template_path, target_path)
+                        print(f"[Database] Restored {db_name} successfully.")
+                        return
+                    except Exception as e:
+                        print(f"[Database] Failed to restore {db_name}: {e}")
+
+# 在导入模块时执行检查 (或者在 init_db 中执行)
+# 为了确保首次使用即有效，最好在 init_db 或连接前执行
+# 这里我们选择在模块加载时简单定义，在 get_db_connection 或 init_db 前可能需要确保存在
+# 但 init_db 会负责创建表，所以如果只是空库，init_db 足够了。
+# 只有当用户希望保留"预设数据"时才需要 restore。
+# 鉴于用户提到了"当作初始模板"，我们加上这个逻辑。
+
+check_and_restore_db('focus_app.db', DB_PATH)
+check_and_restore_db('period_stats.db', PERIOD_STATS_DB_PATH)
+check_and_restore_db('core_events.db', CORE_EVENTS_DB_PATH)
 
 @contextmanager
 def get_db_connection(db_path=None):
